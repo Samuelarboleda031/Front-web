@@ -713,33 +713,42 @@ export function RolesPageModular() {
                 <div>
                   <Label className="text-gray-lightest">Módulos con Acceso ({selectedRole.modulos?.length || 0})</Label>
                   <div className="mt-2 space-y-2">
-                    {selectedRole.modulos?.map((moduloId: string) => {
-                      const modulo = getModuloInfo(moduloId);
-                      if (!modulo) return null;
+                    {console.log('🔍 Debug - selectedRole:', selectedRole)}
+                    {console.log('🔍 Debug - modulos:', selectedRole.modulos)}
+                    {console.log('🔍 Debug - permisosPorModulo:', selectedRole.permisosPorModulo)}
+                    {selectedRole.modulos && selectedRole.modulos.length > 0 ? (
+                      selectedRole.modulos.map((moduloId: string) => {
+                        const modulo = getModuloInfo(moduloId);
+                        if (!modulo) return null;
 
-                      const IconComponent = modulo.icono;
-                      const permisos = selectedRole.permisosPorModulo?.[moduloId];
-                      
-                      return (
-                        <div key={moduloId} className="flex items-center gap-3 p-3 bg-gray-darker rounded-lg">
-                          <IconComponent className={`w-4 h-4 ${modulo.color}`} />
-                          <div className="flex-1">
-                            <p className="text-white-primary font-medium text-sm">{modulo.nombre}</p>
-                            <p className="text-gray-lightest text-xs">{modulo.descripcion}</p>
-                            {permisos && (
-                              <div className="mt-1 text-xs text-gray-lightest">
-                                <span className="text-orange-primary">
-                                  Permisos: {permisos.puedeVer ? '✓' : '✗'} Ver, 
-                                  {permisos.puedeCrear ? '✓' : '✗'} Crear, 
-                                  {permisos.puedeEditar ? '✓' : '✗'} Editar, 
-                                  {permisos.puedeEliminar ? '✓' : '✗'} Eliminar
-                                </span>
-                              </div>
-                            )}
+                        const IconComponent = modulo.icono;
+                        const permisos = selectedRole.permisosPorModulo?.[moduloId];
+                        
+                        return (
+                          <div key={moduloId} className="flex items-center gap-3 p-3 bg-gray-darker rounded-lg">
+                            <IconComponent className={`w-4 h-4 ${modulo.color}`} />
+                            <div className="flex-1">
+                              <p className="text-white-primary font-medium text-sm">{modulo.nombre}</p>
+                              <p className="text-gray-lightest text-xs">{modulo.descripcion}</p>
+                              {permisos && (
+                                <div className="mt-1 text-xs text-gray-lightest">
+                                  <span className="text-orange-primary">
+                                    Permisos: {permisos.puedeVer ? '✓' : '✗'} Ver, 
+                                    {permisos.puedeCrear ? '✓' : '✗'} Crear, 
+                                    {permisos.puedeEditar ? '✓' : '✗'} Editar, 
+                                    {permisos.puedeEliminar ? '✓' : '✗'} Eliminar
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    ) : (
+                      <div className="p-4 bg-gray-darker rounded-lg text-center">
+                        <p className="text-gray-lightest text-sm">Este rol no tiene módulos asignados</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
