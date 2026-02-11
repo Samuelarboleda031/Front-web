@@ -23,6 +23,15 @@ import { modulosService, Modulo } from "@/services/modulosService";
 
 const API_BASE_URL = 'http://edwisbarber.somee.com/api';
 
+// Función para obtener headers de autenticación
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
+
 // Interfaz extendida para módulos con propiedades adicionales
 interface ModuloExtendido {
   id: string;
