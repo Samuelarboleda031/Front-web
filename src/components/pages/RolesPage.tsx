@@ -656,8 +656,9 @@ export function RolesPageModular() {
                               // Preparar el rol para edición con el formato correcto
                               const rolParaEditar = {
                                 ...rol,
-                                modulos: rol.modulos || [], // Asegurar que modulos sea un array
-                                permisosPorModulo: rol.permisosPorModulo || {} // Asegurar que permisosPorModulo exista
+                                // Extraer IDs de módulos desde rolesModulos
+                                modulos: rol.rolesModulos ? rol.rolesModulos.map((rm: any) => String(rm.moduloId)) : [],
+                                permisosPorModulo: rol.permisosPorModulo || {}
                               };
                               setEditingRole(rolParaEditar);
                               setIsEditDialogOpen(true);
