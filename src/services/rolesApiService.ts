@@ -10,7 +10,7 @@ import { rolesModulosService } from './rolesModulosService';
 
 const API_BASE_URL = 'http://edwisbarber.somee.com/api';
 
-interface AuthHeaders {
+interface AuthHeaders extends Record<string, string> {
   'Content-Type': string;
   'Authorization'?: string;
 }
@@ -23,7 +23,7 @@ const getAuthHeaders = (): AuthHeaders => {
   };
 };
 
-// Tipos para RolesModulos (Permisos Granulares)
+// Tipos para RolesModulos (Permisos Granulares) - Basado en estructura del backend
 export interface PermisoModulo {
   puedeVer: boolean;
   puedeCrear: boolean;
@@ -31,15 +31,38 @@ export interface PermisoModulo {
   puedeEliminar: boolean;
 }
 
-export interface RolesModulos extends PermisoModulo {
+// Estructura de la tabla intermedia RolesModulos
+export interface RolesModulos {
   id: number;
-  roleId: number;
+  rolId: number;
   moduloId: string;
+  puedeVer: boolean;
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
   modulo?: {
     id: string;
     nombre: string;
     descripcion: string;
   };
+}
+
+// Estructura de la entidad Modulo
+export interface Modulo {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  estado: boolean;
+}
+
+// Estructura de la entidad Role
+export interface Role {
+  id: string;
+  nombre: string;
+  descripcion?: string; // Renombrado de observaciones para consistencia
+  estado: boolean; // boolean en backend, no string
+  fechaCreacion: string;
+  usuariosAsignados?: number;
 }
 
 export interface ModuloAcceso {
@@ -53,8 +76,8 @@ export interface ModuloAcceso {
 export interface RoleWithModules {
   id: string;
   nombre: string;
-  observaciones: string;
-  estado: 'active' | 'inactive';
+  descripcion?: string;
+  estado: boolean; // boolean para consistencia con backend
   modulos: string[]; // Array de IDs de módulos
   usuariosAsignados: number;
   fechaCreacion: string;
@@ -64,8 +87,9 @@ export interface RoleWithModules {
 
 export interface CreateRoleData {
   nombre: string;
-  observaciones: string;
+  descripcion?: string;
   modulos: string[];
+  permisos?: Record<string, PermisoModulo>; // Permisos granulares
 }
 
 export interface UpdateRoleData extends CreateRoleData {
@@ -105,7 +129,7 @@ class RolesApiService {
     return {
       id: String(apiRole.id),
       nombre: apiRole.nombre || '',
-      observaciones: apiRole.observaciones || apiRole.descripcion || '',
+      descripcion: apiRole.descripcion?.trim() || '',
       estado: apiRole.estado === true || apiRole.estado === 'active' ? 'active' : 'inactive',
       modulos: moduloIds,
       usuariosAsignados: apiRole.usuariosAsignados || 0,
