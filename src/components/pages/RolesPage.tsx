@@ -21,6 +21,8 @@ import { useCustomAlert } from "../ui/custom-alert";
 import { rolesApiService, RoleWithModules, CreateRoleData, UpdateRoleData, PermisoModulo } from "@/services/rolesApiService";
 import { modulosService, Modulo } from "@/services/modulosService";
 
+const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+
 // Interfaz extendida para módulos con propiedades adicionales
 interface ModuloExtendido {
   id: string;
@@ -313,6 +315,43 @@ export function RolesPageModular() {
     }
   }, [roleToDelete, showSuccess, showError]);
 
+  // Función para cargar los rolesmodulos de un rol específico
+  const loadRolesModulosByRole = useCallback(async (roleId: string) => {
+    try {
+      console.log(`📋 Cargando rolesmodulos para rol ${roleId}...`);
+      const response = await fetch(`${API_BASE_URL}/RolesModulos/role/${roleId}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      const rolesModulosData = await response.json();
+      console.log('📋 Datos crudos de rolesmodulos API:', rolesModulosData);
+      return rolesModulosData;
+    } catch (error) {
+      console.error('Error cargando rolesmodulos:', error);
+      return [];
+    }
+  }, []);
+
+  // Función para manejar el click en "Ver Detalles"
+  const handleViewDetails = useCallback(async (rol: RoleWithModules) => {
+    setSelectedRole(rol);
+    setIsDetailDialogOpen(true);
+    
+    // Cargar rolesmodulos específicos del rol
+    const rolesModulosData = await loadRolesModulosByRole(rol.id);
+    
+    // Actualizar el rol seleccionado con los datos de rolesmodulos
+    setSelectedRole(prev => ({
+      ...prev!,
+      rolesModulos: rolesModulosData
+    }));
+  }, [loadRolesModulosByRole]);
+
   const getModuloInfo = useCallback((moduloId: string) => {
     return modulosProyecto.find(m => m.id === moduloId);
   }, [modulosProyecto]);
@@ -598,10 +637,7 @@ export function RolesPageModular() {
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => {
-                              setSelectedRole(rol);
-                              setIsDetailDialogOpen(true);
-                            }}
+                            onClick={() => handleViewDetails(rol)}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
                             title="Ver Detalle"
                             disabled={isCreating || isEditing || isDeleting}
