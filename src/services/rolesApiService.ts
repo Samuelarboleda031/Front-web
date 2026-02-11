@@ -271,19 +271,19 @@ class RolesApiService {
       const createdRole = await roleResponse.json();
       const roleId = createdRole.id;
 
-      // Asignar módulos con permisos por defecto
-      const permisosDefault: PermisoModulo = {
-        puedeVer: true,
-        puedeCrear: false,
-        puedeEditar: false,
-        puedeEliminar: false
-      };
-
+      // Asignar módulos con los permisos enviados desde el frontend
       for (const moduloId of roleData.modulos) {
+        const permisosDelModulo = roleData.permisos?.[moduloId] || {
+          puedeVer: true,
+          puedeCrear: true,
+          puedeEditar: true,
+          puedeEliminar: true
+        };
+        
         const rolesModulosPayload = {
           rolId: roleId,
           moduloId: moduloId,
-          ...permisosDefault
+          ...permisosDelModulo
         };
 
         await fetch(`${API_BASE_URL}/rolesmodulos`, {

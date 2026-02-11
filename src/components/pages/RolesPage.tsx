@@ -202,10 +202,10 @@ export function RolesPageModular() {
         const newPermisosPorModulo = { ...prev.permisosPorModulo };
         if (!newPermisosPorModulo[moduloId]) {
           newPermisosPorModulo[moduloId] = {
-            puedeVer: false,
-            puedeCrear: false,
-            puedeEditar: false,
-            puedeEliminar: false
+            puedeVer: true,
+            puedeCrear: true,
+            puedeEditar: true,
+            puedeEliminar: true
           };
         }
         
