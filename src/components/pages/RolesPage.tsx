@@ -713,9 +713,12 @@ export function RolesPageModular() {
                 <div>
                   <Label className="text-gray-lightest">Módulos con Acceso ({selectedRole.modulos?.length || 0})</Label>
                   <div className="mt-2 space-y-2">
-                    {console.log('🔍 Debug - selectedRole:', selectedRole)}
-                    {console.log('🔍 Debug - modulos:', selectedRole.modulos)}
-                    {console.log('🔍 Debug - permisosPorModulo:', selectedRole.permisosPorModulo)}
+                    {(() => {
+                      console.log('🔍 Debug - selectedRole:', selectedRole);
+                      console.log('🔍 Debug - modulos:', selectedRole.modulos);
+                      console.log('🔍 Debug - permisosPorModulo:', selectedRole.permisosPorModulo);
+                      return null;
+                    })()}
                     {selectedRole.modulos && selectedRole.modulos.length > 0 ? (
                       selectedRole.modulos.map((moduloId: string) => {
                         const modulo = getModuloInfo(moduloId);

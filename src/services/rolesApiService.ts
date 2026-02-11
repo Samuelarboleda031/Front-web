@@ -144,7 +144,8 @@ class RolesApiService {
    */
   async getRolesWithModules(): Promise<RoleWithModules[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/roles`, {
+      // Cambiar endpoint para incluir rolesmodulos y módulos relacionados
+      const response = await fetch(`${API_BASE_URL}/roles?include=rolesmodulos,modulos`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -154,10 +155,19 @@ class RolesApiService {
       }
 
       const data = await response.json();
+      console.log('📋 Datos recibidos de API:', data);
       
       // Normalizar cada rol
-      return (Array.isArray(data) ? data : data.data || [])
-        .map((role: any) => this.normalizeRole(role));
+      const normalizedRoles = (Array.isArray(data) ? data : data.data || [])
+        .map((role: any) => {
+          console.log('🔍 Rol antes de normalizar:', role);
+          const normalized = this.normalizeRole(role);
+          console.log('✅ Rol normalizado:', normalized);
+          return normalized;
+        });
+      
+      console.log('📊 Roles finales:', normalizedRoles);
+      return normalizedRoles;
     } catch (error) {
       console.error('Error fetching roles:', error);
       throw error;
