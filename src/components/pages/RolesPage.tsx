@@ -18,15 +18,24 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { Label } from "../ui/label";
 import { useCustomAlert } from "../ui/custom-alert";
-import { MODULOS_PROYECTO } from "./roles/modulesConfig";
 import { rolesApiService, RoleWithModules, CreateRoleData, UpdateRoleData, PermisoModulo } from "@/services/rolesApiService";
+import { modulosService, Modulo } from "@/services/modulosService";
 
-// Usar módulos centralizados desde la configuración
-const modulosProyecto = MODULOS_PROYECTO;
+// Interfaz extendida para módulos con propiedades adicionales
+interface ModuloExtendido {
+  id: string;
+  nombre: string;
+  estado: boolean;
+  icono: any;
+  color: string;
+  descripcion: string;
+  rolesModulos?: any[];
+}
 
 export function RolesPageModular() {
   const { success: showSuccess, error: showError, AlertContainer } = useCustomAlert();
   const [roles, setRoles] = useState<RoleWithModules[]>([]);
+  const [modulosProyecto, setModulosProyecto] = useState<ModuloExtendido[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -47,21 +56,40 @@ export function RolesPageModular() {
     modulos: []
   });
 
+  // Adaptar módulos de la API al formato esperado por el componente
+  const adaptarModulos = useCallback((modulos: Modulo[]): ModuloExtendido[] => {
+    return modulos.map(modulo => ({
+      ...modulo,
+      id: modulo.id.toString(), // Convertir id a string
+      icono: Settings, // Icono por defecto
+      color: 'blue', // Color por defecto
+      descripcion: modulo.nombre // Usar nombre como descripción
+    }));
+  }, []);
+
   // Cargar roles desde la API
   const loadRoles = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📋 Iniciando carga de roles...');
-      const rolesData = await rolesApiService.getRolesWithModules();
+      console.log('📋 Iniciando carga de roles y módulos...');
+      
+      // Cargar roles y módulos en paralelo
+      const [rolesData, modulosData] = await Promise.all([
+        rolesApiService.getRolesWithModules(),
+        modulosService.getModulos()
+      ]);
+      
       setRoles(rolesData);
+      setModulosProyecto(adaptarModulos(modulosData));
       console.log('✅ Roles cargados correctamente:', rolesData.length);
+      console.log('✅ Módulos cargados correctamente:', modulosData.length);
     } catch (err) {
-      console.error('❌ Error cargando roles:', err);
-      showError('Error al cargar los roles. Por favor, intente nuevamente.');
+      console.error('❌ Error cargando datos:', err);
+      showError('Error al cargar los datos. Por favor, intente nuevamente.');
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [showError, adaptarModulos]);
 
   // Cargar roles al montar el componente
   useEffect(() => {
@@ -141,7 +169,7 @@ export function RolesPageModular() {
   }, []);
 
   // Función para crear nuevo rol
-  const handleCreateRole = async () => {
+  const handleCreateRole = useCallback (async () => {
     if (!validateRoleData(nuevoRol)) return;
 
     try {
@@ -173,10 +201,10 @@ export function RolesPageModular() {
     } finally {
       setIsCreating(false);
     }
-  }, [nuevoRol, validateRoleData, loadRoles, success, showError]);
+  }, [nuevoRol, validateRoleData, loadRoles, showSuccess, showError]);
 
   // Función para editar rol
-  const handleEditRole = async () => {
+  const handleEditRole = useCallback (async () => {
     if (!editingRole || !validateRoleData(editingRole)) return;
 
     try {
@@ -216,10 +244,10 @@ export function RolesPageModular() {
     } finally {
       setIsEditing(false);
     }
-  }, [editingRole, validateRoleData, loadRoles, success, showError]);
+  }, [editingRole, validateRoleData, loadRoles, showSuccess, showError]);
 
   // Función para eliminar rol
-  const handleDeleteRole = async () => {
+  const handleDeleteRole = useCallback (async () => {
     if (roleToDelete) {
       try {
         setIsDeleting(true);
@@ -237,7 +265,7 @@ export function RolesPageModular() {
         setIsDeleting(false);
       }
     }
-  }, [roleToDelete, success, showError]);
+  }, [roleToDelete, showSuccess, showError]);
 
   const getModuloInfo = useCallback((moduloId: string) => {
     return modulosProyecto.find(m => m.id === moduloId);
