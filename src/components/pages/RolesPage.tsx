@@ -404,7 +404,7 @@ export function RolesPageModular() {
         </div>
       )}
 
-      <div className="p-4 bg-gray-darker rounded-lg space-y-3 max-h-96 overflow-y-auto">
+      <div className="p-4 bg-gray-darker rounded-lg space-y-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
         <div className="grid grid-cols-1 gap-3">
           {modulosProyecto.map((modulo) => {
             const IconComponent = modulo.icono;
@@ -519,7 +519,7 @@ export function RolesPageModular() {
                     Nuevo Rol
                   </button>
                 </DialogTrigger>
-                <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
                   <DialogHeader>
                     <DialogTitle className="text-white-primary">Crear Nuevo Rol</DialogTitle>
                     <DialogDescription className="text-gray-lightest">
@@ -709,7 +709,7 @@ export function RolesPageModular() {
 
         {/* Dialog de Detalles */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="bg-gray-darkest border-gray-dark max-w-2xl">
+          <DialogContent className="bg-gray-darkest border-gray-dark max-w-2xl" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <DialogHeader>
               <DialogTitle className="text-white-primary">Detalles del Rol</DialogTitle>
               <DialogDescription className="text-gray-lightest">
@@ -798,7 +798,7 @@ export function RolesPageModular() {
 
         {/* Dialog de Edición */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <DialogHeader>
               <DialogTitle className="text-white-primary">Editar Rol</DialogTitle>
               <DialogDescription className="text-gray-lightest">
