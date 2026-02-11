@@ -315,7 +315,7 @@ export function RolesPageModular() {
 
   const getModuloInfo = useCallback((moduloId: string) => {
     return modulosProyecto.find(m => m.id === moduloId);
-  }, []);
+  }, [modulosProyecto]);
 
   // Componente para mostrar la selección de módulos con permisos granulares
   const ModuleSelector = useCallback(({ 
