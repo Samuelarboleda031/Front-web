@@ -168,12 +168,28 @@ export function RolesPageModular() {
         };
       });
     } else {
-      setNuevoRol((prev) => ({
-        ...prev,
-        modulos: prev.modulos.includes(moduloId)
+      setNuevoRol((prev) => {
+        const newModulos = prev.modulos.includes(moduloId)
           ? prev.modulos.filter((id: string) => id !== moduloId)
-          : [...prev.modulos, moduloId]
-      }));
+          : [...prev.modulos, moduloId];
+        
+        // Si se selecciona un nuevo módulo, agregar todos los permisos por defecto
+        const newPermisosPorModulo = { ...prev.permisos };
+        if (!prev.modulos.includes(moduloId) && newModulos.includes(moduloId)) {
+          newPermisosPorModulo[moduloId] = {
+            puedeVer: true,
+            puedeCrear: true,
+            puedeEditar: true,
+            puedeEliminar: true
+          };
+        }
+        
+        return {
+          ...prev,
+          modulos: newModulos,
+          permisos: newPermisosPorModulo
+        };
+      });
     }
   }, []);
 
@@ -568,6 +584,8 @@ export function RolesPageModular() {
                       onToggle={toggleModulo}
                       onTogglePermiso={togglePermiso}
                       isEditing={false}
+                      showPermisos={true}
+                      permisos={nuevoRol.permisos}
                     />
                   </div>
 
