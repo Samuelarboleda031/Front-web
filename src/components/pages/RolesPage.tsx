@@ -765,7 +765,7 @@ export function RolesPageModular() {
                     })()}
                     {selectedRole.rolesModulos && selectedRole.rolesModulos.length > 0 ? (
                       selectedRole.rolesModulos.map((rolModulo: any) => {
-                        const modulo = getModuloInfo(rolModulo.moduloId);
+                        const modulo = getModuloInfo(String(rolModulo.moduloId)); // Convertir a string
                         if (!modulo) {
                           console.log('⚠️ Módulo no encontrado para ID:', rolModulo.moduloId);
                           return null;
