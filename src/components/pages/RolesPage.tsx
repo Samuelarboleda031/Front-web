@@ -135,12 +135,29 @@ export function RolesPageModular() {
   // Funciones para manejar la selección de módulos
   const toggleModulo = useCallback((moduloId: string, isEditing: boolean = false) => {
     if (isEditing) {
-      setEditingRole((prev) => ({
-        ...prev!,
-        modulos: prev!.modulos.includes(moduloId)
-          ? prev!.modulos.filter((id: string) => id !== moduloId)
-          : [...prev!.modulos, moduloId]
-      }));
+      setEditingRole((prev) => {
+        if (!prev) return prev;
+        const newModulos = prev.modulos.includes(moduloId)
+          ? prev.modulos.filter((id: string) => id !== moduloId)
+          : [...prev.modulos, moduloId];
+        
+        // Si se selecciona un nuevo módulo, agregar permisos por defecto
+        const newPermisosPorModulo = { ...prev.permisosPorModulo };
+        if (!prev.modulos.includes(moduloId) && newModulos.includes(moduloId)) {
+          newPermisosPorModulo[moduloId] = {
+            puedeVer: true,
+            puedeCrear: false,
+            puedeEditar: false,
+            puedeEliminar: false
+          };
+        }
+        
+        return {
+          ...prev,
+          modulos: newModulos,
+          permisosPorModulo: newPermisosPorModulo
+        };
+      });
     } else {
       setNuevoRol((prev) => ({
         ...prev,
@@ -148,6 +165,35 @@ export function RolesPageModular() {
           ? prev.modulos.filter((id: string) => id !== moduloId)
           : [...prev.modulos, moduloId]
       }));
+    }
+  }, []);
+
+  // Función para manejar cambios en permisos de módulos
+  const togglePermiso = useCallback((moduloId: string, permisoType: keyof PermisoModulo, isEditing: boolean = false) => {
+    if (isEditing) {
+      setEditingRole((prev) => {
+        if (!prev) return prev;
+        
+        const newPermisosPorModulo = { ...prev.permisosPorModulo };
+        if (!newPermisosPorModulo[moduloId]) {
+          newPermisosPorModulo[moduloId] = {
+            puedeVer: false,
+            puedeCrear: false,
+            puedeEditar: false,
+            puedeEliminar: false
+          };
+        }
+        
+        newPermisosPorModulo[moduloId] = {
+          ...newPermisosPorModulo[moduloId],
+          [permisoType]: !newPermisosPorModulo[moduloId][permisoType]
+        };
+        
+        return {
+          ...prev,
+          permisosPorModulo: newPermisosPorModulo
+        };
+      });
     }
   }, []);
 
@@ -275,6 +321,7 @@ export function RolesPageModular() {
   const ModuleSelector = useCallback(({ 
     modulos, 
     onToggle, 
+    onTogglePermiso,
     isEditing = false, 
     showSelectAll = true,
     showPermisos = false,
@@ -282,6 +329,7 @@ export function RolesPageModular() {
   }: { 
     modulos: string[]; 
     onToggle: (id: string, isEdit: boolean) => void; 
+    onTogglePermiso?: (id: string, permisoType: keyof PermisoModulo, isEdit: boolean) => void;
     isEditing?: boolean; 
     showSelectAll?: boolean;
     showPermisos?: boolean;
@@ -356,7 +404,7 @@ export function RolesPageModular() {
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeVer}
-                              onChange={() => {}}
+                              onChange={() => onTogglePermiso && onTogglePermiso(modulo.id, 'puedeVer', isEditing)}
                               className="rounded"
                             />
                             <span>Ver</span>
@@ -365,7 +413,7 @@ export function RolesPageModular() {
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeCrear}
-                              onChange={() => {}}
+                              onChange={() => onTogglePermiso && onTogglePermiso(modulo.id, 'puedeCrear', isEditing)}
                               className="rounded"
                             />
                             <span>Crear</span>
@@ -374,7 +422,7 @@ export function RolesPageModular() {
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeEditar}
-                              onChange={() => {}}
+                              onChange={() => onTogglePermiso && onTogglePermiso(modulo.id, 'puedeEditar', isEditing)}
                               className="rounded"
                             />
                             <span>Editar</span>
@@ -383,7 +431,7 @@ export function RolesPageModular() {
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeEliminar}
-                              onChange={() => {}}
+                              onChange={() => onTogglePermiso && onTogglePermiso(modulo.id, 'puedeEliminar', isEditing)}
                               className="rounded"
                             />
                             <span>Eliminar</span>
@@ -406,7 +454,7 @@ export function RolesPageModular() {
         </div>
       </div>
     </div>
-  ), [selectAllModulos, deselectAllModulos]);
+  ), [selectAllModulos, deselectAllModulos, modulosProyecto]);
 
   return (
     <div className="w-full bg-black-primary text-white-primary h-full overflow-y-auto">
@@ -472,6 +520,7 @@ export function RolesPageModular() {
                     <ModuleSelector
                       modulos={nuevoRol.modulos}
                       onToggle={toggleModulo}
+                      onTogglePermiso={togglePermiso}
                       isEditing={false}
                     />
                   </div>
@@ -725,6 +774,7 @@ export function RolesPageModular() {
                 <ModuleSelector
                   modulos={editingRole.modulos}
                   onToggle={toggleModulo}
+                  onTogglePermiso={togglePermiso}
                   isEditing={true}
                   showPermisos={true}
                   permisos={editingRole.permisosPorModulo || {}}
