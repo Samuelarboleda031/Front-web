@@ -582,10 +582,8 @@ export function RolesPageModular() {
                     <ModuleSelector
                       modulos={nuevoRol.modulos}
                       onToggle={toggleModulo}
-                      onTogglePermiso={togglePermiso}
                       isEditing={false}
-                      showPermisos={true}
-                      permisos={nuevoRol.permisos}
+                      showPermisos={false}
                     />
                   </div>
 
