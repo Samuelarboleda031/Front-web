@@ -283,11 +283,13 @@ export function RolesPageModular() {
     try {
       setIsEditing(true);
       console.log('🔧 Actualizando rol con módulos:', editingRole.modulos);
+      console.log('🔑 Permisos a actualizar:', editingRole.permisosPorModulo);
       
       const updateData: UpdateRoleData = {
         nombre: editingRole.nombre.trim(),
         descripcion: editingRole.descripcion?.trim() || '',
         modulos: editingRole.modulos,
+        permisos: editingRole.permisosPorModulo || {},
         estado: editingRole.estado === true
       };
       
