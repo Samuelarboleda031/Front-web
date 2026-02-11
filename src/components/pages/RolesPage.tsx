@@ -464,7 +464,7 @@ export function RolesPageModular() {
                     {showPermisos && isSelected && moduloPermisos && (
                       <div className="mt-2 p-2 bg-gray-darkest rounded text-xs">
                         <div className="grid grid-cols-2 gap-1">
-                          <label className="flex items-center gap-1 text-gray-lightest">
+                          <label className="flex items-center gap-1 text-gray-lightest" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeVer}
@@ -473,7 +473,7 @@ export function RolesPageModular() {
                             />
                             <span>Ver</span>
                           </label>
-                          <label className="flex items-center gap-1 text-gray-lightest">
+                          <label className="flex items-center gap-1 text-gray-lightest" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeCrear}
@@ -482,7 +482,7 @@ export function RolesPageModular() {
                             />
                             <span>Crear</span>
                           </label>
-                          <label className="flex items-center gap-1 text-gray-lightest">
+                          <label className="flex items-center gap-1 text-gray-lightest" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeEditar}
@@ -491,7 +491,7 @@ export function RolesPageModular() {
                             />
                             <span>Editar</span>
                           </label>
-                          <label className="flex items-center gap-1 text-gray-lightest">
+                          <label className="flex items-center gap-1 text-gray-lightest" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={moduloPermisos.puedeEliminar}
