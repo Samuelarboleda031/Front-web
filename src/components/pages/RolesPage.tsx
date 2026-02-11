@@ -246,11 +246,13 @@ export function RolesPageModular() {
     try {
       setIsCreating(true);
       console.log('➕ Creando nuevo rol con módulos:', nuevoRol.modulos);
+      console.log('🔑 Permisos a enviar:', nuevoRol.permisos);
       
       const newRole = await rolesApiService.createRoleWithModules({
         nombre: nuevoRol.nombre.trim(),
         descripcion: nuevoRol.descripcion?.trim() || '',
-        modulos: nuevoRol.modulos
+        modulos: nuevoRol.modulos,
+        permisos: nuevoRol.permisos || {}
       });
 
       // Validar que el rol creado tenga módulos
