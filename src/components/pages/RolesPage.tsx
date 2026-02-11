@@ -58,17 +58,6 @@ export function RolesPageModular() {
     modulos: []
   });
 
-  // Adaptar módulos de la API al formato esperado por el componente
-  const adaptarModulos = useCallback((modulos: Modulo[]): ModuloExtendido[] => {
-    return modulos.map(modulo => ({
-      ...modulo,
-      id: modulo.id.toString(), // Convertir id a string
-      icono: Settings, // Icono por defecto
-      color: 'blue', // Color por defecto
-      descripcion: modulo.nombre // Usar nombre como descripción
-    }));
-  }, []);
-
   // Cargar roles desde la API
   const loadRoles = useCallback(async () => {
     try {
@@ -81,8 +70,17 @@ export function RolesPageModular() {
         modulosService.getModulos()
       ]);
       
+      // Adaptar módulos inline para evitar dependencias circulares
+      const modulosAdaptados = modulosData.map(modulo => ({
+        ...modulo,
+        id: modulo.id.toString(),
+        icono: Settings,
+        color: 'blue',
+        descripcion: modulo.nombre
+      }));
+      
       setRoles(rolesData);
-      setModulosProyecto(adaptarModulos(modulosData));
+      setModulosProyecto(modulosAdaptados);
       console.log('✅ Roles cargados correctamente:', rolesData.length);
       console.log('✅ Módulos cargados correctamente:', modulosData.length);
     } catch (err) {
@@ -91,12 +89,12 @@ export function RolesPageModular() {
     } finally {
       setLoading(false);
     }
-  }, [showError, adaptarModulos]);
+  }, [showError]); // Eliminar adaptarModulos de las dependencias
 
   // Cargar roles al montar el componente
   useEffect(() => {
     loadRoles();
-  }, [loadRoles]);
+  }, []); // Eliminar dependencia de loadRoles para evitar ciclos infinitos
 
   // Filtrar roles según el término de búsqueda
   const filteredRoles = useMemo(() => {
