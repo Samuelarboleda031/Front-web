@@ -717,32 +717,33 @@ export function RolesPageModular() {
                       console.log('🔍 Debug - selectedRole:', selectedRole);
                       console.log('🔍 Debug - modulos:', selectedRole.modulos);
                       console.log('🔍 Debug - permisosPorModulo:', selectedRole.permisosPorModulo);
+                      console.log('🔍 Debug - rolesModulos:', selectedRole.rolesModulos);
                       return null;
                     })()}
-                    {selectedRole.modulos && selectedRole.modulos.length > 0 ? (
-                      selectedRole.modulos.map((moduloId: string) => {
-                        const modulo = getModuloInfo(moduloId);
-                        if (!modulo) return null;
+                    {selectedRole.rolesModulos && selectedRole.rolesModulos.length > 0 ? (
+                      selectedRole.rolesModulos.map((rolModulo: any) => {
+                        const modulo = getModuloInfo(rolModulo.moduloId);
+                        if (!modulo) {
+                          console.log('⚠️ Módulo no encontrado para ID:', rolModulo.moduloId);
+                          return null;
+                        }
 
                         const IconComponent = modulo.icono;
-                        const permisos = selectedRole.permisosPorModulo?.[moduloId];
                         
                         return (
-                          <div key={moduloId} className="flex items-center gap-3 p-3 bg-gray-darker rounded-lg">
+                          <div key={rolModulo.moduloId} className="flex items-center gap-3 p-3 bg-gray-darker rounded-lg">
                             <IconComponent className={`w-4 h-4 ${modulo.color}`} />
                             <div className="flex-1">
                               <p className="text-white-primary font-medium text-sm">{modulo.nombre}</p>
                               <p className="text-gray-lightest text-xs">{modulo.descripcion}</p>
-                              {permisos && (
-                                <div className="mt-1 text-xs text-gray-lightest">
-                                  <span className="text-orange-primary">
-                                    Permisos: {permisos.puedeVer ? '✓' : '✗'} Ver, 
-                                    {permisos.puedeCrear ? '✓' : '✗'} Crear, 
-                                    {permisos.puedeEditar ? '✓' : '✗'} Editar, 
-                                    {permisos.puedeEliminar ? '✓' : '✗'} Eliminar
-                                  </span>
-                                </div>
-                              )}
+                              <div className="mt-1 text-xs text-gray-lightest">
+                                <span className="text-orange-primary">
+                                  Permisos: {rolModulo.puedeVer ? '✓' : '✗'} Ver, 
+                                  {rolModulo.puedeCrear ? '✓' : '✗'} Crear, 
+                                  {rolModulo.puedeEditar ? '✓' : '✗'} Editar, 
+                                  {rolModulo.puedeEliminar ? '✓' : '✗'} Eliminar
+                                </span>
+                              </div>
                             </div>
                           </div>
                         );
