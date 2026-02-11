@@ -25,7 +25,7 @@ import { rolesApiService, RoleWithModules, CreateRoleData, UpdateRoleData, Permi
 const modulosProyecto = MODULOS_PROYECTO;
 
 export function RolesPageModular() {
-  const { success, error: showError, AlertContainer } = useCustomAlert();
+  const { success: showSuccess, error: showError, AlertContainer } = useCustomAlert();
   const [roles, setRoles] = useState<RoleWithModules[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -165,7 +165,7 @@ export function RolesPageModular() {
 
       setNuevoRol({ nombre: '', descripcion: '', modulos: [] });
       setIsDialogOpen(false);
-      success(`Rol "${newRole.nombre}" creado exitosamente con ${newRole.modulos.length} módulo(s)`);
+      showSuccess(`Rol "${newRole.nombre}" creado exitosamente con ${newRole.modulos.length} módulo(s)`);
       console.log('✅ Rol creado:', newRole);
     } catch (err) {
       console.error('❌ Error creando rol:', err);
@@ -208,7 +208,7 @@ export function RolesPageModular() {
       
       setIsEditDialogOpen(false);
       setEditingRole(null);
-      success(`Rol "${updatedRole.nombre}" actualizado exitosamente`);
+      showSuccess(`Rol "${updatedRole.nombre}" actualizado exitosamente`);
       console.log('✅ Rol actualizado:', updatedRole);
     } catch (err) {
       console.error('❌ Error actualizando rol:', err);
@@ -226,10 +226,10 @@ export function RolesPageModular() {
         console.log('🗑️ Eliminando rol...');
         await rolesApiService.deleteRole(parseInt(roleToDelete.id));
         setRoles(prev => prev.filter(rol => rol.id !== roleToDelete.id));
-        success(`Rol "${roleToDelete.nombre}" eliminado exitosamente`);
+        showSuccess(`Rol "${roleToDelete.nombre}" eliminado exitosamente`);
         setIsDeleteDialogOpen(false);
         setRoleToDelete(null);
-        console.log('✅ Rol eliminado correctamente');
+        console.log('✅ Rol eliminado correctamente.');
       } catch (err) {
         console.error('❌ Error eliminando rol:', err);
         showError('Error al eliminar el rol. Por favor, intente nuevamente.');
