@@ -144,25 +144,67 @@ class RolesApiService {
    */
   async getRolesWithModules(): Promise<RoleWithModules[]> {
     try {
-      // Cambiar endpoint para incluir rolesmodulos y módulos relacionados
-      const response = await fetch(`${API_BASE_URL}/roles?include=rolesmodulos,modulos`, {
+      // Primero intentar con include
+      let response = await fetch(`${API_BASE_URL}/roles?include=rolesmodulos,modulos`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
+      let data: any;
+      
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        // Si falla, intentar endpoint simple
+        response = await fetch(`${API_BASE_URL}/roles`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+        
+        data = await response.json();
+        console.log('📋 Datos recibidos de API (endpoint simple):', data);
+        
+        // Si no incluye rolesmodulos, hacer llamada separada
+        console.log('🔍 Haciendo llamada separada para rolesmodulos...');
+        const rolesModulosResponse = await fetch(`${API_BASE_URL}/rolesmodulos`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+        
+        if (rolesModulosResponse.ok) {
+          const rolesModulosData = await rolesModulosResponse.json();
+          console.log('📋 Datos de rolesmodulos:', rolesModulosData);
+          
+          // Combinar roles con rolesmodulos
+          if (Array.isArray(data)) {
+            data = data.map((role: any) => {
+              const roleModulos = Array.isArray(rolesModulosData) 
+                ? rolesModulosData.filter((rm: any) => rm.rolId === role.id)
+                : [];
+              return {
+                ...role,
+                rolesModulos: roleModulos
+              };
+            });
+          }
+        }
+      } else {
+        data = await response.json();
+        console.log('📋 Datos recibidos de API (con include):', data);
       }
-
-      const data = await response.json();
-      console.log('📋 Datos recibidos de API:', data);
       
       // Normalizar cada rol
       const normalizedRoles = (Array.isArray(data) ? data : data.data || [])
         .map((role: any) => {
           console.log('🔍 Rol antes de normalizar:', role);
+          console.log('📋 rolesModulos del rol:', role.rolesModulos);
+          console.log('📋 modulos del rol:', role.modulos);
           const normalized = this.normalizeRole(role);
           console.log('✅ Rol normalizado:', normalized);
+          console.log('📊 modulos después de normalizar:', normalized.modulos);
+          console.log('🔑 permisosPorModulo después de normalizar:', normalized.permisosPorModulo);
           return normalized;
         });
       
