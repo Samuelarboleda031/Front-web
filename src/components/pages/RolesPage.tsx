@@ -610,7 +610,13 @@ export function RolesPageModular() {
                           </button>
                           <button
                             onClick={() => {
-                              setEditingRole({ ...rol });
+                              // Preparar el rol para edición con el formato correcto
+                              const rolParaEditar = {
+                                ...rol,
+                                modulos: rol.modulos || [], // Asegurar que modulos sea un array
+                                permisosPorModulo: rol.permisosPorModulo || {} // Asegurar que permisosPorModulo exista
+                              };
+                              setEditingRole(rolParaEditar);
                               setIsEditDialogOpen(true);
                             }}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"

@@ -130,8 +130,8 @@ class RolesApiService {
       id: String(apiRole.id),
       nombre: apiRole.nombre || '',
       descripcion: apiRole.descripcion?.trim() || '',
-      estado: apiRole.estado === true || apiRole.estado === 'active' ? 'active' : 'inactive',
-      modulos: moduloIds,
+      estado: apiRole.estado === true || apiRole.estado === 'active', // Convertir a boolean
+      modulos: moduloIds.map(id => String(id)), // Asegurar que todos los IDs sean strings
       usuariosAsignados: apiRole.usuariosAsignados || 0,
       fechaCreacion: apiRole.fechaCreacion || new Date().toISOString(),
       rolesModulos: apiRole.rolesModulos,
