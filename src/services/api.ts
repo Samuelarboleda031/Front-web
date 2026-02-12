@@ -1,4 +1,4 @@
-const API_BASE_URL = '/api';
+const API_BASE_URL = 'http://edwisbarber.somee.com/api';
 
 export interface ApiUser {
   id: number;
@@ -186,6 +186,38 @@ class ApiService {
     }
   }
 
+  // Método especializado para actualizar solo el estado del usuario
+  async updateUsuarioStatus(id: number, estado: boolean, userData?: Partial<ApiUser>): Promise<void> {
+    try {
+      let currentUser: Partial<ApiUser> | null | undefined = userData;
+
+      // Si no se proporcionan datos del usuario, intentar obtenerlos de la API
+      if (!currentUser) {
+        currentUser = await this.getUsuarioById(id);
+        if (!currentUser) {
+          throw new Error('Usuario no encontrado');
+        }
+      }
+
+      // Enviar todos los campos requeridos con el estado actualizado
+      const apiBody = this.mapToApiFormat({
+        ...currentUser,
+        estado: estado
+      });
+      apiBody.Id = id;
+
+      await this.request(`/usuarios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(apiBody),
+      });
+
+      console.log(`✅ Estado del usuario ${id} actualizado a ${estado}`);
+    } catch (error) {
+      console.error('Error updating usuario status:', error);
+      throw error;
+    }
+  }
+
   async deleteUsuario(id: number): Promise<void> {
     try {
       console.log(`🗑️ Intentando eliminar usuario con ID: ${id}`);
@@ -213,6 +245,10 @@ class ApiService {
 
   async authenticateUser(correo: string, contrasena: string): Promise<ApiUser | null> {
     try {
+      // Este método ahora solo debe usarse para sincronización con Firebase
+      // La autenticación principal debe manejarse a través de Firebase Auth
+      console.warn('⚠️ authenticateUser está deprecado. Usa Firebase Auth para autenticación.');
+      
       const usuarios = await this.getUsuarios();
       const user = usuarios.find(u => u.correo === correo);
       
@@ -221,24 +257,16 @@ class ApiService {
         return null;
       }
 
-      // Para demostración, permitir contraseñas comunes
-      const validPasswords = ['admin123', 'cliente123', 'cajero123', 'super123', 'invitado123'];
-      if (validPasswords.includes(contrasena)) {
-        console.log('Autenticación exitosa (demo):', user.correo);
-        return user;
+      // Solo permitir autenticación local para usuarios sincronizados con Firebase
+      if (user.contrasena === 'firebase_auth') {
+        console.log('Usuario sincronizado con Firebase. Usa Firebase Auth para autenticación.');
+        return null;
       }
 
-      // Comparación normal de contraseñas
+      // Comparación normal de contraseñas para usuarios legacy
       if (user.contrasena === contrasena) {
-        console.log('Autenticación exitosa:', user.correo);
+        console.log('Autenticación local exitosa (legacy):', user.correo);
         return user;
-      }
-
-      // Si la contraseña está hasheada, permitir contraseñas comunes para demostración
-      if (user.contrasena.startsWith('hash')) {
-        if (validPasswords.includes(contrasena)) {
-          return user;
-        }
       }
 
       console.log('Contraseña incorrecta para:', correo);

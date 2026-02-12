@@ -14,13 +14,13 @@ import {
 
 // Configuración de Firebase - Proyecto: appbarber-845d7
 const firebaseConfig = {
-  apiKey: "AIzaSyCa6o15lvjvVMMY82cBd1kTV-AOQLh1qWU",
-  authDomain: "appbarber-845d7.firebaseapp.com",
-  projectId: "appbarber-845d7",
-  storageBucket: "appbarber-845d7.firebasestorage.app",
-  messagingSenderId: "309607252500",
-  appId: "1:309607252500:web:e78174aaa828a28c3fdd01",
-  measurementId: "G-6RC0F5GYGC"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCa6o15lvjvVMMY82cBd1kTV-AOQLh1qWU",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "appbarber-845d7.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "appbarber-845d7",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "appbarber-845d7.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "309607252500",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:309607252500:web:e78174aaa828a28c3fdd01",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-6RC0F5GYGC"
 };
 
 // Inicializar Firebase
@@ -61,10 +61,15 @@ export class FirebaseAuthService {
     try {
       const result = await signInWithEmailAndPassword(this.auth, email, password);
       
-      // Enviar verificación de email si no está verificado
+      // Temporalmente desactivada la verificación de email para pruebas
+      // TODO: Reactivar cuando el sistema esté en producción
+      /*
       if (!result.user.emailVerified) {
+        console.warn('⚠️ Email no verificado. Se ha enviado un email de verificación.');
         await this.sendEmailVerification();
+        throw new Error('Por favor, verifica tu email antes de iniciar sesión. Hemos enviado un email de verificación a ' + email);
       }
+      */
       
       return result;
     } catch (error: any) {

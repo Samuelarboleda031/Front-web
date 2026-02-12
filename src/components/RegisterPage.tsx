@@ -19,8 +19,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
     email: '',
     password: '',
     confirmPassword: '',
-    telefono: '',
-    role: 'cliente' as 'admin' | 'cliente'
+    telefono: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -93,7 +92,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         telefono: formData.telefono.trim() || undefined,
-        role: formData.role
+        role: 'cliente' // Rol asignado automáticamente
       });
 
       if (result.success) {
@@ -171,33 +170,12 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
               </div>
             )}
 
-            {/* Selector de rol */}
-            <div className="space-y-2">
-              <Label className="text-white-primary">Tipo de Usuario</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, role: 'cliente' })}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    formData.role === 'cliente'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Cliente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, role: 'admin' })}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    formData.role === 'admin'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Admin
-                </button>
-              </div>
+            {/* Información de rol automático */}
+            <div className="p-3 bg-blue-600/10 border border-blue-600/30 rounded-lg">
+              <p className="text-blue-400 text-sm text-center">
+                🎯 Te registrarás automáticamente como <strong>Cliente</strong>. 
+                Si necesitas acceso de administrador, contacta al soporte.
+              </p>
             </div>
 
             <div className="space-y-2">

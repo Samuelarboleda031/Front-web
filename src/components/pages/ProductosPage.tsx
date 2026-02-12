@@ -1,131 +1,24 @@
-﻿import React, { useState, useRef } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Package, Plus, Edit, Trash2, Search, Filter, DollarSign, AlertTriangle, Watch, Eye, Sparkles, Upload, X, Image as ImageIcon, ChevronLeft, ChevronRight, Power, Percent, Calculator, ToggleRight, ToggleLeft, Tags, Boxes, FileText, Camera } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Search, Filter, DollarSign, AlertTriangle, Watch, Eye, Sparkles, Upload, X, Image as ImageIcon, ChevronLeft, ChevronRight, Power, Percent, Calculator, ToggleRight, ToggleLeft, Tags, Boxes, FileText, Camera, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Switch } from "../ui/switch";
 import { useCustomAlert } from "../ui/custom-alert";
+import { productoService, ApiProducto } from "../../services/productos";
 
-// Función para formatear moneda
 const formatCurrency = (amount: number): string => {
   return amount.toLocaleString('es-CO');
 };
 
-const productosData = [
-  {
-    id: 1,
-    nombre: "Pomada Hair Wax",
-    descripcion: "Pomada premium para fijación fuerte",
-    categoria: "Cuidado Capilar",
-    precioBase: 37815,
-    iva: 7185,
-    porcentajeIva: 19,
-    precio: 45000,
-    stockVentas: 45,
-    stockInsumos: 0,
-    cantidad: 45,
-    minCantidad: 10,
-    marca: "Hair Products Co.",
-    imagen: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=200&h=200&fit=crop&crop=center",
-    activo: true
-  },
-  {
-    id: 2,
-    nombre: "Shampoo Premium",
-    descripcion: "Shampoo profesional para todo tipo de cabello",
-    categoria: "Cuidado Capilar",
-    precioBase: 46218,
-    iva: 8782,
-    porcentajeIva: 19,
-    precio: 55000,
-    stockVentas: 3,
-    stockInsumos: 0,
-    cantidad: 3,
-    minCantidad: 10,
-    marca: "Beauty Supply Inc.",
-    imagen: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=200&h=200&fit=crop&crop=center",
-    activo: true
-  },
-  {
-    id: 3,
-    nombre: "Aceite de Barba",
-    descripcion: "Aceite nutritivo para barba y bigote",
-    categoria: "Cuidado Barba",
-    precioBase: 40336,
-    iva: 7664,
-    porcentajeIva: 19,
-    precio: 48000,
-    stockVentas: 28,
-    stockInsumos: 0,
-    cantidad: 28,
-    minCantidad: 15,
-    marca: "Beard Masters",
-    imagen: "https://images.unsplash.com/photo-1593085512500-5d55148d6f0d?w=200&h=200&fit=crop&crop=center",
-    activo: true
-  },
-  {
-    id: 4,
-    nombre: "Cera Modeladora",
-    descripcion: "Cera texturizante para peinados modernos",
-    categoria: "Cuidado Capilar",
-    precioBase: 54622,
-    iva: 10378,
-    porcentajeIva: 19,
-    precio: 65000,
-    stockVentas: 8,
-    stockInsumos: 0,
-    cantidad: 8,
-    minCantidad: 20,
-    marca: "Style Pro",
-    imagen: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=200&h=200&fit=crop&crop=center",
-    activo: false
-  },
-  {
-    id: 5,
-    nombre: "Cuchillas de Afeitar",
-    descripcion: "Cuchillas profesionales de acero inoxidable",
-    categoria: "Herramientas",
-    precioBase: 21008,
-    iva: 3992,
-    porcentajeIva: 19,
-    precio: 25000,
-    stockVentas: 8,
-    stockInsumos: 0,
-    cantidad: 8,
-    minCantidad: 20,
-    marca: "Blade Co.",
-    imagen: "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=200&h=200&fit=crop&crop=center",
-    activo: true
-  },
-  {
-    id: 6,
-    nombre: "Cadena de Rodio Plateada",
-    descripcion: "Cadena elegante de rodio con acabado brillante, resistente al agua",
-    categoria: "Accesorios",
-    precioBase: 151261,
-    iva: 28739,
-    porcentajeIva: 19,
-    precio: 180000,
-    stockVentas: 15,
-    stockInsumos: 0,
-    cantidad: 15,
-    minCantidad: 8,
-    marca: "Jewelry Elite",
-    imagen: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=200&h=200&fit=crop&crop=center",
-    activo: true
-  }
-];
-
-const categorias = [
-  "Cuidado Capilar", "Cuidado Barba", "Herramientas", "Suministros", "Accesorios"
-];
-
 export function ProductosPage() {
-  const { success, error, created, edited, deleted, AlertContainer } = useCustomAlert();
-  const [productos, setProductos] = useState(productosData);
+  const { error, created, edited, deleted, AlertContainer } = useCustomAlert();
+  const [productos, setProductos] = useState<ApiProducto[]>([]);
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -153,6 +46,29 @@ export function ProductosPage() {
   });
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Load products and categories from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [productosData, categoriasData] = await Promise.all([
+          productoService.getProductos(),
+          productoService.getCategorias()
+        ]);
+        setProductos(productosData);
+        setCategorias(categoriasData);
+      } catch (error: any) {
+        console.error('Error loading data:', error);
+        error('Error de carga', 'No se pudieron cargar los productos y categorías desde el servidor.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const filteredProductos = productos.filter(producto => {
     const matchesSearch = producto.nombre.toLowerCase().includes(searchTerm.toLowerCase());
@@ -249,42 +165,53 @@ export function ProductosPage() {
     setIsCreateDialogOpen(true);
   };
 
-  const confirmCreateProducto = () => {
-    const precioFinal = nuevoProducto.precioBase;
+  const confirmCreateProducto = async () => {
+    try {
+      const precioFinal = nuevoProducto.precioBase;
 
-    const stockVentas = nuevoProducto.stockVentas || 0;
-    const stockInsumos = nuevoProducto.stockInsumos || 0;
-    const stockTotal = stockVentas + stockInsumos;
+      const stockVentas = nuevoProducto.stockVentas || 0;
+      const stockInsumos = nuevoProducto.stockInsumos || 0;
 
-    const producto = {
-      id: Date.now(),
-      ...nuevoProducto,
-      iva: 0,
-      porcentajeIva: 0,
-      precio: precioFinal,
-      stockVentas,
-      stockInsumos,
-      cantidad: stockTotal
-    };
+      const productoData = {
+        nombre: nuevoProducto.nombre,
+        descripcion: nuevoProducto.descripcion,
+        categoria: nuevoProducto.categoria,
+        precioBase: nuevoProducto.precioBase,
+        stockVentas,
+        stockInsumos,
+        minCantidad: nuevoProducto.minCantidad,
+        marca: nuevoProducto.marca,
+        imagen: nuevoProducto.imagen,
+        activo: true
+      };
 
-    setProductos([...productos, producto]);
-    setNuevoProducto({
-      nombre: '',
-      descripcion: '',
-      categoria: '',
-      precioBase: 0,
-      stockVentas: 0,
-      stockInsumos: 0,
-      minCantidad: 10,
-      marca: '',
-      imagen: '',
-      activo: true
-    });
-    setImagenPreview(null);
-    setIsDialogOpen(false);
-    setIsCreateDialogOpen(false);
+      const productoCreado = await productoService.createProducto(productoData);
+      
+      // Refresh products list
+      const productosActualizados = await productoService.getProductos();
+      setProductos(productosActualizados);
 
-    created("Producto creado ✔️", `El producto "${producto.nombre}" ha sido agregado exitosamente al inventario con un precio de ${formatCurrency(precioFinal)}.`);
+      setNuevoProducto({
+        nombre: '',
+        descripcion: '',
+        categoria: '',
+        precioBase: 0,
+        stockVentas: 0,
+        stockInsumos: 0,
+        minCantidad: 10,
+        marca: '',
+        imagen: '',
+        activo: true
+      });
+      setImagenPreview(null);
+      setIsDialogOpen(false);
+      setIsCreateDialogOpen(false);
+
+      created("Producto creado ✔️", `El producto "${productoCreado.nombre}" ha sido agregado exitosamente al inventario con un precio de ${formatCurrency(precioFinal)}.`);
+    } catch (error: any) {
+      console.error('Error creating product:', error);
+      error('Error al crear producto', error.message || 'No se pudo crear el producto. Inténtalo nuevamente.');
+    }
   };
 
   const handleEditProducto = (producto: any) => {
@@ -313,48 +240,56 @@ export function ProductosPage() {
     setIsEditDialogOpen(true);
   };
 
-  const confirmUpdateProducto = () => {
+  const confirmUpdateProducto = async () => {
     if (!editingProducto) return;
 
-    const precioFinal = nuevoProducto.precioBase;
+    try {
+      const precioFinal = nuevoProducto.precioBase;
 
-    const stockVentas = nuevoProducto.stockVentas || 0;
-    const stockInsumos = nuevoProducto.stockInsumos || 0;
-    const stockTotal = stockVentas + stockInsumos;
+      const stockVentas = nuevoProducto.stockVentas || 0;
+      const stockInsumos = nuevoProducto.stockInsumos || 0;
 
-    const productoActualizado = {
-      ...editingProducto,
-      ...nuevoProducto,
-      iva: 0,
-      porcentajeIva: 0,
-      precio: precioFinal,
-      stockVentas,
-      stockInsumos,
-      cantidad: stockTotal
-    };
+      const productoData = {
+        nombre: nuevoProducto.nombre,
+        descripcion: nuevoProducto.descripcion,
+        categoria: nuevoProducto.categoria,
+        precioBase: nuevoProducto.precioBase,
+        stockVentas,
+        stockInsumos,
+        minCantidad: nuevoProducto.minCantidad,
+        marca: nuevoProducto.marca,
+        imagen: nuevoProducto.imagen,
+        activo: nuevoProducto.activo
+      };
 
-    setProductos(productos.map(p =>
-      p.id === editingProducto.id ? productoActualizado : p
-    ));
+      const productoActualizado = await productoService.updateProducto(editingProducto.id, productoData);
+      
+      // Refresh products list
+      const productosActualizados = await productoService.getProductos();
+      setProductos(productosActualizados);
 
-    setEditingProducto(null);
-    setNuevoProducto({
-      nombre: '',
-      descripcion: '',
-      categoria: '',
-      precioBase: 0,
-      stockVentas: 0,
-      stockInsumos: 0,
-      minCantidad: 10,
-      marca: '',
-      imagen: '',
-      activo: true
-    });
-    setImagenPreview(null);
-    setIsDialogOpen(false);
-    setIsEditDialogOpen(false);
+      setEditingProducto(null);
+      setNuevoProducto({
+        nombre: '',
+        descripcion: '',
+        categoria: '',
+        precioBase: 0,
+        stockVentas: 0,
+        stockInsumos: 0,
+        minCantidad: 10,
+        marca: '',
+        imagen: '',
+        activo: true
+      });
+      setImagenPreview(null);
+      setIsDialogOpen(false);
+      setIsEditDialogOpen(false);
 
-    edited("Producto editado ✔️", `El producto "${productoActualizado.nombre}" ha sido actualizado exitosamente. El nuevo precio es ${formatCurrency(precioFinal)}.`);
+      edited("Producto editado ✔️", `El producto "${productoActualizado.nombre}" ha sido actualizado exitosamente. El nuevo precio es ${formatCurrency(precioFinal)}.`);
+    } catch (error: any) {
+      console.error('Error updating product:', error);
+      error('Error al actualizar producto', error.message || 'No se pudo actualizar el producto. Inténtalo nuevamente.');
+    }
   };
 
   const handleDeleteProducto = (productoId: number) => {
@@ -365,24 +300,38 @@ export function ProductosPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteProducto = () => {
-    if (productoToDelete) {
-      setProductos(productos.filter(producto => producto.id !== productoToDelete.id));
+  const confirmDeleteProducto = async () => {
+    if (!productoToDelete) return;
+
+    try {
+      await productoService.deleteProducto(productoToDelete.id);
+      
+      // Refresh products list
+      const productosActualizados = await productoService.getProductos();
+      setProductos(productosActualizados);
+
       setIsDeleteDialogOpen(false);
       setProductoToDelete(null);
       deleted("Producto eliminado ✔️", `El producto "${productoToDelete.nombre}" ha sido eliminado exitosamente del inventario.`);
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
+      error('Error al eliminar producto', error.message || 'No se pudo eliminar el producto. Inténtalo nuevamente.');
     }
   };
 
-  const toggleProductoActivo = (productoId: number) => {
-    const producto = productos.find(p => p.id === productoId);
-    if (!producto) return;
+  const toggleProductoActivo = async (productoId: number) => {
+    try {
+      const productoActualizado = await productoService.toggleProductoActivo(productoId);
+      
+      // Refresh products list
+      const productosActualizados = await productoService.getProductos();
+      setProductos(productosActualizados);
 
-    setProductos(productos.map(p =>
-      p.id === productoId ? { ...p, activo: !p.activo } : p
-    ));
-
-    edited(`Producto ${!producto.activo ? 'activado' : 'desactivado'} ✔️`, `El producto "${producto.nombre}" ha sido ${!producto.activo ? 'activado' : 'desactivado'} exitosamente.`);
+      edited(`Producto ${!productoActualizado.activo ? 'activado' : 'desactivado'} ✔️`, `El producto "${productoActualizado.nombre}" ha sido ${!productoActualizado.activo ? 'activado' : 'desactivado'} exitosamente.`);
+    } catch (error: any) {
+      console.error('Error toggling product active status:', error);
+      error('Error al cambiar estado', error.message || 'No se pudo cambiar el estado del producto. Inténtalo nuevamente.');
+    }
   };
 
   const getCantidadStatus = (cantidad: number, minCantidad: number) => {
@@ -396,17 +345,79 @@ export function ProductosPage() {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Response del endpoint de upload de imágenes
+interface UploadResponse {
+  url: string;     // URL relativa del archivo guardado
+  message: string; // Mensaje de confirmación
+}
+
+// Función para subir imágenes al servidor usando el endpoint /api/upload
+// Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
+// Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch('http://edwisbarber.somee.com/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error al subir imagen: ${response.statusText}`);
+    }
+
+    const result: UploadResponse = await response.json();
+    return result.url;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setNuevoProducto({ ...nuevoProducto, imagen: result });
-      setImagenPreview(result);
-    };
-    reader.readAsDataURL(file);
+    // Validar tipo de archivo
+    if (!file.type.startsWith('image/')) {
+      error('Error de formato', 'Por favor selecciona un archivo de imagen válido (jpg, jpeg, png, gif, webp).');
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      error('Archivo demasiado grande', 'La imagen no debe superar los 5MB.');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      
+      // Mostrar preview mientras se sube
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setNuevoProducto({ ...nuevoProducto, imagen: result });
+        setImagenPreview(result);
+      };
+      reader.readAsDataURL(file);
+
+      // Subir al servidor
+      const imageUrl = await uploadImage(file);
+      setNuevoProducto({ ...nuevoProducto, imagen: imageUrl });
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      error('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
+      // Limpiar preview si falló
+      setImagenPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const removeImage = () => {
@@ -429,6 +440,14 @@ export function ProductosPage() {
 
   return (
     <>
+      {loading ? (
+        <main className="flex-1 overflow-auto p-8 bg-black-primary flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-primary mx-auto mb-4"></div>
+            <p className="text-white-primary text-lg">Cargando productos...</p>
+          </div>
+        </main>
+      ) : (
       <main className="flex-1 overflow-auto p-8 bg-black-primary">
         {/* Sección Principal */}
         <div className="elegante-card">
@@ -472,6 +491,62 @@ export function ProductosPage() {
                   </DialogHeader>
                   <div className="space-y-6 pt-4">
                     {/* Datos Básicos */}
+                     <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-orange-primary" />
+                          Imagen del Producto
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          {uploadingImage ? (
+                            <div className="w-16 h-16 rounded bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                              <Loader2 className="w-6 h-6 text-orange-primary animate-spin" />
+                            </div>
+                          ) : imagenPreview ? (
+                            <div className="relative">
+                              <img
+                                src={imagenPreview}
+                                alt="Vista previa"
+                                className="w-16 h-16 rounded object-cover border-2 border-orange-primary"
+                              />
+                              <button
+                                onClick={removeImage}
+                                className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
+                                type="button"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                              <ImageIcon className="w-6 h-6 text-gray-lightest" />
+                            </div>
+                          )}
+                          <button
+                            onClick={triggerFileSelect}
+                            disabled={uploadingImage}
+                            className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            type="button"
+                          >
+                            {uploadingImage ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="w-3 h-3" />
+                                {imagenPreview ? 'Cambiar' : 'Subir'}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
@@ -516,50 +591,9 @@ export function ProductosPage() {
                           className="elegante-input"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <ImageIcon className="w-4 h-4 text-orange-primary" />
-                          Imagen del Producto
-                        </Label>
-                        <div className="flex items-center gap-3">
-                          {imagenPreview ? (
-                            <div className="relative">
-                              <img
-                                src={imagenPreview}
-                                alt="Vista previa"
-                                className="w-16 h-16 rounded object-cover border-2 border-orange-primary"
-                              />
-                              <button
-                                onClick={removeImage}
-                                className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
-                                type="button"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="w-16 h-16 rounded bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                              <ImageIcon className="w-6 h-6 text-gray-lightest" />
-                            </div>
-                          )}
-                          <button
-                            onClick={triggerFileSelect}
-                            className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center"
-                            type="button"
-                          >
-                            <Camera className="w-3 h-3" />
-                            {imagenPreview ? 'Cambiar' : 'Subir'}
-                          </button>
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                      </div>
+                     
                     </div>
+                  </div>
 
                     {/* Configuración de Precios */}
                     <div className="space-y-2">
@@ -1131,6 +1165,7 @@ export function ProductosPage() {
 
         <AlertContainer />
       </main>
+      )}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { ThemeProvider } from "./components/ThemeContext";
 import { Dashboard } from "./components/Dashboard";
 import { ClienteDashboard } from "./components/ClienteDashboard";
 import { LandingPage } from "./components/LandingPage";
-import { LoginPageSimplified } from "./components/LoginPageSimplified";
+import { LoginPage } from "./components/LoginPage";
 import { RegisterPage } from "./components/RegisterPage";
 
 function AppContent() {
@@ -21,7 +21,7 @@ function AppContent() {
   if (!isAuthenticated) {
     if (publicView === "login") {
       return (
-        <LoginPageSimplified
+        <LoginPage
           onRequestRegister={() => setPublicView("register")}
           onBackToLanding={() => setPublicView("landing")}
         />

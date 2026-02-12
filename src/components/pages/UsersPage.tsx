@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -12,92 +12,111 @@ import {
   Scissors, Star, TrendingUp, TrendingDown, Target,
   Award, Crown, Medal, Activity, Filter, MapPin,
   CreditCard, Home, Camera, Upload, ToggleRight, ToggleLeft,
-  X
+  X, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
+import { apiService, ApiUser } from "../../services/api";
 
-const usersData = [
-  {
-    id: 1,
-    nombres: "Carlos Eduardo",
-    apellidos: "Rodriguez Martinez",
-    tipoDocumento: "Cédula",
-    documento: "1234567890",
-    correo: "carlos@barberia.com",
-    celular: "+57 300 123 4567",
-    direccion: "Carrera 15 # 85-23",
-    barrio: "Chapinero",
-    fechaNacimiento: "1985-05-15",
-    password: "admin123",
-    status: "active",
-    fechaCreacion: "01-01-2025",
-    avatar: "CR",
-    imagenUrl: "",
-    rol: "Admin"
-  },
-  {
-    id: 2,
-    nombres: "Maria Fernanda",
-    apellidos: "Gonzalez Lopez",
-    tipoDocumento: "Cédula",
-    documento: "9876543210",
-    correo: "maria@barberia.com",
-    celular: "+57 301 234 5678",
-    direccion: "Calle 72 # 10-45",
-    barrio: "Zona Rosa",
-    fechaNacimiento: "1992-08-22",
-    password: "barbero123",
-    status: "active",
-    fechaCreacion: "05-01-2025",
-    avatar: "MG",
-    imagenUrl: "",
-    rol: "Barbero"
-  },
-  {
-    id: 3,
-    nombres: "Juan Carlos",
-    apellidos: "Martinez Perez",
-    tipoDocumento: "Cédula",
-    documento: "1122334455",
-    correo: "juan@barberia.com",
-    celular: "+57 302 345 6789",
-    direccion: "Avenida 68 # 45-12",
-    barrio: "Engativá",
-    fechaNacimiento: "1990-12-03",
-    password: "cliente123",
-    status: "active",
-    fechaCreacion: "10-01-2025",
-    avatar: "JM",
-    imagenUrl: "",
-    rol: "Cliente"
-  },
-  {
-    id: 4,
-    nombres: "Ana Sofia",
-    apellidos: "Lopez Rodriguez",
-    tipoDocumento: "Cédula de Extranjería",
-    documento: "5566778899",
-    correo: "ana@barberia.com",
-    celular: "+57 303 456 7890",
-    direccion: "Carrera 7 # 127-89",
-    barrio: "Usaquén",
-    fechaNacimiento: "1988-03-18",
-    password: "recep123",
-    status: "inactive",
-    fechaCreacion: "12-01-2025",
-    avatar: "AL",
-    imagenUrl: "",
-    rol: "Cliente"
-  }
-];
+// DTOs para la comunicación con la API
+// Estos objetos definen la estructura de datos que se envía y recibe del backend
+interface UsuarioInput {
+  nombre: string;           // Nombre del usuario
+  apellido: string;          // Apellido del usuario
+  correo: string;            // Correo electrónico (único)
+  contrasena?: string;       // Contraseña (opcional para actualizaciones)
+  rolId: number;            // ID del rol (1:Admin, 2:Barbero, 3:Recepcionista, 4:Gerente, 5:Cajero, 6:Cliente)
+  tipoDocumento?: string;   // Tipo de documento (Cédula, Pasaporte, etc.)
+  documento?: string;       // Número de documento
+  telefono?: string;         // Teléfono del usuario
+  direccion?: string;       // Dirección completa
+  barrio?: string;           // Barrio o localidad
+  fechaNacimiento?: string; // Fecha de nacimiento (YYYY-MM-DD)
+  fotoPerfil?: string;       // URL de la imagen de perfil (subida via /api/upload)
+  estado: boolean;          // Estado del usuario (true: activo, false: inactivo)
+}
 
-const roles = ["Admin", "Barbero", "Cliente"];
+// Response del endpoint de upload de imágenes
+interface UploadResponse {
+  url: string;     // URL relativa del archivo guardado
+  message: string; // Mensaje de confirmación
+}
+
+
+const roles = ["Admin", "Barbero", "Cliente", "Recepcionista", "Gerente", "Cajero"];
 const tiposDocumento = ["Cédula", "Cédula de Extranjería", "Pasaporte"];
+
+// Mapear datos de la API al formato del componente
+const mapApiUserToComponent = (apiUser: ApiUser): any => {
+  // Mapeo de IDs de roles a nombres
+  const roleMap: { [key: number]: string } = {
+    1: "Admin",
+    2: "Barbero", 
+    3: "Recepcionista",
+    4: "Gerente",
+    5: "Cajero",
+    6: "Cliente"
+  };
+
+  return {
+    id: apiUser.id,
+    nombres: apiUser.nombre,
+    apellidos: apiUser.apellido,
+    tipoDocumento: apiUser.tipoDocumento || "Cédula",
+    documento: apiUser.documento || "",
+    correo: apiUser.correo,
+    celular: apiUser.telefono || "",
+    direccion: apiUser.direccion || "",
+    barrio: apiUser.barrio || "",
+    fechaNacimiento: apiUser.fechaNacimiento || "",
+    password: apiUser.contrasena || "",
+    status: apiUser.estado,
+    fechaCreacion: new Date().toLocaleDateString('es-ES'),
+    avatar: `${apiUser.nombre?.split(' ')[0]?.[0] || ''}${apiUser.apellido?.split(' ')[0]?.[0] || ''}`.toUpperCase(),
+    imagenUrl: apiUser.fotoPerfil || "",
+    rol: apiUser.rol?.nombre || roleMap[apiUser.rolId || 6] || "Cliente"
+  };
+};
+
+// Mapear datos del componente al formato de la API (DTO)
+const mapComponentToApiUser = (componentUser: any): UsuarioInput => {
+  // Mapeo de roles a IDs basado en la API
+  const roleMap: { [key: string]: number } = {
+    "Admin": 1,
+    "Barbero": 2,
+    "Recepcionista": 3,
+    "Gerente": 4,
+    "Cajero": 5,
+    "Cliente": 6
+  };
+
+  const apiUser: any = {
+    nombre: componentUser.nombres,
+    apellido: componentUser.apellidos,
+    tipoDocumento: componentUser.tipoDocumento,
+    documento: componentUser.documento,
+    correo: componentUser.correo,
+    telefono: componentUser.celular,
+    direccion: componentUser.direccion,
+    barrio: componentUser.barrio,
+    contrasena: componentUser.password,
+    estado: componentUser.status,
+    fotoPerfil: componentUser.imagenUrl,
+    rolId: roleMap[componentUser.rol] || 6
+  };
+
+  // Solo incluir fechaNacimiento si tiene un valor válido
+  if (componentUser.fechaNacimiento && componentUser.fechaNacimiento.trim() !== '') {
+    apiUser.fechaNacimiento = componentUser.fechaNacimiento;
+  }
+
+  return apiUser;
+};
 
 export function UsersPage() {
   const { success, error, AlertContainer } = useCustomAlert();
-  const [users, setUsers] = useState(usersData);
+  const [users, setUsers] = useState<any[]>([]); // Estado principal - única fuente de verdad
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -127,17 +146,43 @@ export function UsersPage() {
     imagenUrl: ''
   });
   const userFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [userPreviewUrl, setUserPreviewUrl] = useState<string>('');
 
+  // Cargar usuarios desde la API
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const apiUsers = await apiService.getUsuarios();
+      const mappedUsers = apiUsers.map(mapApiUserToComponent);
+      setUsers(mappedUsers); // Única fuente de verdad
+    } catch (error: any) {
+      console.error('Error loading users:', error);
+      error('Error al cargar usuarios', 'No se pudieron cargar los usuarios desde el servidor. Por favor, intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar usuarios al montar el componente
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
   // Filtros de usuario
-  const filteredUsers = users.filter(user => {
-    const searchMatch = user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.documento.includes(searchTerm) ||
-      user.correo.toLowerCase().includes(searchTerm.toLowerCase());
-    const statusMatch = filterStatus === "all" || user.status === filterStatus;
-    return searchMatch && statusMatch;
-  });
+ const filteredUsers = users.filter((user: any) => {
+  const searchMatch =
+    user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.documento.includes(searchTerm) ||
+    user.correo.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const statusMatch =
+    filterStatus === "all" ||
+    user.status === (filterStatus === "true");
+
+  return searchMatch && statusMatch;
+});
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -167,17 +212,81 @@ export function UsersPage() {
     userFileInputRef.current?.click();
   };
 
-  const handleUserImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+// Función para subir imágenes al servidor usando el endpoint /api/upload
+// Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
+// Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch('http://edwisbarber.somee.com/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error al subir imagen: ${response.statusText}`);
+    }
+
+    const result: UploadResponse = await response.json();
+    return result.url;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+  const handleUserImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setNewUser((prev) => ({ ...prev, imagenUrl: result }));
-      setUserPreviewUrl(result);
-    };
-    reader.readAsDataURL(file);
+    // Validar tipo de archivo
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      error('Formato no válido', 'Solo se permiten imágenes en formato JPG, PNG, GIF o WebP');
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      error('Archivo muy grande', 'La imagen no puede superar los 5MB');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      
+      // Mostrar preview mientras se sube
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setUserPreviewUrl(result);
+      };
+      reader.readAsDataURL(file);
+
+      // Subir al servidor
+      const imageUrl = await uploadImage(file);
+      setNewUser((prev) => ({ ...prev, imagenUrl: imageUrl }));
+      
+      toast.success('Imagen subida exitosamente', {
+        style: {
+          background: 'var(--color-gray-darkest)',
+          border: '1px solid var(--color-orange-primary)',
+          color: 'var(--color-white-primary)',
+        },
+      });
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      error('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
+      // Limpiar preview si falló
+      setUserPreviewUrl('');
+      if (userFileInputRef.current) {
+        userFileInputRef.current.value = '';
+      }
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const removeUserProfileImage = () => {
@@ -188,24 +297,39 @@ export function UsersPage() {
     }
   };
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     if (!newUser.nombres || !newUser.apellidos || !newUser.documento || !newUser.correo || !newUser.celular || !newUser.rol) {
       error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
       return;
     }
-    setIsCreateDialogOpen(true);
 
-    const user = {
-      id: Date.now(),
-      ...newUser,
-      avatar: newUser.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
-        newUser.apellidos.split(' ').map(n => n[0]).join('').toUpperCase(),
-      fechaCreacion: new Date().toLocaleDateString('es-ES')
-    };
-    setUsers([user, ...users]);
-    resetForm();
-    setIsDialogOpen(false);
-    success("¡Usuario creado exitosamente!", `El usuario "${user.nombres} ${user.apellidos}" ha sido registrado en el sistema y está disponible en la lista de usuarios.`);
+    try {
+      const apiUserData = mapComponentToApiUser(newUser);
+      const createdUser = await apiService.createUsuario(apiUserData);
+      const mappedUser = mapApiUserToComponent(createdUser);
+      
+      setUsers([mappedUser, ...users]);
+      setIsCreateDialogOpen(false);
+      success("¡Usuario creado exitosamente!", `El usuario "${mappedUser.nombres} ${mappedUser.apellidos}" ha sido registrado en el sistema y está disponible en la lista de usuarios.`);
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      if (typeof error === 'function') {
+        error('Error al crear usuario', 'No se pudo crear el usuario. Por favor, verifica los datos e intenta nuevamente.');
+      } else {
+        // Mostrar error con toast si no es función
+        toast.error('Error al crear usuario', {
+          style: {
+            background: 'var(--color-gray-darkest)',
+            border: '1px solid #DC2626',
+            color: 'var(--color-white-primary)',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          description: 'No se pudo crear el usuario. Por favor, verifica los datos e intenta nuevamente.'
+        });
+      }
+    }
   };
 
   const handleEditUser = (user: any) => {
@@ -232,15 +356,35 @@ export function UsersPage() {
     setIsDialogOpen(true);
   };
 
-  const handleUpdateUser = () => {
+  const handleUpdateUser = async () => {
     if (!newUser.nombres || !newUser.apellidos || !newUser.documento || !newUser.correo || !newUser.celular || !newUser.rol) {
       error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
       return;
     }
-    setIsEditDialogOpen(true);
+
+    try {
+      const apiUserData = mapComponentToApiUser(newUser);
+      await apiService.updateUsuario(editingUser.id, apiUserData);
+      
+      const updatedUser = {
+        ...editingUser,
+        ...newUser,
+        avatar: newUser.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
+          newUser.apellidos.split(' ').map(n => n[0]).join('').toUpperCase()
+      };
+      
+      setUsers(users.map((u: any) => u.id === editingUser.id ? updatedUser : u));
+      success("Usuario actualizado", `Los datos de ${newUser.nombres} ${newUser.apellidos} han sido actualizados exitosamente.`);
+      setIsDialogOpen(false);
+      setEditingUser(null);
+      resetForm();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      error('Error al actualizar usuario', 'No se pudo actualizar el usuario. Por favor, verifica los datos e intenta nuevamente.');
+    }
   };
 
-  const handleDeleteUser = (userId: number) => {
+  const handleDeleteUser = async (userId: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
 
@@ -248,27 +392,58 @@ export function UsersPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const toggleUserStatus = (userId: number) => {
-    setUsers(users.map(user =>
-      user.id === userId
-        ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-        : user
-    ));
-    const user = users.find(u => u.id === userId);
-    toast.success(`Usuario ${user?.status === 'active' ? 'desactivado' : 'activado'} exitosamente`, {
-      style: {
-        background: 'var(--color-gray-darkest)',
-        border: '1px solid var(--color-orange-primary)',
-        color: 'var(--color-white-primary)',
-        borderRadius: '12px',
-        fontSize: '14px',
-        fontWeight: '500',
-        boxShadow: 'rgba(0, 0, 0, 0.5) 0px 4px 12px'
-      },
-      icon: user?.status === 'active' ? '🔴' : '🟢',
-      duration: 4000,
-    });
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await apiService.deleteUsuario(userToDelete.id);
+      setUsers(users.filter(u => u.id !== userToDelete.id));
+      success("Usuario eliminado", `El usuario ${userToDelete.nombres} ${userToDelete.apellidos} ha sido eliminado del sistema.`);
+      setUserToDelete(null);
+      setIsDeleteDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      error('Error al eliminar usuario', 'No se pudo eliminar el usuario. Por favor, intenta nuevamente.');
+    }
   };
+
+  const toggleUserStatus = async (userId: number) => {
+  const user = users.find(u => u.id === userId);
+  if (!user) return;
+
+  const newStatus = !user.status; // 🔥 si es false → true, si es true → false
+
+ 
+  try {
+    const loadingToast = toast.loading("Cambiando estado...");
+
+    // Convertir datos del usuario al formato de API y pasarlos para evitar el 404
+    const userData = mapComponentToApiUser(user);
+    
+    // Actualizar solo el estado (BOOLEAN) con datos locales
+    await apiService.updateUsuarioStatus(userId, newStatus, userData);
+
+    // Actualizar estado localmente
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, status: newStatus }
+          : u
+      )
+    );
+
+    toast.dismiss(loadingToast);
+
+    success(
+      newStatus ? "Usuario activado" : "Usuario desactivado",
+      `${user.nombres} ahora está ${newStatus ? "activo" : "inactivo"}`
+    );
+
+  } catch (err) {
+    toast.dismiss();
+    error("Error", "No se pudo cambiar el estado");
+  }
+};
 
 
   return (
@@ -293,14 +468,14 @@ export function UsersPage() {
           <div className="elegante-card text-center">
             <UserCheck className="w-8 h-8 text-green-400 mx-auto mb-2" />
             <h4 className="text-2xl font-bold text-white-primary mb-1">
-              {filteredUsers.filter(u => u.status === 'active').length}
+              {filteredUsers.filter(u => u.status === true).length}
             </h4>
             <p className="text-gray-lightest text-sm">Usuarios Activos</p>
           </div>
           <div className="elegante-card text-center">
             <UserX className="w-8 h-8 text-red-400 mx-auto mb-2" />
             <h4 className="text-2xl font-bold text-white-primary mb-1">
-              {filteredUsers.filter(u => u.status === 'inactive').length}
+              {filteredUsers.filter(u => u.status === false).length}
             </h4>
             <p className="text-gray-lightest text-sm">Usuarios Inactivos</p>
           </div>
@@ -340,9 +515,102 @@ export function UsersPage() {
                       {editingUser ? 'Modifica los datos del usuario seleccionado' : 'Completa la información del nuevo usuario para agregarlo al sistema'}
                     </DialogDescription>
                   </DialogHeader>
+                  {/* Foto de Perfil y Contraseña */}
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-orange-primary" />
+                          Foto de Perfil
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            {uploadingImage ? (
+                              <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 text-orange-primary animate-spin" />
+                              </div>
+                            ) : userPreviewUrl ? (
+                              <div className="relative">
+                                <img
+                                  src={userPreviewUrl}
+                                  alt="Vista previa"
+                                  className="w-16 h-16 rounded-full object-cover border-2 border-orange-primary"
+                                />
+                                <button
+                                  onClick={removeUserProfileImage}
+                                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
+                                  type="button"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                                <User className="w-6 h-6 text-gray-lightest" />
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={triggerUserFileSelect}
+                            disabled={uploadingImage}
+                            className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            type="button"
+                          >
+                            {uploadingImage ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Subiendo...
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="w-3 h-3" />
+                                {userPreviewUrl ? 'Cambiar' : 'Subir'}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <input
+                          ref={userFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUserImageUpload}
+                          className="hidden"
+                        />
+                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <IdCard className="w-4 h-4 text-orange-primary" />
+                          Tipo de Documento *
+                        </Label>
+                        <select
+                          value={newUser.tipoDocumento}
+                          onChange={(e) => setNewUser({ ...newUser, tipoDocumento: e.target.value })}
+                          className="elegante-input w-full"
+                          disabled={editingUser !== null}
+                        >
+                          <option value="">Selecciona tipo de documento</option>
+                          {tiposDocumento.map(tipo => (
+                            <option key={tipo} value={tipo}>{tipo}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                   <div className="space-y-6 pt-4">
                     {/* Información Personal */}
                     <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <IdCard className="w-4 h-4 text-orange-primary" />
+                          Número de Documento *
+                        </Label>
+                        <Input
+                          value={newUser.documento}
+                          onChange={(e) => setNewUser({ ...newUser, documento: e.target.value })}
+                          className="elegante-input w-full"
+                          placeholder="Número de documento"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <User className="w-4 h-4 text-orange-primary" />
@@ -367,43 +635,6 @@ export function UsersPage() {
                           placeholder="Ingresa los apellidos"
                         />
                       </div>
-                    </div>
-
-                    {/* Tipo y Número de Documento */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <IdCard className="w-4 h-4 text-orange-primary" />
-                          Tipo de Documento *
-                        </Label>
-                        <select
-                          value={newUser.tipoDocumento}
-                          onChange={(e) => setNewUser({ ...newUser, tipoDocumento: e.target.value })}
-                          className="elegante-input w-full"
-                          disabled={editingUser !== null}
-                        >
-                          <option value="">Selecciona tipo de documento</option>
-                          {tiposDocumento.map(tipo => (
-                            <option key={tipo} value={tipo}>{tipo}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <IdCard className="w-4 h-4 text-orange-primary" />
-                          Número de Documento *
-                        </Label>
-                        <Input
-                          value={newUser.documento}
-                          onChange={(e) => setNewUser({ ...newUser, documento: e.target.value })}
-                          className="elegante-input w-full"
-                          placeholder="Número de documento"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Fecha de Nacimiento y Rol */}
-                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-orange-primary" />
@@ -432,10 +663,6 @@ export function UsersPage() {
                           ))}
                         </select>
                       </div>
-                    </div>
-
-                    {/* Información de Contacto */}
-                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Mail className="w-4 h-4 text-orange-primary" />
@@ -461,10 +688,6 @@ export function UsersPage() {
                           placeholder="+57 300 123 4567"
                         />
                       </div>
-                    </div>
-
-                    {/* Dirección y Barrio */}
-                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Home className="w-4 h-4 text-orange-primary" />
@@ -487,55 +710,6 @@ export function UsersPage() {
                           onChange={(e) => setNewUser({ ...newUser, barrio: e.target.value })}
                           className="elegante-input w-full"
                           placeholder="Nombre del barrio"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Foto de Perfil y Contraseña */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Camera className="w-4 h-4 text-orange-primary" />
-                          Foto de Perfil
-                        </Label>
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            {userPreviewUrl ? (
-                              <div className="relative">
-                                <img
-                                  src={userPreviewUrl}
-                                  alt="Vista previa"
-                                  className="w-16 h-16 rounded-full object-cover border-2 border-orange-primary"
-                                />
-                                <button
-                                  onClick={removeUserProfileImage}
-                                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
-                                  type="button"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                                <User className="w-6 h-6 text-gray-lightest" />
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={triggerUserFileSelect}
-                            className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center"
-                            type="button"
-                          >
-                            <Camera className="w-3 h-3" />
-                            {userPreviewUrl ? 'Cambiar' : 'Subir'}
-                          </button>
-                        </div>
-                        <input
-                          ref={userFileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleUserImageUpload}
-                          className="hidden"
                         />
                       </div>
                       <div className="space-y-2">
@@ -610,92 +784,115 @@ export function UsersPage() {
                 className="elegante-input w-48"
               >
                 <option value="all">Todos los estados</option>
-                <option value="active">Activos</option>
-                <option value="inactive">Inactivos</option>
+                <option value="true">Activos</option>
+                <option value="false">Inactivos</option>
               </select>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Usuario</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Documento</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Contacto</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Rol</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Dirección</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm"
-                    style={{ paddingLeft: '65px' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedUsers.map(user => (
-                  <tr key={user.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-lighter" />
-                        </div>
-                        <span className="text-gray-lighter">{user.correo}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{user.documento || "—"}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{user.celular || "—"}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">
-                        {user.rol}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 pl-20 text-gray-lighter"
-                      style={{ paddingLeft: '80px' }}>{user.direccion}</td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar usuario"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => toggleUserStatus(user.id)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={user.status === 'active' ? "Desactivar usuario" : "Activar usuario"}
-                        >
-                          {user.status === 'active' ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar usuario"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-orange-primary animate-spin" />
+                <span className="ml-2 text-gray-lighter">Cargando usuarios...</span>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-dark">
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Usuario</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Documento</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Contacto</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Rol</th>
+                    <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Dirección</th>
+                    <th className="text-center py-3 px-4 text-white-primary font-bold text-sm"
+                      style={{ paddingLeft: '65px' }}>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12">
+                        <div className="flex flex-col items-center">
+                          <Users className="w-12 h-12 text-gray-lighter mb-4" />
+                          <p className="text-gray-lighter">No se encontraron usuarios</p>
+                          <p className="text-gray-lightest text-sm mt-2">
+                            {searchTerm || filterStatus !== "all" 
+                              ? "Intenta ajustar los filtros de búsqueda" 
+                              : "Crea tu primer usuario usando el botón 'Nuevo Usuario'"}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedUsers.map(user => (
+                      <tr key={user.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
+                              <User className="w-5 h-5 text-gray-lighter" />
+                            </div>
+                            <span className="text-gray-lighter">{user.correo}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">{user.documento || "—"}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">{user.celular || "—"}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">
+                            {user.rol}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 pl-20 text-gray-lighter"
+                          style={{ paddingLeft: '80px' }}>{user.direccion}</td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setIsDetailDialogOpen(true);
+                              }}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Ver detalles"
+                            >
+                              <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                            </button>
+                            <button
+                              onClick={() => handleEditUser(user)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Editar usuario"
+                            >
+                              <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                            </button>
+                            <button
+                              onClick={() => toggleUserStatus(user.id)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title={user.status ? "Desactivar usuario" : "Activar usuario"}
+                            >
+                              {user.status ? (
+                                <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Eliminar usuario"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Paginación */}
@@ -736,25 +933,7 @@ export function UsersPage() {
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
-                  if (editingUser) {
-                    setUsers(users.map(u =>
-                      u.id === editingUser.id
-                        ? {
-                          ...u,
-                          ...newUser,
-                          avatar: newUser.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
-                            newUser.apellidos.split(' ').map(n => n[0]).join('').toUpperCase()
-                        }
-                        : u
-                    ));
-                    success("Usuario actualizado", `Los datos de ${newUser.nombres} ${newUser.apellidos} han sido actualizados exitosamente.`);
-                    setIsDialogOpen(false);
-                    setEditingUser(null);
-                    resetForm();
-                  }
-                  setIsEditDialogOpen(false);
-                }}
+                onClick={handleUpdateUser}
                 className="elegante-button-primary"
               >
                 Actualizar Usuario
@@ -778,14 +957,7 @@ export function UsersPage() {
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
-                  if (userToDelete) {
-                    setUsers(users.filter(u => u.id !== userToDelete.id));
-                    success("Usuario eliminado", `El usuario ${userToDelete.nombres} ${userToDelete.apellidos} ha sido eliminado del sistema.`);
-                    setUserToDelete(null);
-                  }
-                  setIsDeleteDialogOpen(false);
-                }}
+                onClick={confirmDeleteUser}
                 className="bg-red-600 text-white hover:bg-red-700"
               >
                 Eliminar Usuario
@@ -823,9 +995,9 @@ export function UsersPage() {
                       <span className="text-white-primary">
                         {selectedUser.rol}
                       </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${selectedUser.status === 'active' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${selectedUser.status ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
                         }`}>
-                        {selectedUser.status === 'active' ? 'Activo' : 'Inactivo'}
+                        {selectedUser.status ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>
                   </div>

@@ -253,7 +253,7 @@ class RolesApiService {
       // Preparar payload - Crear el rol primero
       const rolePayload = {
         nombre: roleData.nombre.trim(),
-        descripcion: roleData.observaciones?.trim() || '',
+        descripcion: roleData.descripcion?.trim() || '',
         estado: true
       };
 
@@ -316,7 +316,7 @@ class RolesApiService {
       // Actualizar datos básicos del rol
       const updatePayload = {
         nombre: roleData.nombre.trim(),
-        descripcion: roleData.observaciones?.trim() || '',
+        descripcion: roleData.descripcion?.trim() || '',
         estado: roleData.estado
       };
 

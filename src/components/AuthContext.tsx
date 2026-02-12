@@ -124,11 +124,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Si no se especifica rolId, usar CLIENTE por defecto
-      const selectedRolId = rolId || AppRole.CLIENTE;
+      // Autenticar con Firebase primero
+      const userCredential = await firebaseAuthService.signIn(email, password);
+      const firebaseProfile = firebaseAuthService.getUserProfile(userCredential.user);
       
-      // Autenticar con Firebase y sincronizar con API
-      const result = await authSyncService.authenticateAndSync(email, password, selectedRolId);
+      // Buscar usuario existente en la API para obtener su rol
+      let selectedRolId = rolId;
+      if (!selectedRolId) {
+        try {
+          const usuarios = await apiService.getUsuarios();
+          const usuarioExistente = usuarios.find(u => u.correo.toLowerCase() === email.toLowerCase());
+          
+          if (usuarioExistente && usuarioExistente.rolId) {
+            // Usar el rol existente del usuario
+            selectedRolId = usuarioExistente.rolId;
+            console.log(`🎯 Rol detectado automáticamente: ${selectedRolId === AppRole.ADMIN ? 'ADMIN' : 'CLIENTE'}`);
+          } else {
+            // Si no existe, asignar rol por defecto CLIENTE
+            selectedRolId = AppRole.CLIENTE;
+            console.log(`🔰 Nuevo usuario, asignando rol por defecto: CLIENTE`);
+          }
+        } catch (error) {
+          console.error('Error obteniendo rol del usuario:', error);
+          selectedRolId = AppRole.CLIENTE;
+        }
+      }
+      
+      // Sincronizar con API usando el rol detectado
+      const result = await authSyncService.syncUsuarioConApi(firebaseProfile, selectedRolId);
       
       if (result.success && result.user) {
         const userData: User = {
@@ -137,8 +160,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: `${result.user.nombre || ''} ${result.user.apellido || ''}`.trim() || result.user.correo,
           role: authSyncService.getRolId(result.user.rolId) === AppRole.ADMIN ? 'admin' : 'cliente',
           telefono: result.user.telefono ?? undefined,
-          fotoPerfil: result.user.fotoPerfil ?? undefined
+          fotoPerfil: result.user.fotoPerfil ?? undefined,
+          firebaseUid: firebaseProfile.uid,
+          emailVerified: firebaseProfile.emailVerified
         };
+        
+        // Guardar en localStorage
+        localStorage.setItem('barbershop_user', JSON.stringify(userData));
         
         setUser(userData);
         setIsAuthenticated(true);
@@ -338,11 +366,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Si no se especifica rolId, usar CLIENTE por defecto
-      const selectedRolId = rolId || AppRole.CLIENTE;
+      // Primero autenticar con Google para obtener el email
+      const userCredential = await firebaseAuthService.signInWithGoogle();
+      const firebaseProfile = firebaseAuthService.getUserProfile(userCredential.user);
       
-      // Autenticar con Google y sincronizar
-      const result = await authSyncService.googleSignInAndSync(selectedRolId);
+      // Buscar usuario existente en la API para obtener su rol
+      let selectedRolId = rolId;
+      if (!selectedRolId && firebaseProfile.email) {
+        try {
+          const usuarios = await apiService.getUsuarios();
+          const usuarioExistente = usuarios.find(u => u.correo.toLowerCase() === firebaseProfile.email!.toLowerCase());
+          
+          if (usuarioExistente && usuarioExistente.rolId) {
+            // Usar el rol existente del usuario
+            selectedRolId = usuarioExistente.rolId;
+            console.log(`🎯 Rol detectado automáticamente para Google: ${selectedRolId === AppRole.ADMIN ? 'ADMIN' : 'CLIENTE'}`);
+          } else {
+            // Si no existe, asignar rol por defecto CLIENTE
+            selectedRolId = AppRole.CLIENTE;
+            console.log(`🔰 Nuevo usuario Google, asignando rol por defecto: CLIENTE`);
+          }
+        } catch (error) {
+          console.error('Error obteniendo rol del usuario Google:', error);
+          selectedRolId = AppRole.CLIENTE;
+        }
+      }
+      
+      // Asegurar que siempre haya un rolId
+      if (!selectedRolId) {
+        selectedRolId = AppRole.CLIENTE;
+      }
+      
+      // Sincronizar con API usando el rol detectado
+      const result = await authSyncService.syncUsuarioConApi(firebaseProfile, selectedRolId);
       
       if (result.success && result.user) {
         const userData: User = {
@@ -351,8 +407,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: `${result.user.nombre || ''} ${result.user.apellido || ''}`.trim() || result.user.correo,
           role: authSyncService.getRolId(result.user.rolId) === AppRole.ADMIN ? 'admin' : 'cliente',
           telefono: result.user.telefono ?? undefined,
-          fotoPerfil: result.user.fotoPerfil ?? undefined
+          fotoPerfil: result.user.fotoPerfil ?? undefined,
+          firebaseUid: firebaseProfile.uid,
+          emailVerified: firebaseProfile.emailVerified
         };
+        
+        // Guardar en localStorage
+        localStorage.setItem('barbershop_user', JSON.stringify(userData));
         
         setUser(userData);
         setIsAuthenticated(true);

@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "../ui/input";
 import {
   Plus,
@@ -25,201 +25,121 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Label } from "../ui/label";
-
 import { toast } from "sonner";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
+import { entregaInsumosService, EntregaInsumo, CreateEntregaData, UpdateEntregaData } from "../../services/entregaInsumosService";
+import { apiService, ApiUser } from "../../services/api";
+import { barberosService, Barbero } from "../../services/barberosService";
+import { insumosService, Insumo } from "../../services/insumosService";
 
 // Función para formatear moneda colombiana con puntos para separar miles
-const formatCurrency = (amount: number): string => {
+const formatCurrency = (amount: number | undefined | null): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '0';
+  }
   return amount.toLocaleString('es-CO');
 };
 
-// Datos de barberos
-const barberosData: Barbero[] = [
-  { id: "BARB001", nombre: "Miguel Rodriguez", telefono: "+57 300 123 4567", especialidad: "Cortes Clásicos", estado: "Activo", ultimaEntrega: "15-08-2025", documento: "CC 2012345678" },
-  { id: "BARB002", nombre: "Sofia Martinez", telefono: "+57 301 234 5678", especialidad: "Cortes Femeninos", estado: "Activo", ultimaEntrega: "12-08-2025", documento: "CC 2023456789" },
-  { id: "BARB003", nombre: "Carlos Ruiz", telefono: "+57 302 345 6789", especialidad: "Barbería Tradicional", estado: "Activo", ultimaEntrega: "10-08-2025", documento: "CC 2034567890" },
-  { id: "BARB004", nombre: "Ana Herrera", telefono: "+57 303 456 7890", especialidad: "Estilismo Avanzado", estado: "Activo", ultimaEntrega: "08-08-2025", documento: "CC 2045678901" },
-  { id: "BARB005", nombre: "Luis Torres", telefono: "+57 304 567 8901", especialidad: "Barba y Bigote", estado: "Inactivo", ultimaEntrega: "05-08-2025", documento: "CC 2056789012" }
-];
-
-// Datos de insumos disponibles
-const insumosDisponibles: Insumo[] = [
-  { id: "INS001", nombre: "Champú Premium Kerastase", categoria: "Cuidado Capilar", stock: 45, minimo: 10, precio: 35000 },
-  { id: "INS002", nombre: "Acondicionador L'Oréal Professional", categoria: "Cuidado Capilar", stock: 32, minimo: 8, precio: 28000 },
-  { id: "INS003", nombre: "Cera para Cabello", categoria: "Styling", stock: 28, minimo: 15, precio: 18000 },
-  { id: "INS004", nombre: "Gel Fijador Fuerte", categoria: "Styling", stock: 6, minimo: 12, precio: 15000 },
-  { id: "INS005", nombre: "Aceite de Barba", categoria: "Barba", stock: 22, minimo: 8, precio: 25000 },
-  { id: "INS006", nombre: "Tijeras Profesionales", categoria: "Herramientas", stock: 12, minimo: 5, precio: 120000 },
-  { id: "INS007", nombre: "Máquina de Cortar", categoria: "Herramientas", stock: 8, minimo: 3, precio: 150000 },
-  { id: "INS008", nombre: "Toallas Desechables", categoria: "Suministros", stock: 3, minimo: 20, precio: 12000 },
-  { id: "INS009", nombre: "Spray Desinfectante", categoria: "Higiene", stock: 18, minimo: 10, precio: 8000 },
-  { id: "INS010", nombre: "Talco en Polvo", categoria: "Finishing", stock: 25, minimo: 8, precio: 6000 }
-];
-
-// Tipos de datos
-interface Barbero {
-  id: string;
-  nombre: string;
-  telefono: string;
-  especialidad: string;
-  estado: string;
-  ultimaEntrega: string;
-}
-
-interface Insumo {
-  id: string;
-  nombre: string;
-  categoria: string;
-  stock: number;
-  minimo: number;
-  precio: number;
-}
-
-interface Entrega {
-  id: string;
-  barbero: string;
-  barberoId: string;
-  fecha: string;
-  hora: string;
-  cantidadTotal: number;
-  valorTotal: number;
-  estado: string;
-  responsable: string;
-  insumosDetalle: InsumoEntrega[];
-}
-
-interface InsumoEntrega {
-  id: string;
-  nombre: string;
-  categoria: string;
-  cantidad: number;
-  precio: number;
-}
-
-// Estados disponibles para las entregas - Solo dos estados
-const ESTADOS_ENTREGA = [
-  { value: 'Entregado', label: 'Entregado', color: 'bg-green-600' },
-  { value: 'Anulado', label: 'Anulado', color: 'bg-red-600' }
-];
-
-// Datos de entregas históricas con solo dos estados
-const entregasHistorial: Entrega[] = [
-  {
-    id: "ENT001",
-    barbero: "Miguel Rodriguez",
-    barberoId: "BARB001",
-    barberoDocumento: "CC 2012345678",
-    fecha: "15-08-2025",
-    hora: "09:30",
-    cantidadTotal: 8,
-    valorTotal: 142000,
-    estado: "Entregado",
-    responsable: "Admin Principal",
-    insumosDetalle: [
-      { id: "INS001", nombre: "Champú Premium Kerastase", categoria: "Cuidado Capilar", cantidad: 3, precio: 35000 },
-      { id: "INS003", nombre: "Cera para Cabello", categoria: "Styling", cantidad: 5, precio: 18000 }
-    ]
-  },
-  {
-    id: "ENT002",
-    barbero: "Sofia Martinez",
-    barberoId: "BARB002",
-    barberoDocumento: "CC 2023456789",
-    fecha: "12-08-2025",
-    hora: "14:15",
-    cantidadTotal: 6,
-    valorTotal: 173000,
-    estado: "Entregado",
-    responsable: "Admin Principal",
-    insumosDetalle: [
-      { id: "INS002", nombre: "Acondicionador L'Oréal Professional", categoria: "Cuidado Capilar", cantidad: 2, precio: 28000 },
-      { id: "INS005", nombre: "Aceite de Barba", categoria: "Barba", cantidad: 3, precio: 25000 },
-      { id: "INS006", nombre: "Tijeras Profesionales", categoria: "Herramientas", cantidad: 1, precio: 120000 }
-    ]
-  },
-  {
-    id: "ENT003",
-    barbero: "Carlos Ruiz",
-    barberoId: "BARB003",
-    barberoDocumento: "CC 2034567890",
-    fecha: "10-08-2025",
-    hora: "11:00",
-    cantidadTotal: 12,
-    valorTotal: 96000,
-    estado: "Entregado",
-    responsable: "Admin Principal",
-    insumosDetalle: [
-      { id: "INS004", nombre: "Gel Fijador Fuerte", categoria: "Styling", cantidad: 6, precio: 15000 },
-      { id: "INS009", nombre: "Spray Desinfectante", categoria: "Higiene", cantidad: 6, precio: 8000 }
-    ]
-  },
-  {
-    id: "ENT004",
-    barbero: "Ana Herrera",
-    barberoId: "BARB004",
-    barberoDocumento: "CC 2045678901",
-    fecha: "08-08-2025",
-    hora: "16:45",
-    cantidadTotal: 4,
-    valorTotal: 162000,
-    estado: "Entregado",
-    responsable: "Admin Principal",
-    insumosDetalle: [
-      { id: "INS007", nombre: "Máquina de Cortar", categoria: "Herramientas", cantidad: 1, precio: 150000 },
-      { id: "INS008", nombre: "Toallas Desechables", categoria: "Suministros", cantidad: 3, precio: 12000 }
-    ]
-  },
-  {
-    id: "ENT005",
-    barbero: "Miguel Rodriguez",
-    barberoId: "BARB001",
-    barberoDocumento: "CC 2012345678",
-    fecha: "05-08-2025",
-    hora: "10:20",
-    cantidadTotal: 15,
-    valorTotal: 108000,
-    estado: "Anulado",
-    responsable: "Admin Secundario",
-    insumosDetalle: [
-      { id: "INS010", nombre: "Talco en Polvo", categoria: "Finishing", cantidad: 12, precio: 6000 },
-      { id: "INS003", nombre: "Cera para Cabello", categoria: "Styling", cantidad: 3, precio: 18000 }
-    ]
-  }
-];
+const getFullName = (nombre?: string, apellido?: string) => {
+  return `${nombre || ''}${apellido ? ` ${apellido}` : ''}`.trim();
+};
 
 export function EntregaInsumosPage() {
   const { confirmCreateAction, confirmDeleteAction, DoubleConfirmationContainer } = useDoubleConfirmation();
 
-  const [barberos] = useState<Barbero[]>(barberosData);
-  const [insumos, setInsumos] = useState<Insumo[]>(insumosDisponibles);
-  const [entregas, setEntregas] = useState<Entrega[]>(entregasHistorial);
+  // Estados para el componente
+  const [barberos, setBarberos] = useState<Barbero[]>([]);
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const [entregas, setEntregas] = useState<EntregaInsumo[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creatingDelivery, setCreatingDelivery] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [isEstadoDialogOpen, setIsEstadoDialogOpen] = useState(false);
-  const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
-  const [entregaToChangeStatus, setEntregaToChangeStatus] = useState<Entrega | null>(null);
-  const [nuevoEstado, setNuevoEstado] = useState('');
+  const [selectedEntrega, setSelectedEntrega] = useState<EntregaInsumo | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
 
+  const getBarberoNombreById = (barberoId: number | string | undefined | null) => {
+    if (barberoId === undefined || barberoId === null) return 'Sin asignar';
+    const id = typeof barberoId === 'string' ? Number(barberoId) : barberoId;
+    const barbero = barberos.find(b => b.id === id);
+    if (!barbero) return 'Sin asignar';
+    return getFullName(barbero.nombre, barbero.apellido) || 'Sin asignar';
+  };
+
+  const getProductoNombreById = (productoId: number | string | undefined | null) => {
+    if (productoId === undefined || productoId === null) return 'Sin asignar';
+    const id = typeof productoId === 'string' ? Number(productoId) : productoId;
+    const producto = insumos.find(p => p.id === id);
+    return producto?.nombre || 'Sin asignar';
+  };
+
+  const getUsuarioNombreById = (usuarioId: number | string | undefined | null) => {
+    if (usuarioId === undefined || usuarioId === null) return 'Sin asignar';
+    const id = typeof usuarioId === 'string' ? Number(usuarioId) : usuarioId;
+    const usuario = users.find(u => u.id === id);
+    if (!usuario) return 'Sin asignar';
+    return getFullName(usuario.nombre, usuario.apellido) || 'Sin asignar';
+  };
+
+  // Cargar datos desde la API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Cargar barberos, insumos, entregas y usuarios desde la API en paralelo
+        const [barberosData, insumosData, entregasData, usersData] = await Promise.all([
+          barberosService.getBarberos(),
+          insumosService.getInsumos(),
+          entregaInsumosService.getEntregas(),
+          apiService.getUsuarios()
+        ]);
+
+        console.log('🔵 Barberos desde API:', barberosData);
+        console.log('🔵 Insumos desde API:', insumosData);
+        console.log('🔵 Entregas desde API:', entregasData);
+        console.log('🔵 Usuarios desde API:', usersData);
+
+        setBarberos(barberosData);
+        setInsumos(insumosData);
+        setEntregas(entregasData);
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error cargando datos:', error);
+        toast.error('Error al cargar los datos desde el servidor');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
   // Estado para nueva entrega
   const inicialNuevaEntrega = {
-    barberoSeleccionado: '',
-    fechaEntrega: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    barberoSeleccionado: 0,
+    fechaEntrega: new Date().toISOString().split('T')[0],
+    horaEntrega: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    responsable: 'Admin Principal',
     insumos: [] as InsumoEntrega[]
   };
 
   const [nuevaEntrega, setNuevaEntrega] = useState(inicialNuevaEntrega);
-  const [insumoSeleccionado, setInsumoSeleccionado] = useState('');
+
+  const [insumoSeleccionado, setInsumoSeleccionado] = useState(0); // Cambiar a number
+
   const [cantidadInsumo, setCantidadInsumo] = useState(1);
 
   // Filtros y paginación
-  const filteredEntregas = entregas.filter(entrega =>
-    entrega.barbero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entrega.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEntregas = entregas.filter(entrega => {
+    const barberoNombre = getBarberoNombreById((entrega as any).barberoId);
+    const entregaId = String(entrega.id || '');
+    
+    return barberoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entregaId.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const totalPages = Math.ceil(filteredEntregas.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -234,26 +154,50 @@ export function EntregaInsumosPage() {
     }
   };
 
-  const getStockColor = (stock: number, minimo: number) => {
-    if (stock === 0) return "text-red-500";
-    if (stock <= minimo) return "text-orange-secondary";
-    return "text-green-500";
-  };
-
   const agregarInsumo = () => {
-    if (!insumoSeleccionado || cantidadInsumo <= 0) return;
+    console.log('🧪 Click Agregar insumo', {
+      insumoSeleccionado,
+      cantidadInsumo,
+      nuevaEntregaInsumos: nuevaEntrega.insumos,
+      insumosCount: insumos.length,
+    });
 
-    const insumo = insumos.find(i => i.id === insumoSeleccionado);
-    if (!insumo) return;
+    if (!insumoSeleccionado) {
+      toast.error('Selecciona un producto antes de agregar');
+      console.warn('🟡 No se agregó: insumoSeleccionado vacío/0');
+      return;
+    }
+
+    if (!cantidadInsumo || cantidadInsumo <= 0) {
+      toast.error('Ingresa una cantidad válida');
+      console.warn('🟡 No se agregó: cantidadInsumo inválida', { cantidadInsumo });
+      return;
+    }
+
+    const selectedId = Number(insumoSeleccionado);
+    const insumo = insumos.find(i => Number(i.id) === selectedId);
+    console.log('🧪 Producto seleccionado encontrado:', { selectedId, insumo });
+    if (!insumo) {
+      toast.error('Producto no encontrado');
+      console.error('❌ Producto no encontrado. insumoSeleccionado=', insumoSeleccionado, 'insumos=', insumos);
+      return;
+    }
 
     // Verificar stock disponible
     if (cantidadInsumo > insumo.stock) {
       toast.error(`No hay suficiente stock. Disponible: ${insumo.stock} unidades`);
+      console.warn('🟡 No se agregó: stock insuficiente', {
+        id: insumo.id,
+        nombre: insumo.nombre,
+        solicitado: cantidadInsumo,
+        disponible: insumo.stock,
+      });
       return;
     }
 
     const insumosActuales = nuevaEntrega.insumos || [];
-    const existeInsumo = insumosActuales.find(i => i.id === insumo.id);
+    const existeInsumo = insumosActuales.find(i => Number(i.id) === Number(insumo.id));
+    console.log('🧪 Estado antes de agregar', { insumosActuales, existeInsumo });
 
     if (existeInsumo) {
       const nuevaCantidad = existeInsumo.cantidad + cantidadInsumo;
@@ -265,7 +209,7 @@ export function EntregaInsumosPage() {
       setNuevaEntrega({
         ...nuevaEntrega,
         insumos: insumosActuales.map(i =>
-          i.id === insumo.id
+          Number(i.id) === Number(insumo.id)
             ? { ...i, cantidad: nuevaCantidad }
             : i
         )
@@ -278,16 +222,18 @@ export function EntregaInsumosPage() {
           nombre: insumo.nombre,
           categoria: insumo.categoria,
           cantidad: cantidadInsumo,
-          precio: insumo.precio
+          precio: Number(insumo.precio) || 0
         }]
       });
     }
 
-    setInsumoSeleccionado('');
+    setInsumoSeleccionado(0); // Resetear a 0 en lugar de string vacío
     setCantidadInsumo(1);
+
+    console.log('✅ Producto agregado a la entrega:', { id: insumo.id, nombre: insumo.nombre, cantidad: cantidadInsumo });
   };
 
-  const eliminarInsumo = (insumoId: string) => {
+  const eliminarInsumo = (insumoId: number) => {
     const insumosActuales = nuevaEntrega.insumos || [];
     setNuevaEntrega({
       ...nuevaEntrega,
@@ -299,138 +245,169 @@ export function EntregaInsumosPage() {
     if (!nuevaEntrega.insumos || !Array.isArray(nuevaEntrega.insumos)) {
       return 0;
     }
-    return nuevaEntrega.insumos.reduce((total, insumo) =>
-      total + (insumo.precio * insumo.cantidad), 0
-    );
+
+    return nuevaEntrega.insumos.reduce((total, insumo) => {
+      const precio = Number((insumo as any).precio) || 0;
+      const cantidad = Number((insumo as any).cantidad) || 0;
+      return total + (precio * cantidad);
+    }, 0);
   };
 
-  const handleCreateEntrega = () => {
+  const handleCreateEntrega = async () => {
+    console.log('🧪 Click Registrar Entrega', {
+      barberoSeleccionado: nuevaEntrega.barberoSeleccionado,
+      fechaEntrega: nuevaEntrega.fechaEntrega,
+      insumosCount: (nuevaEntrega.insumos || []).length,
+      insumos: nuevaEntrega.insumos,
+    });
+
     if (!nuevaEntrega.barberoSeleccionado || !nuevaEntrega.insumos || nuevaEntrega.insumos.length === 0) {
       toast.error('Por favor complete todos los campos obligatorios');
       return;
     }
 
-    const barbero = barberos.find(b => b.id === nuevaEntrega.barberoSeleccionado);
-    if (!barbero) return;
-
-    const numeroEntrega = `ENT${String(entregas.length + 1).padStart(3, '0')}`;
-    const total = calcularTotalEntrega();
-    const insumosActuales = nuevaEntrega.insumos || [];
-    const cantidadTotal = insumosActuales.reduce((sum, insumo) => sum + insumo.cantidad, 0);
-
-    // Cerrar el modal temporalmente para evitar conflictos de z-index
-    const tempNuevaEntrega = { ...nuevaEntrega };
-    const tempBarbero = { ...barbero };
-
-    setIsDialogOpen(false);
-
-    confirmCreateAction(
-      `${numeroEntrega} para ${barbero.nombre}`,
-      () => {
-        const entrega: Entrega = {
-          id: numeroEntrega,
-          barbero: tempBarbero.nombre,
-          barberoId: tempBarbero.id,
-          fecha: tempNuevaEntrega.fechaEntrega,
-          hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-          cantidadTotal: cantidadTotal,
-          valorTotal: total,
-          estado: 'Entregado',
-          responsable: 'Admin Principal',
-          insumosDetalle: insumosActuales
-        };
-
-        // Actualizar stock de insumos
-        const nuevosInsumos = insumos.map(insumo => {
-          const insumoEntregado = insumosActuales.find(i => i.id === insumo.id);
-          if (insumoEntregado) {
-            return {
-              ...insumo,
-              stock: insumo.stock - insumoEntregado.cantidad
-            };
-          }
-          return insumo;
-        });
-
-        setInsumos(nuevosInsumos);
-        setEntregas([entrega, ...entregas]);
-        setNuevaEntrega(inicialNuevaEntrega);
-      },
-      {
-        confirmTitle: 'Registrar Nueva Entrega',
-        confirmMessage: `¿Estás seguro de que deseas registrar la entrega ${numeroEntrega} para ${barbero.nombre} con ${cantidadTotal} insumos por un valor de ${formatCurrency(total)}?`,
-        successTitle: 'Entrega registrada exitosamente ✔️',
-        successMessage: `La entrega ${numeroEntrega} ha sido registrada para ${barbero.nombre}. El stock de insumos ha sido actualizado automáticamente.`,
-        requireInput: false
+    try {
+      setCreatingDelivery(true);
+      
+      const barbero = barberos.find(b => b.id === nuevaEntrega.barberoSeleccionado);
+      if (!barbero) {
+        toast.error('Barbero no encontrado');
+        console.error('❌ Barbero no encontrado', { barberoSeleccionado: nuevaEntrega.barberoSeleccionado, barberos });
+        return;
       }
-    );
+
+
+      const numeroEntrega = `ENT${String(Date.now())}`;
+      const total = calcularTotalEntrega();
+      const insumosActuales = nuevaEntrega.insumos || [];
+      const cantidadTotal = insumosActuales.length > 0 
+        ? insumosActuales.reduce((sum, insumo) => sum + insumo.cantidad, 0)
+        : 0;
+
+     const entregaData: CreateEntregaData = {
+  barberoId: nuevaEntrega.barberoSeleccionado,
+  usuarioId: 1,
+  detalles: nuevaEntrega.insumos.map(insumo => ({
+    productoId: insumo.id,
+    cantidad: insumo.cantidad
+  }))
+};
+
+console.log('📤 Enviando a API:', entregaData);
+
+const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
+
+      // Actualizar stock de insumos (simulado localmente)
+      const nuevosInsumos = insumos.map(insumo => {
+        const insumoEntregado = insumosActuales.find(i => i.id === insumo.id);
+        if (insumoEntregado) {
+          return {
+            ...insumo,
+            stock: insumo.stock - insumoEntregado.cantidad
+          };
+        }
+        return insumo;
+      });
+
+      setInsumos(nuevosInsumos);
+      // refrescar lista desde API para evitar inconsistencias
+      const entregasActualizadas = await entregaInsumosService.getEntregas();
+      setEntregas(entregasActualizadas);
+      setNuevaEntrega(inicialNuevaEntrega);
+      setIsDialogOpen(false);
+      
+      toast.success(`Entrega ${numeroEntrega} registrada exitosamente para ${getFullName(barbero?.nombre, barbero?.apellido) || 'Sin asignar'}`);
+    } catch (error: any) {
+      console.error('Error creando entrega:', error);
+      toast.error(error?.message || 'Error al registrar la entrega');
+    } finally {
+      setCreatingDelivery(false);
+    }
   };
 
-  const handleAnularClick = (entrega: Entrega) => {
-    confirmCreateAction(
-      `${entrega.id} para ${entrega.barbero}`,
-      () => {
-        // Cambiar estado de la entrega
-        setEntregas(entregas.map(e =>
-          e.id === entrega.id
-            ? { ...e, estado: "Anulado" }
-            : e
-        ));
-
-        // Devolver stock de insumos al inventario
-        const nuevosInsumos = insumos.map(insumo => {
-          const insumoDevuelto = entrega.insumosDetalle.find(i => i.id === insumo.id);
-          if (insumoDevuelto) {
-            return {
-              ...insumo,
-              stock: insumo.stock + insumoDevuelto.cantidad
-            };
-          }
-          return insumo;
-        });
-
-        setInsumos(nuevosInsumos);
-      },
-      {
-        confirmTitle: 'Anular Entrega',
-        confirmMessage: `¿Estás seguro de que deseas anular la entrega ${entrega.id} para ${entrega.barbero}? Esta acción devolverá todos los insumos al inventario y marcará la entrega como anulada.`,
-        successTitle: 'Entrega anulada exitosamente ✔️',
-        successMessage: `La entrega ${entrega.id} ha sido anulada. El stock de ${entrega.cantidadTotal} insumos ha sido devuelto al inventario automáticamente.`,
-        requireInput: false
+  // Función para ver detalles completos de una entrega consumiendo la API
+  const handleViewDetails = async (entrega: EntregaInsumo) => {
+    try {
+      console.log(`🔍 Obteniendo detalles completos de entrega ${entrega.id}...`);
+      
+      // Obtener detalles completos desde la API
+      const entregaCompleta = await entregaInsumosService.getEntregaById(entrega.id.toString());
+      
+      if (entregaCompleta) {
+        console.log('✅ Detalles completos obtenidos:', entregaCompleta);
+        console.log('🔍 Estructura del barbero:', (entregaCompleta as any).barbero);
+        console.log('🔍 Barbero ID:', (entregaCompleta as any).barberoId);
+        console.log('🔍 Estructura de insumosDetalle:', (entregaCompleta as any).insumosDetalle);
+        console.log('🔍 Tipo de insumosDetalle:', typeof (entregaCompleta as any).insumosDetalle);
+        console.log('🔍 Length de insumosDetalle:', (entregaCompleta as any).insumosDetalle?.length);
+        console.log('🔍 Todos los detalles de la entrega:', JSON.stringify(entregaCompleta, null, 2));
+        setSelectedEntrega(entregaCompleta);
+      } else {
+        console.warn('⚠️ No se pudieron obtener detalles completos, usando datos locales');
+        setSelectedEntrega(entrega);
       }
-    );
+      
+      setIsDetailDialogOpen(true);
+    } catch (error) {
+      console.error('❌ Error obteniendo detalles de entrega:', error);
+      // Si falla la API, mostrar los datos locales que tenemos
+      setSelectedEntrega(entrega);
+      setIsDetailDialogOpen(true);
+      toast.error('No se pudieron cargar los detalles completos');
+    }
   };
 
-  const handleChangeStatusClick = (entrega: Entrega) => {
-    setEntregaToChangeStatus(entrega);
-    setNuevoEstado(entrega.estado);
-    setIsEstadoDialogOpen(true);
-  };
+  // Función para anular una entrega
+  const handleAnularClick = async (entrega: EntregaInsumo) => {
+    // Confirmación antes de anular
+    const confirmado = window.confirm(`¿Estás seguro de anular la entrega ${entrega.id}? Esta acción devolverá los insumos al inventario.`);
+    if (!confirmado) return;
 
-  const handleConfirmChangeStatus = () => {
-    if (!entregaToChangeStatus || !nuevoEstado) return;
+    try {
+      console.log(`🚫 Anulando entrega ${entrega.id}...`);
+      
+      const response = await entregaInsumosService.updateEntrega(entrega.id, {
+        id: entrega.id,
+        estado: 'Anulado'
+      });
 
-    setEntregas(entregas.map(e =>
-      e.id === entregaToChangeStatus.id
-        ? { ...e, estado: nuevoEstado }
-        : e
-    ));
+      console.log('✅ Entrega anulada:', response);
+      
+      // Actualizar lista local
+      setEntregas(entregas.map(e => 
+        e.id === entrega.id ? { ...e, estado: 'Anulado' } : e
+      ));
 
-    setIsEstadoDialogOpen(false);
+      // Devolver stock de insumos al inventario
+      // Usar el campo correcto según la API: detalleEntregasInsumos
+      const detalles = (entrega as any).detalleEntregasInsumos || entrega.insumosDetalle || [];
+      console.log('🔄 Devolviendo stock para detalles:', detalles);
+      
+      const nuevosInsumos = insumos.map(insumo => {
+        const detalleDevuelto = detalles.find((d: any) => d.productoId === insumo.id);
+        if (detalleDevuelto) {
+          console.log(`📦 Devolviendo ${detalleDevuelto.cantidad} unidades de ${insumo.nombre} al stock`);
+          return {
+            ...insumo,
+            stock: insumo.stock + detalleDevuelto.cantidad
+          };
+        }
+        return insumo;
+      });
+      setInsumos(nuevosInsumos);
 
-    toast.success(`Estado de entrega ${entregaToChangeStatus.id} actualizado a ${nuevoEstado}`, {
-      style: {
-        background: 'var(--color-gray-darkest)',
-        border: '1px solid var(--color-orange-primary)',
-        color: 'var(--color-white-primary)',
-      },
-    });
-    setEntregaToChangeStatus(null);
-    setNuevoEstado('');
+      toast.success(`Entrega ${entrega.id} anulada exitosamente`);
+    } catch (error) {
+      console.error('❌ Error anulando entrega:', error);
+      toast.error('Error al anular la entrega');
+    }
   };
 
   // Generar reporte PDF individual por entrega
-  const generateIndividualEntregaPDF = (entrega: Entrega) => {
+  const generateIndividualEntregaPDF = (entrega: EntregaInsumo) => {
+    const barberoNombre = (entrega as any).barbero
+      ? String((entrega as any).barbero)
+      : getBarberoNombreById((entrega as any).barberoId);
     const reportContent = `
       <!DOCTYPE html>
       <html lang="es">
@@ -618,7 +595,7 @@ export function EntregaInsumosPage() {
           <div class="info-grid">
             <div class="info-card">
               <div class="info-label">Barbero</div>
-              <div class="info-value">${entrega.barbero}</div>
+              <div class="info-value">${barberoNombre}</div>
             </div>
             <div class="info-card">
               <div class="info-label">Fecha y Hora</div>
@@ -673,7 +650,7 @@ export function EntregaInsumosPage() {
         <div class="footer">
           <p>Reporte generado automáticamente el ${new Date().toLocaleString('es-ES')}</p>
           <p><strong class="highlight">EDWINS BARBER</strong> - Sistema de Gestión de Insumos</p>
-          <p>Entrega: ${entrega.id} | Barbero: ${entrega.barbero}</p>
+          <p>Entrega: ${entrega.id} | Barbero: ${barberoNombre}</p>
         </div>
       </body>
       </html>
@@ -684,7 +661,7 @@ export function EntregaInsumosPage() {
 
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Entrega_${entrega.id}_${entrega.barbero.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
+    link.download = `Entrega_${entrega.id}_${String(barberoNombre).replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -710,10 +687,7 @@ export function EntregaInsumosPage() {
   };
 
   // Estadísticas
-  const totalEntregas = entregas.reduce((sum, entrega) => sum + entrega.valorTotal, 0);
-  const entregasCompletadas = entregas.filter(e => e.estado === "Entregado").length;
-  const entregasHoy = entregas.filter(e => e.fecha === new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })).length;
-  const insumosConStockBajo = insumos.filter(i => i.stock <= i.minimo).length;
+  const totalEntregas = entregas.reduce((sum: number, entrega: EntregaInsumo) => sum + entrega.valorTotal, 0);
 
   return (
     <>
@@ -729,6 +703,16 @@ export function EntregaInsumosPage() {
       </header>
 
       <main className="flex-1 overflow-auto p-8 bg-black-primary">
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-gray-darkest border border-gray-dark rounded-lg p-6 flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-primary"></div>
+              <span className="text-white-primary">Cargando datos...</span>
+            </div>
+          </div>
+        )}
+        
         {/* Sección Principal */}
         <div className="elegante-card">
           {/* Barra de Controles */}
@@ -755,13 +739,15 @@ export function EntregaInsumosPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary">Barbero</Label>
                         <select
-                          className="elegante-input w-full"
                           value={nuevaEntrega.barberoSeleccionado}
-                          onChange={(e) => setNuevaEntrega({ ...nuevaEntrega, barberoSeleccionado: e.target.value })}
+                          onChange={(e) => setNuevaEntrega({...nuevaEntrega, barberoSeleccionado: Number(e.target.value)})}
+                          className="w-full px-3 py-2 bg-gray-darker border border-gray-dark rounded-lg text-white-primary focus:outline-none focus:ring-2 focus:ring-blue-primary"
                         >
-                          <option value="">Seleccionar barbero...</option>
-                          {barberos.filter(b => b.estado === 'Activo').map((barbero) => (
-                            <option key={barbero.id} value={barbero.id}>{barbero.nombre}</option>
+                          <option value={0}>Seleccionar barbero...</option>
+                          {barberos.map((barbero) => (
+                            <option key={barbero.id} value={barbero.id}>
+                              {barbero.nombre} {barbero.apellido ? ` ${barbero.apellido}` : "Sin asignar"}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -783,11 +769,11 @@ export function EntregaInsumosPage() {
                             <select
                               className="elegante-input"
                               value={insumoSeleccionado}
-                              onChange={(e) => setInsumoSeleccionado(e.target.value)}
+                              onChange={(e) => setInsumoSeleccionado(Number(e.target.value))}
                             >
-                              <option value="">Seleccionar insumo...</option>
-                              {insumos.filter(insumo => insumo.stock > 0).map((insumo) => (
-                                <option key={insumo.id} value={insumo.id}>
+                              <option value={0}>Seleccionar insumo...</option>
+                              {insumos.map((insumo) => (
+                                <option key={insumo.id} value={insumo.id} disabled={insumo.stock <= 0}>
                                   {insumo.nombre} (Stock: {insumo.stock})
                                 </option>
                               ))}
@@ -872,11 +858,17 @@ export function EntregaInsumosPage() {
                     </button>
                     <button
                       onClick={handleCreateEntrega}
-                      className="elegante-button-primary"
-                      disabled={!nuevaEntrega.barberoSeleccionado || (nuevaEntrega.insumos || []).length === 0}
+                      className="elegante-button-primary flex items-center gap-2"
+                      disabled={!nuevaEntrega.barberoSeleccionado || (nuevaEntrega.insumos || []).length === 0 || creatingDelivery}
                     >
-
-                      Registrar Entrega
+                      {creatingDelivery ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Registrando...
+                        </>
+                      ) : (
+                        'Registrar Entrega'
+                      )}
                     </button>
                   </div>
                 </DialogContent>
@@ -930,7 +922,9 @@ export function EntregaInsumosPage() {
                         <div className="w-8 h-8 rounded-lg bg-orange-primary flex items-center justify-center">
                           <User className="w-4 h-4 text-black-primary" />
                         </div>
-                        <span className="text-gray-lighter">{entrega.barbero}</span>
+                        <span className="text-gray-lighter">
+                          {getBarberoNombreById((entrega as any).barberoId)}
+                        </span>
                       </div>
                     </td>
                     <td className="py-4 px-4">
@@ -952,10 +946,7 @@ export function EntregaInsumosPage() {
                     <td className="py-4 px-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => {
-                            setSelectedEntrega(entrega);
-                            setIsDetailDialogOpen(true);
-                          }}
+                          onClick={() => handleViewDetails(entrega)}
                           className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
                           title="Ver detalles"
                         >
@@ -1026,25 +1017,35 @@ export function EntregaInsumosPage() {
                   <div className="space-y-3">
                     <div>
                       <span className="text-gray-lightest">Barbero:</span>
-                      <p className="text-white-primary font-semibold">{selectedEntrega.barbero}</p>
+                      <p className="text-white-primary font-semibold">
+                        {(selectedEntrega as any).barbero
+                          ? (typeof (selectedEntrega as any).barbero === 'object' 
+                              ? getFullName((selectedEntrega as any).barbero.nombre, (selectedEntrega as any).barbero.apellido)
+                              : String((selectedEntrega as any).barbero))
+                          : getBarberoNombreById((selectedEntrega as any).barberoId)}
+                      </p>
                     </div>
                     <div>
                       <span className="text-gray-lightest">Fecha y Hora:</span>
-                      <p className="text-white-primary font-semibold">{selectedEntrega.fecha} - {selectedEntrega.hora}</p>
+                      <p className="text-white-primary font-semibold">
+                        {selectedEntrega.fecha || 'Sin fecha'} - {selectedEntrega.hora || 'Sin hora'}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div>
                       <span className="text-gray-lightest">Estado:</span>
                       <p>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoColor(selectedEntrega.estado)}`}>
-                          {selectedEntrega.estado}
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoColor(selectedEntrega.estado || 'Desconocido')}`}>
+                          {selectedEntrega.estado || 'Desconocido'}
                         </span>
                       </p>
                     </div>
                     <div>
                       <span className="text-gray-lightest">Responsable:</span>
-                      <p className="text-white-primary font-semibold">{selectedEntrega.responsable}</p>
+                      <p className="text-white-primary font-semibold">
+                        {getUsuarioNombreById((selectedEntrega as any).usuarioId) || selectedEntrega.responsable || 'Sin asignar'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1053,11 +1054,11 @@ export function EntregaInsumosPage() {
                 <div className="bg-gray-darker p-4 rounded-lg border border-gray-dark">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-white-primary">{selectedEntrega.cantidadTotal}</div>
+                      <div className="text-2xl font-bold text-white-primary">{selectedEntrega.cantidadTotal || 0}</div>
                       <div className="text-gray-lightest">Insumos Entregados</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-primary">${formatCurrency(selectedEntrega.valorTotal)}</div>
+                      <div className="text-2xl font-bold text-orange-primary">${formatCurrency(selectedEntrega.valorTotal || 0)}</div>
                       <div className="text-gray-lightest">Valor Total</div>
                     </div>
                   </div>
@@ -1067,21 +1068,46 @@ export function EntregaInsumosPage() {
                 <div>
                   <h4 className="text-white-primary font-semibold mb-3">Insumos Entregados</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {selectedEntrega.insumosDetalle.map((insumo) => (
-                      <div key={insumo.id} className="flex justify-between items-center p-3 bg-gray-darker rounded-lg border border-gray-dark">
-                        <div className="flex-1">
-                          <div className="text-white-primary font-medium">{insumo.nombre}</div>
-                          <div className="text-sm text-gray-lightest">{insumo.categoria}</div>
+                    {(() => {
+                      const insumos = selectedEntrega.insumosDetalle || 
+                                     (selectedEntrega as any).detalleEntregasInsumos || 
+                                     (selectedEntrega as any).detalles || 
+                                     (selectedEntrega as any).insumos || 
+                                     (selectedEntrega as any).productos || 
+                                     [];
+                      
+                      console.log('🔍 Insumos a mostrar:', insumos);
+                      
+                      return insumos && insumos.length > 0 ? (
+                        insumos.map((detalle: any, index: number) => {
+                          const insumo = detalle.producto || detalle;
+                          return (
+                        <div key={detalle.id || index} className="flex justify-between items-center p-3 bg-gray-darker rounded-lg border border-gray-dark">
+                          <div className="flex-1">
+                            <div className="text-white-primary font-medium">
+                              {insumo.nombre || `Insumo ${index + 1}`}
+                            </div>
+                            <div className="text-sm text-gray-lightest">
+                              {insumo.categoria?.nombre || 'Sin categoría'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-orange-primary font-semibold">{detalle.cantidad || 0} unidades</div>
+                            <div className="text-sm text-gray-lightest">${formatCurrency(detalle.precioHistorico || insumo.precioVenta || 0)} c/u</div>
+                          </div>
+                          <div className="ml-4 text-right">
+                            <div className="text-white-primary font-semibold">
+                              ${formatCurrency((detalle.cantidad || 0) * (detalle.precioHistorico || insumo.precioVenta || 0))}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-orange-primary font-semibold">{insumo.cantidad} unidades</div>
-                          <div className="text-sm text-gray-lightest">${formatCurrency(insumo.precio)} c/u</div>
+                      )})
+                      ) : (
+                        <div className="text-center py-8 text-gray-lightest">
+                          No hay detalles de insumos disponibles para esta entrega
                         </div>
-                        <div className="ml-4 text-right">
-                          <div className="text-white-primary font-semibold">${formatCurrency(insumo.cantidad * insumo.precio)}</div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1103,49 +1129,6 @@ export function EntregaInsumosPage() {
                   Descargar PDF
                 </button>
               )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal de cambio de estado */}
-        <Dialog open={isEstadoDialogOpen} onOpenChange={setIsEstadoDialogOpen}>
-          <DialogContent className="bg-gray-darkest border-gray-dark">
-            <DialogHeader>
-              <DialogTitle className="text-white-primary">Cambiar Estado de Entrega</DialogTitle>
-              <DialogDescription className="text-gray-lightest">
-                Selecciona el nuevo estado para la entrega {entregaToChangeStatus?.id}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-4">
-              <div className="space-y-2">
-                <Label className="text-white-primary">Nuevo Estado</Label>
-                <select
-                  className="elegante-input w-full"
-                  value={nuevoEstado}
-                  onChange={(e) => setNuevoEstado(e.target.value)}
-                >
-                  {ESTADOS_ENTREGA.map((estado) => (
-                    <option key={estado.value} value={estado.value}>{estado.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-dark">
-              <button
-                onClick={() => setIsEstadoDialogOpen(false)}
-                className="elegante-button-secondary"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmChangeStatus}
-                className="elegante-button-primary"
-              >
-                <Edit2 className="w-4 h-4 mr-2" />
-                Actualizar Estado
-              </button>
             </div>
           </DialogContent>
         </Dialog>

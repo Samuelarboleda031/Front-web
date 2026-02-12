@@ -12,11 +12,14 @@ import {
   UserCheck,
   FileText,
   Check,
-  Loader2
+  Loader2,
+  ToggleRight,
+  ToggleLeft
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { Label } from "../ui/label";
+import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
 import { rolesApiService, RoleWithModules, CreateRoleData, UpdateRoleData, PermisoModulo } from "@/services/rolesApiService";
 import { modulosService, Modulo } from "@/services/modulosService";
@@ -43,7 +46,7 @@ interface ModuloExtendido {
   rolesModulos?: any[];
 }
 
-export function RolesPageModular() {
+export function RolesPage() {
   const { success: showSuccess, error: showError, AlertContainer } = useCustomAlert();
   const [roles, setRoles] = useState<RoleWithModules[]>([]);
   const [modulosProyecto, setModulosProyecto] = useState<ModuloExtendido[]>([]);
@@ -320,6 +323,53 @@ export function RolesPageModular() {
       setIsEditing(false);
     }
   }, [editingRole, validateRoleData, loadRoles, showSuccess, showError]);
+
+  // Función para cambiar el estado de un rol
+  const toggleRoleStatus = useCallback(async (roleId: string) => {
+    const role = roles.find(r => r.id === roleId);
+    if (!role) return;
+
+    const newStatus = !role.estado;
+
+    try {
+      const loadingToast = toast.loading("Cambiando estado...");
+
+      // Actualizar el estado del rol
+      const updateData: UpdateRoleData = {
+        nombre: role.nombre,
+        descripcion: role.descripcion || '',
+        modulos: role.modulos,
+        permisos: role.permisosPorModulo || {},
+        estado: newStatus
+      };
+
+      const updatedRole = await rolesApiService.updateRoleWithModules(
+        parseInt(roleId),
+        updateData
+      );
+
+      // Actualizar estado localmente
+      setRoles(prev =>
+        prev.map(r =>
+          r.id === roleId
+            ? { ...r, estado: newStatus }
+            : r
+        )
+      );
+
+      toast.dismiss(loadingToast);
+
+      showSuccess(
+        newStatus ? "Rol activado" : "Rol desactivado",
+        `El rol "${role.nombre}" ahora está ${newStatus ? "activo" : "inactivo"}`
+      );
+
+    } catch (err) {
+      toast.dismiss();
+      console.error('Error cambiando estado del rol:', err);
+      showError("Error", "No se pudo cambiar el estado del rol");
+    }
+  }, [roles, showSuccess, showError]);
 
   // Función para eliminar rol
   const handleDeleteRole = useCallback (async () => {
@@ -689,6 +739,20 @@ export function RolesPageModular() {
                           >
                             <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
                           </button>
+                          
+                          <button
+                            onClick={() => toggleRoleStatus(rol.id)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title={rol.estado ? "Desactivar rol" : "Activar rol"}
+                            disabled={isCreating || isEditing || isDeleting}
+                          >
+                            {rol.estado ? (
+                              <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                            ) : (
+                              <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            )}
+                          </button>
+                          
                           <button
                             onClick={() => {
                               setRoleToDelete(rol);

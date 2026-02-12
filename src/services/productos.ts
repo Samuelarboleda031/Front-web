@@ -179,6 +179,7 @@ class ProductoService {
         stockInsumos: Number(productoData.stockInsumos) || 0,
         stockMinimo: Number(productoData.minCantidad) || 0,
         categoriaId: categoriaId,
+        imagen: productoData.imagen || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
       
@@ -229,6 +230,8 @@ class ProductoService {
         stockInsumos: Number(productoData.stockInsumos),
         stockMinimo: Number(productoData.minCantidad),
         categoriaId: categoriaId,
+        marca: productoData.marca || '',
+        imagen: productoData.imagen || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
       

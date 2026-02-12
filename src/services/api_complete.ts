@@ -1,4 +1,4 @@
-const API_BASE_URL = '/api';
+const API_BASE_URL = 'http://edwisbarber.somee.com/api';
 
 // Interfaces existentes
 export interface ApiUser {

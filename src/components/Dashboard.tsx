@@ -27,20 +27,20 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import logo from "../assets/a51cd14e3664f3752eaa436dadb14492d91e40aa.png";
 import { DashboardPage } from "./pages/DashboardPage";
-import { AgendamientoPageAdvanced as AgendamientoPage } from "./pages/AgendamientoPageAdvanced";
+import { AgendamientoPage } from "./pages/AgendamientoPage";
 import { ServiciosPage } from "./pages/ServiciosPage";
 import { BarberosPage } from "./pages/BarberosPage";
 import { ProductosPage } from "./pages/ProductosPage";
 import { VentasPage } from "./pages/VentasPage";
-import { ClientesPageWithPhoto as ClientesPage } from "./pages/ClientesPageWithPhoto";
-import { HorariosPageWeekly as HorariosPage } from "./pages/HorariosPageWeekly";
+import {ClientesPage } from "./pages/ClientesPage";
+import { HorariosPage } from "./pages/HorariosPage";
 import { PaquetesPage } from "./pages/PaquetesPage";
 import { ComprasPage } from "./pages/ComprasPage";
 import { ProveedoresPage } from "./pages/ProveedoresPage";
 import { CategoriasPage } from "./pages/CategoriasPage";
 import { EntregaInsumosPage } from "./pages/EntregaInsumosPage";
 import { DevolucionesPage } from "./pages/DevolucionesPage";
-import { RolesPageModular } from "./pages/RolesPage";
+import { RolesPage } from "./pages/RolesPage";
 import { UsersPage } from "./pages/UsersPage";
 
 // Información de cada módulo para el título dinámico
@@ -263,7 +263,7 @@ export function Dashboard() {
       case "Usuarios":
         return <UsersPage />;
       case "Roles":
-        return <RolesPageModular />;
+        return <RolesPage />;
       default:
         return <DashboardPage />;
     }

@@ -64,6 +64,8 @@ export class AuthSyncService {
 
         if (necesitaActualizacion) {
           const datosActualizacion: Partial<ApiUser> = {
+            correo: correo,
+            contrasena: 'firebase_auth', // Contraseña por defecto para usuarios de Firebase
             rolId: rolId,
             estado: true,
             ...additionalData
@@ -87,8 +89,8 @@ export class AuthSyncService {
           contrasena: 'firebase_auth', // Contraseña por defecto para usuarios de Firebase
           rolId: rolId,
           estado: true,
-          nombre: firebaseProfile.displayName || '',
-          apellido: '',
+          nombre: firebaseProfile.displayName?.split(' ')[0] || '',
+          apellido: firebaseProfile.displayName?.split(' ').slice(1).join(' ') || 'Usuario',
           fotoPerfil: firebaseProfile.photoURL || '',
           ...additionalData
         };
@@ -201,7 +203,7 @@ export class AuthSyncService {
       // 2. Sincronizar con API
       const syncResult = await this.syncUsuarioConApi(firebaseProfile, rolId, {
         nombre: firebaseProfile.displayName?.split(' ')[0] || '',
-        apellido: firebaseProfile.displayName?.split(' ').slice(1).join(' ') || '',
+        apellido: firebaseProfile.displayName?.split(' ').slice(1).join(' ') || 'Usuario',
         fotoPerfil: firebaseProfile.photoURL || '',
         ...additionalData
       });

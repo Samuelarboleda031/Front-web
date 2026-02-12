@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -8,133 +8,79 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   Users, Plus, Edit, Trash2, Mail, Phone, Calendar,
   Search, UserCheck, UserX, Eye, User, ChevronLeft,
-  ChevronRight, IdCard, Lock, EyeOff, Settings,
-  Scissors, Star, TrendingUp, TrendingDown, Target,
-  Award, Crown, Medal, Activity, Filter, MapPin,
-  CreditCard, Home, Camera, Upload, ToggleRight, ToggleLeft,
-  X
+  ChevronRight, IdCard, Lock, EyeOff, Scissors, Star,
+  TrendingUp, TrendingDown, Target, Award, Crown, Medal,
+  Activity, Filter, MapPin, CreditCard, Home, Camera,
+  Upload, ToggleRight, ToggleLeft, X, Loader2
 } from "lucide-react";
-import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
-
-const barberosData = [
-  {
-    id: 1,
-    nombres: "Carlos Eduardo",
-    apellidos: "Rodriguez Martinez",
-    tipoDocumento: "Cédula",
-    documento: "1234567890",
-    correo: "carlos.rodriguez@barberia.com",
-    celular: "+57 300 123 4567",
-    direccion: "Carrera 15 # 85-23",
-    barrio: "Chapinero",
-    fechaNacimiento: "1985-05-15",
-    password: "barbero123",
-    status: "active",
-    fechaCreacion: "01-01-2025",
-    avatar: "CR",
-    imagenUrl: "",
-    rol: "Barbero"
-  },
-  {
-    id: 2,
-    nombres: "Miguel Ángel",
-    apellidos: "Gonzalez Lopez",
-    tipoDocumento: "Cédula",
-    documento: "9876543210",
-    correo: "miguel.gonzalez@barberia.com",
-    celular: "+57 301 234 5678",
-    direccion: "Calle 72 # 10-45",
-    barrio: "Zona Rosa",
-    fechaNacimiento: "1992-08-22",
-    password: "barbero123",
-    status: "active",
-    fechaCreacion: "05-01-2025",
-    avatar: "MG",
-    imagenUrl: "",
-    rol: "Barbero"
-  },
-  {
-    id: 3,
-    nombres: "Juan Carlos",
-    apellidos: "Martinez Perez",
-    tipoDocumento: "Cédula",
-    documento: "1122334455",
-    correo: "juan.martinez@barberia.com",
-    celular: "+57 302 345 6789",
-    direccion: "Avenida 68 # 45-12",
-    barrio: "Engativá",
-    fechaNacimiento: "1990-12-03",
-    password: "barbero123",
-    status: "active",
-    fechaCreacion: "10-01-2025",
-    avatar: "JM",
-    imagenUrl: "",
-    rol: "Barbero"
-  },
-  {
-    id: 4,
-    nombres: "Andrés Felipe",
-    apellidos: "Lopez Rodriguez",
-    tipoDocumento: "Cédula de Extranjería",
-    documento: "5566778899",
-    correo: "andres.lopez@barberia.com",
-    celular: "+57 303 456 7890",
-    direccion: "Carrera 7 # 127-89",
-    barrio: "Usaquén",
-    fechaNacimiento: "1988-03-18",
-    password: "barbero123",
-    status: "inactive",
-    fechaCreacion: "12-01-2025",
-    avatar: "AL",
-    imagenUrl: "",
-    rol: "Barbero"
-  }
-];
+import { barberosService, Barbero, CreateBarberoData, UpdateBarberoData } from "../../services/barberosService";
 
 const tiposDocumento = ["Cédula", "Cédula de Extranjería", "Pasaporte"];
 
 export function BarberosPage() {
   const { success, error, AlertContainer } = useCustomAlert();
-  const [barberos, setBarberos] = useState(barberosData);
+  const [barberos, setBarberos] = useState<Barbero[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingBarbero, setEditingBarbero] = useState<any>(null);
-  const [selectedBarbero, setSelectedBarbero] = useState<any>(null);
-  const [barberoToDelete, setBarberoToDelete] = useState<any>(null);
+  const [editingBarbero, setEditingBarbero] = useState<Barbero | null>(null);
+  const [selectedBarbero, setSelectedBarbero] = useState<Barbero | null>(null);
+  const [barberoToDelete, setBarberoToDelete] = useState<Barbero | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [showPassword, setShowPassword] = useState(false);
-  const [newBarbero, setNewBarbero] = useState({
-    nombres: '',
-    apellidos: '',
+  const [itemsPerPage] = useState(5);
+  const [newBarbero, setNewBarbero] = useState<CreateBarberoData>({
+    nombre: '',
+    apellido: '',
     tipoDocumento: '',
     documento: '',
     correo: '',
-    celular: '',
+    telefono: '',
     direccion: '',
     barrio: '',
     fechaNacimiento: '',
-    password: '',
     rol: 'Barbero',
     status: 'active',
-    imagenUrl: ''
+    fotoPerfil: ''
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
 
+  // Cargar barberos desde la API al montar el componente
+  useEffect(() => {
+    loadBarberos();
+  }, []);
+
+  const loadBarberos = async () => {
+    try {
+      setLoading(true);
+      const data = await barberosService.getBarberos();
+      const mappedData = data.map(barbero => barberosService.mapApiToComponent(barbero));
+      setBarberos(mappedData);
+    } catch (error: unknown) {
+      console.error('Error cargando barberos:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      error("Error", `No se pudieron cargar los barberos: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filtros de barbero
   const filteredBarberos = barberos.filter(barbero => {
-    const searchMatch = barbero.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      barbero.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      barbero.documento.includes(searchTerm) ||
-      barbero.correo.toLowerCase().includes(searchTerm.toLowerCase());
-    const statusMatch = filterStatus === "all" || barbero.status === filterStatus;
+    const searchMatch = (barbero.nombres || barbero.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (barbero.apellidos || barbero.apellido || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (barbero.correo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (barbero.documento || '').includes(searchTerm);
+    
+    const statusMatch = filterStatus === "all" || 
+      (filterStatus === "active" && barbero.status === 'active') ||
+      (filterStatus === "inactive" && barbero.status === 'inactive');
+    
     return searchMatch && statusMatch;
   });
 
@@ -142,19 +88,10 @@ export function BarberosPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const displayedBarberos = filteredBarberos.slice(startIndex, startIndex + itemsPerPage);
 
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let password = '';
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setNewBarbero({ ...newBarbero, password });
-  };
-
   const resetForm = () => {
     setNewBarbero({
-      nombres: '', apellidos: '', tipoDocumento: '', documento: '', correo: '', celular: '',
-      direccion: '', barrio: '', fechaNacimiento: '', password: '', rol: 'Barbero', status: 'active', imagenUrl: ''
+      nombre: '', apellido: '', tipoDocumento: '', documento: '', correo: '', telefono: '',
+      direccion: '', barrio: '', fechaNacimiento: '', rol: 'Barbero', status: 'active', fotoPerfil: ''
     });
     setPreviewUrl('');
     if (fileInputRef.current) {
@@ -173,100 +110,181 @@ export function BarberosPage() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
-      setNewBarbero((prev) => ({ ...prev, imagenUrl: result }));
+      setNewBarbero((prev) => ({ ...prev, fotoPerfil: result }));
       setPreviewUrl(result);
     };
     reader.readAsDataURL(file);
   };
 
   const removeProfileImage = () => {
-    setNewBarbero((prev) => ({ ...prev, imagenUrl: '' }));
+    setNewBarbero((prev) => ({ ...prev, fotoPerfil: '' }));
     setPreviewUrl('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleCreateBarbero = () => {
-    if (!newBarbero.nombres || !newBarbero.apellidos || !newBarbero.documento || !newBarbero.correo || !newBarbero.celular) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo y celular.");
+  const handleCreateBarbero = async () => {
+    if (!newBarbero.nombre || !newBarbero.apellido || !newBarbero.documento || !newBarbero.correo || !newBarbero.telefono) {
+      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre, apellido, documento, correo y teléfono.");
       return;
     }
-    setIsCreateDialogOpen(true);
 
-    const barbero = {
-      id: Date.now(),
-      ...newBarbero,
-      avatar: newBarbero.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
-        newBarbero.apellidos.split(' ').map(n => n[0]).join('').toUpperCase(),
-      fechaCreacion: new Date().toLocaleDateString('es-ES')
-    };
-    setBarberos([barbero, ...barberos]);
-    resetForm();
-    setIsDialogOpen(false);
-    success("¡Barbero creado exitosamente!", `El barbero "${barbero.nombres} ${barbero.apellidos}" ha sido registrado en el sistema y está disponible en la lista de barberos.`);
+    try {
+      // Mapear datos del componente a la API
+      const apiData = barberosService.mapComponentToApi(newBarbero);
+      const createdBarbero = await barberosService.createBarbero(apiData);
+      const mappedBarbero = barberosService.mapApiToComponent(createdBarbero);
+      setBarberos([mappedBarbero, ...barberos]);
+      resetForm();
+      setIsDialogOpen(false);
+      success("¡Barbero creado exitosamente!", `El barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" ha sido registrado en el sistema.`);
+    } catch (error: unknown) {
+      console.error('Error creando barbero:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      error("Error", `No se pudo crear el barbero: ${errorMessage}`);
+    }
   };
 
-  const handleEditBarbero = (barbero: any) => {
+  const handleEditBarbero = (barbero: Barbero) => {
     setEditingBarbero(barbero);
     setNewBarbero({
-      nombres: barbero.nombres,
-      apellidos: barbero.apellidos,
+      nombre: barbero.nombre || barbero.nombres || '',
+      apellido: barbero.apellido || barbero.apellidos || '',
       tipoDocumento: barbero.tipoDocumento || '',
-      documento: barbero.documento,
-      correo: barbero.correo,
-      celular: barbero.celular,
+      documento: barbero.documento || '',
+      correo: barbero.correo || '',
+      telefono: barbero.telefono || barbero.celular || '',
       direccion: barbero.direccion || '',
       barrio: barbero.barrio || '',
       fechaNacimiento: barbero.fechaNacimiento || '',
-      password: barbero.password,
-      rol: barbero.rol,
-      status: barbero.status,
-      imagenUrl: barbero.imagenUrl || ''
+      rol: barbero.rol || 'Barbero',
+      status: barbero.status || 'active',
+      fotoPerfil: barbero.fotoPerfil || barbero.imagenUrl || ''
     });
-    setPreviewUrl(barbero.imagenUrl || '');
+    setPreviewUrl(barbero.fotoPerfil || barbero.imagenUrl || '');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
     setIsDialogOpen(true);
   };
 
-  const handleUpdateBarbero = () => {
-    if (!newBarbero.nombres || !newBarbero.apellidos || !newBarbero.documento || !newBarbero.correo || !newBarbero.celular) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo y celular.");
+  const handleUpdateBarbero = async () => {
+    if (!editingBarbero || !newBarbero.nombre || !newBarbero.apellido || !newBarbero.documento || !newBarbero.correo || !newBarbero.telefono) {
+      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre, apellido, documento, correo y teléfono.");
       return;
     }
-    setIsEditDialogOpen(true);
+
+    try {
+      // Mapear datos del componente a la API
+      const apiData = barberosService.mapComponentToApi({
+        ...newBarbero,
+        id: editingBarbero.id
+      });
+      
+      const updatedBarbero = await barberosService.updateBarbero(editingBarbero.id, apiData);
+      const mappedBarbero = barberosService.mapApiToComponent(updatedBarbero);
+      
+      setBarberos(barberos.map(b => b.id === editingBarbero.id ? mappedBarbero : b));
+      resetForm();
+      setIsDialogOpen(false);
+      setEditingBarbero(null);
+      success("¡Barbero actualizado!", `Los datos del barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" han sido actualizados exitosamente.`);
+    } catch (error: unknown) {
+      console.error('Error actualizando barbero:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      error("Error", `No se pudo actualizar el barbero: ${errorMessage}`);
+    }
   };
 
-  const handleDeleteBarbero = (barberoId: number) => {
-    const barbero = barberos.find(b => b.id === barberoId);
-    if (!barbero) return;
-
+  const handleDeleteBarbero = (barbero: Barbero) => {
     setBarberoToDelete(barbero);
     setIsDeleteDialogOpen(true);
   };
 
-  const toggleBarberoStatus = (barberoId: number) => {
-    setBarberos(barberos.map(barbero =>
-      barbero.id === barberoId
-        ? { ...barbero, status: barbero.status === 'active' ? 'inactive' : 'active' }
-        : barbero
-    ));
-    const barbero = barberos.find(b => b.id === barberoId);
-    toast.success(`Barbero ${barbero?.status === 'active' ? 'desactivado' : 'activado'} exitosamente`, {
-      style: {
-        background: 'var(--color-gray-darkest)',
-        border: '1px solid var(--color-orange-primary)',
-        color: 'var(--color-white-primary)',
-        borderRadius: '12px',
-        fontSize: '14px',
-        fontWeight: '500',
-        boxShadow: 'rgba(0, 0, 0, 0.5) 0px 4px 12px'
-      },
-      icon: barbero?.status === 'active' ? '🔴' : '🟢',
-      duration: 4000,
-    });
+  const confirmDeleteBarbero = async () => {
+    if (!barberoToDelete) return;
+
+    try {
+      await barberosService.deleteBarbero(barberoToDelete.id);
+      setBarberos(barberos.filter(b => b.id !== barberoToDelete.id));
+      setIsDeleteDialogOpen(false);
+      setBarberoToDelete(null);
+      success("¡Barbero eliminado!", `El barbero "${barberoToDelete.nombre || barberoToDelete.nombres} ${barberoToDelete.apellido || barberoToDelete.apellidos}" ha sido eliminado del sistema.`);
+    } catch (error: unknown) {
+      console.error('Error eliminando barbero:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      error("Error", `No se pudo eliminar el barbero: ${errorMessage}`);
+    }
+  };
+
+  // Función para cambiar el estado del barbero (activo/inactivo)
+  const toggleBarberoStatus = async (barberoId: number) => {
+    try {
+      const barbero = barberos.find(b => b.id === barberoId);
+      if (!barbero) {
+        console.error('Barbero no encontrado con ID:', barberoId);
+        return;
+      }
+
+      console.log('Barbero actual:', barbero);
+      const nuevoEstado = barbero.status === 'active' ? 'inactive' : 'active';
+      console.log('Nuevo estado (string):', nuevoEstado);
+      
+      // Conversión explícita a boolean para la API
+      const estadoBoolean = nuevoEstado === 'active';
+      console.log('Estado boolean final:', estadoBoolean);
+      
+      // Enviar todos los campos requeridos por la API (no soporta actualización parcial)
+      const datosParaAPI = {
+        id: barberoId,
+        usuarioId: barbero.usuarioId,
+        nombre: barbero.nombre || barbero.nombres,
+        apellido: barbero.apellido || barbero.apellidos,
+        documento: barbero.documento,
+        correo: barbero.correo,
+        telefono: barbero.telefono || barbero.celular,
+        especialidad: barbero.especialidad || '',
+        fotoPerfil: barbero.fotoPerfil || barbero.imagenUrl || '',
+        estado: estadoBoolean,
+        // Campos adicionales que la API podría esperar
+        tipoDocumento: barbero.tipoDocumento || 'Cédula',
+        direccion: barbero.direccion || '',
+        barrio: barbero.barrio || '',
+        fechaNacimiento: barbero.fechaNacimiento || '',
+        rol: barbero.rol || 'Barbero'
+      };
+      console.log('Datos para API (completos):', datosParaAPI);
+      
+      const updatedBarbero = await barberosService.updateBarbero(barberoId, datosParaAPI);
+      console.log('Respuesta de API:', updatedBarbero);
+      
+      // Si la API devuelve una respuesta vacía, construir el objeto actualizado manualmente
+      let mappedBarbero;
+      if (!updatedBarbero || Object.keys(updatedBarbero).length === 0) {
+        console.log('API devolvió respuesta vacía, construyendo objeto actualizado');
+        mappedBarbero = {
+          ...barbero,
+          status: nuevoEstado as 'active' | 'inactive',
+          estado: estadoBoolean
+        };
+      } else {
+        // Si la API devuelve datos, mapearlos normalmente
+        mappedBarbero = barberosService.mapApiToComponent(updatedBarbero);
+      }
+      
+      console.log('Barbero mapeado final:', mappedBarbero);
+      
+      setBarberos(barberos.map(b => b.id === barberoId ? mappedBarbero as Barbero : b));
+      success(
+        `Barbero ${nuevoEstado === 'active' ? 'activado' : 'desactivado'}`,
+        `El barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" ha sido ${nuevoEstado === 'active' ? 'activado' : 'desactivado'} exitosamente.`
+      );
+    } catch (err: unknown) {
+      console.error('Error cambiando estado del barbero:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      error("Error", `No se pudo cambiar el estado del barbero: ${errorMessage}`);
+    }
   };
 
 
@@ -329,88 +347,8 @@ export function BarberosPage() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-6 pt-4">
-                    {/* Identificación */}
+                    {/* Foto de Perfil y Tipo de Documento */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <IdCard className="w-4 h-4 text-orange-primary" />
-                          Tipo de Documento *
-                        </Label>
-                        <select
-                          id="tipoDocumento"
-                          value={newBarbero.tipoDocumento}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, tipoDocumento: e.target.value })}
-                          className="elegante-input w-full"
-                          disabled={editingBarbero !== null}
-                        >
-                          <option value="">Selecciona tipo de documento</option>
-                          {tiposDocumento.map((tipo) => (
-                            <option key={tipo} value={tipo}>
-                              {tipo}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <IdCard className="w-4 h-4 text-orange-primary" />
-                          Número de Documento *
-                        </Label>
-                        <Input
-                          id="documento"
-                          value={newBarbero.documento}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, documento: e.target.value })}
-                          className="elegante-input"
-                          placeholder="Número de documento"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Información Personal */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <User className="w-4 h-4 text-orange-primary" />
-                          Nombres *
-                        </Label>
-                        <Input
-                          id="nombres"
-                          value={newBarbero.nombres}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, nombres: e.target.value })}
-                          className="elegante-input"
-                          placeholder="Ingresa los nombres"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <User className="w-4 h-4 text-orange-primary" />
-                          Apellidos *
-                        </Label>
-                        <Input
-                          id="apellidos"
-                          value={newBarbero.apellidos}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, apellidos: e.target.value })}
-                          className="elegante-input"
-                          placeholder="Ingresa los apellidos"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Fecha de Nacimiento y Foto */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-orange-primary" />
-                          Fecha de Nacimiento
-                        </Label>
-                        <Input
-                          id="fechaNacimiento"
-                          type="date"
-                          value={newBarbero.fechaNacimiento}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, fechaNacimiento: e.target.value })}
-                          className="elegante-input"
-                        />
-                      </div>
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Camera className="w-4 h-4 text-orange-primary" />
@@ -456,6 +394,82 @@ export function BarberosPage() {
                           className="hidden"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <IdCard className="w-4 h-4 text-orange-primary" />
+                          Tipo de Documento *
+                        </Label>
+                        <select
+                          id="tipoDocumento"
+                          value={newBarbero.tipoDocumento}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, tipoDocumento: e.target.value })}
+                          className="elegante-input w-full"
+                          disabled={editingBarbero !== null}
+                        >
+                          <option value="">Selecciona tipo de documento</option>
+                          {tiposDocumento.map((tipo) => (
+                            <option key={tipo} value={tipo}>
+                              {tipo}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Información Personal y Documento */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <IdCard className="w-4 h-4 text-orange-primary" />
+                          Número de Documento *
+                        </Label>
+                        <Input
+                          id="documento"
+                          value={newBarbero.documento}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, documento: e.target.value })}
+                          className="elegante-input w-full"
+                          placeholder="Número de documento"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <User className="w-4 h-4 text-orange-primary" />
+                          Nombres *
+                        </Label>
+                        <Input
+                          id="nombres"
+                          value={newBarbero.nombre || ''}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, nombre: e.target.value })}
+                          className="elegante-input w-full"
+                          placeholder="Ingresa los nombres"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <User className="w-4 h-4 text-orange-primary" />
+                          Apellidos *
+                        </Label>
+                        <Input
+                          id="apellidos"
+                          value={newBarbero.apellido || ''}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, apellido: e.target.value })}
+                          className="elegante-input w-full"
+                          placeholder="Ingresa los apellidos"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-orange-primary" />
+                          Fecha de Nacimiento
+                        </Label>
+                        <Input
+                          id="fechaNacimiento"
+                          type="date"
+                          value={newBarbero.fechaNacimiento}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, fechaNacimiento: e.target.value })}
+                          className="elegante-input w-full"
+                        />
+                      </div>
                     </div>
 
                     {/* Información de Contacto */}
@@ -468,9 +482,9 @@ export function BarberosPage() {
                         <Input
                           id="correo"
                           type="email"
-                          value={newBarbero.correo}
+                          value={newBarbero.correo || ''}
                           onChange={(e) => setNewBarbero({ ...newBarbero, correo: e.target.value })}
-                          className="elegante-input"
+                          className="elegante-input w-full"
                           placeholder="correo@ejemplo.com"
                         />
                       </div>
@@ -481,84 +495,58 @@ export function BarberosPage() {
                         </Label>
                         <Input
                           id="celular"
-                          value={newBarbero.celular}
-                          onChange={(e) => setNewBarbero({ ...newBarbero, celular: e.target.value })}
-                          className="elegante-input"
+                          value={newBarbero.telefono || ''}
+                          onChange={(e) => setNewBarbero({ ...newBarbero, telefono: e.target.value })}
+                          className="elegante-input w-full"
                           placeholder="+57 300 123 4567"
                         />
                       </div>
+                    </div>
+
+                    {/* Especialidad */}
+                    <div className="space-y-2">
+                      <Label className="text-white-primary flex items-center gap-2">
+                        <Scissors className="w-4 h-4 text-orange-primary" />
+                        Especialidad
+                      </Label>
+                      <Input
+                        id="especialidad"
+                        value={newBarbero.especialidad || ''}
+                        onChange={(e) => setNewBarbero({ ...newBarbero, especialidad: e.target.value })}
+                        className="elegante-input w-full"
+                        placeholder="Ej: Cortes masculinos, Afeitados, Coloración, etc."
+                      />
                     </div>
 
                     {/* Dirección */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-orange-primary" />
+                          <Home className="w-4 h-4 text-orange-primary" />
                           Dirección
                         </Label>
                         <Input
                           id="direccion"
                           value={newBarbero.direccion}
                           onChange={(e) => setNewBarbero({ ...newBarbero, direccion: e.target.value })}
-                          className="elegante-input"
+                          className="elegante-input w-full"
                           placeholder="Dirección completa"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
-                          <Home className="w-4 h-4 text-orange-primary" />
+                          <MapPin className="w-4 h-4 text-orange-primary" />
                           Barrio
                         </Label>
                         <Input
                           id="barrio"
                           value={newBarbero.barrio}
                           onChange={(e) => setNewBarbero({ ...newBarbero, barrio: e.target.value })}
-                          className="elegante-input"
+                          className="elegante-input w-full"
                           placeholder="Nombre del barrio"
                         />
                       </div>
                     </div>
-
-                    {/* Contraseña */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-orange-primary" />
-                          Contraseña
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="password"
-                            type={showPassword ? 'text' : 'password'}
-                            value={newBarbero.password}
-                            onChange={(e) => setNewBarbero({ ...newBarbero, password: e.target.value })}
-                            className="elegante-input pr-10"
-                            placeholder="Contraseña del barbero"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-lighter hover:text-white-primary"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-orange-primary" />
-                          Generar Contraseña
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={generatePassword}
-                          className="elegante-button-secondary w-full"
-                        >
-                          Generar Contraseña Aleatoria
-                        </button>
-                      </div>
-                    </div>
-                  </div>
 
                   <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
                     <button
@@ -578,6 +566,7 @@ export function BarberosPage() {
                       {editingBarbero ? 'Actualizar Barbero' : 'Crear Barbero'}
                     </button>
                   </div>
+                </div>
                 </DialogContent>
               </Dialog>
 
@@ -610,7 +599,13 @@ export function BarberosPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="w-8 h-8 text-orange-primary animate-spin mr-3" />
+                <span className="text-white-primary">Cargando barberos...</span>
+              </div>
+            ) : (
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-dark">
                   <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Barbero</th>
@@ -629,14 +624,14 @@ export function BarberosPage() {
                         <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
                           <User className="w-5 h-5 text-gray-lighter" />
                         </div>
-                        <span className="text-gray-lighter">{barbero.nombres} {barbero.apellidos}</span>
+                        <span className="text-gray-lighter">{barbero.nombre || barbero.nombres} {barbero.apellido || barbero.apellidos}</span>
                       </div>
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-gray-lighter">{barbero.documento}</span>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{barbero.celular}</span>
+                      <span className="text-gray-lighter">{barbero.telefono || barbero.celular}</span>
                     </td>
                     <td className="py-4 px-4 text-center text-gray-lighter">{barbero.direccion}</td>
                     <td className="py-4 px-4">
@@ -670,7 +665,7 @@ export function BarberosPage() {
                           )}
                         </button>
                         <button
-                          onClick={() => handleDeleteBarbero(barbero.id)}
+                          onClick={() => handleDeleteBarbero(barbero)}
                           className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
                           title="Eliminar"
                         >
@@ -682,6 +677,7 @@ export function BarberosPage() {
                 ))}
               </tbody>
             </table>
+            )}
           </div>
 
           {/* Paginación */}
@@ -730,12 +726,12 @@ export function BarberosPage() {
                         ? {
                           ...b,
                           ...newBarbero,
-                          avatar: newBarbero.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
-                            newBarbero.apellidos.split(' ').map(n => n[0]).join('').toUpperCase()
+                          avatar: (newBarbero.nombre || '').split(' ').map(n => n[0]).join('').toUpperCase() +
+                            (newBarbero.apellido || '').split(' ').map(n => n[0]).join('').toUpperCase()
                         }
                         : b
                     ));
-                    success("Barbero actualizado", `Los datos de ${newBarbero.nombres} ${newBarbero.apellidos} han sido actualizados exitosamente.`);
+                    success("Barbero actualizado", `Los datos de ${newBarbero.nombre || ''} ${newBarbero.apellido || ''} han sido actualizados exitosamente.`);
                     setIsDialogOpen(false);
                     setEditingBarbero(null);
                     resetForm();
@@ -765,14 +761,7 @@ export function BarberosPage() {
                 Cancelar
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
-                  if (barberoToDelete) {
-                    setBarberos(barberos.filter(b => b.id !== barberoToDelete.id));
-                    success("Barbero eliminado", `El barbero ${barberoToDelete.nombres} ${barberoToDelete.apellidos} ha sido eliminado del sistema.`);
-                    setBarberoToDelete(null);
-                  }
-                  setIsDeleteDialogOpen(false);
-                }}
+                onClick={confirmDeleteBarbero}
                 className="bg-red-600 text-white hover:bg-red-700"
               >
                 Eliminar Barbero
@@ -792,11 +781,12 @@ export function BarberosPage() {
             </DialogHeader>
 
             {selectedBarbero && (
-              <div className="grid grid-cols-4 gap-6 pt-4">
-                <div className="col-span-4 flex items-center gap-4 p-4 bg-gray-darker rounded-lg border border-gray-dark">
+              <div className="pt-4">
+                {/* Información principal con foto */}
+                <div className="flex items-center gap-4 p-4 bg-gray-darker rounded-lg border border-gray-dark mb-6">
                   <Avatar className="w-16 h-16">
                     {selectedBarbero.imagenUrl ? (
-                      <AvatarImage src={selectedBarbero.imagenUrl} alt={`${selectedBarbero.nombres} ${selectedBarbero.apellidos}`} />
+                      <AvatarImage src={selectedBarbero.imagenUrl || selectedBarbero.fotoPerfil} alt={`${selectedBarbero.nombre || selectedBarbero.nombres} ${selectedBarbero.apellido || selectedBarbero.apellidos}`} />
                     ) : (
                       <AvatarFallback className="bg-orange-primary text-black-primary text-xl font-bold">
                         {selectedBarbero.avatar}
@@ -804,7 +794,7 @@ export function BarberosPage() {
                     )}
                   </Avatar>
                   <div>
-                    <h3 className="text-xl font-semibold text-white-primary">{selectedBarbero.nombres} {selectedBarbero.apellidos}</h3>
+                    <h3 className="text-xl font-semibold text-white-primary">{selectedBarbero.nombre || selectedBarbero.nombres} {selectedBarbero.apellido || selectedBarbero.apellidos}</h3>
                     <p className="text-gray-lighter">{selectedBarbero.correo}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="px-2 py-1 rounded-full text-xs bg-gray-medium text-gray-lighter">
@@ -814,29 +804,47 @@ export function BarberosPage() {
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Documento</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.tipoDocumento}: {selectedBarbero.documento}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Teléfono</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.celular}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Fecha de Nacimiento</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.fechaNacimiento || 'No especificada'}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Dirección</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.direccion || 'No especificada'}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Barrio</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.barrio || 'No especificado'}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-lighter text-sm mb-2 block">Fecha de Creación</Label>
-                  <p className="text-white-primary text-lg">{selectedBarbero.fechaCreacion}</p>
+                {/* Información detallada en dos columnas */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Columna izquierda */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Documento</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.tipoDocumento}: {selectedBarbero.documento}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Teléfono</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.telefono || selectedBarbero.celular}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Especialidad</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.especialidad || 'No especificada'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Fecha de Nacimiento</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.fechaNacimiento || 'No especificada'}</p>
+                    </div>
+                  </div>
+
+                  {/* Columna derecha */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Dirección</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.direccion || 'No especificada'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Barrio</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.barrio || 'No especificado'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">Fecha de Creación</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.fechaCreacion}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-2 block">ID de Usuario</Label>
+                      <p className="text-white-primary text-lg">{selectedBarbero.usuarioId || 'No asignado'}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
