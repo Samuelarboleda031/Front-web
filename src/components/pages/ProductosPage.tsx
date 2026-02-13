@@ -35,7 +35,7 @@ export function ProductosPage() {
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: '',
     descripcion: '',
-    categoria: '',
+    categoriaId: 0,  // 👈 Ahora usa ID numérico
     precioBase: 0,
     stockVentas: 0,
     stockInsumos: 0,
@@ -57,6 +57,8 @@ export function ProductosPage() {
           productoService.getProductos(),
           productoService.getCategorias()
         ]);
+        console.log('🔍 API Response - productosData:', productosData);
+        console.log('🔍 First product structure:', productosData[0]);
         setProductos(productosData);
         setCategorias(categoriasData);
       } catch (error: any) {
@@ -72,7 +74,7 @@ export function ProductosPage() {
 
   const filteredProductos = productos.filter(producto => {
     const matchesSearch = producto.nombre.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategoria = filterCategoria === "all" || producto.categoria === filterCategoria;
+    const matchesCategoria = filterCategoria === "all" || producto.categoria?.nombre === filterCategoria;
     return matchesSearch && matchesCategoria;
   });
 
@@ -88,7 +90,17 @@ export function ProductosPage() {
   };
 
   const handleCategoriaChange = (value: string) => {
-    setFilterCategoria(value);
+    if (value === "all") {
+      setFilterCategoria("all");
+      setNuevoProducto({ ...nuevoProducto, categoriaId: 0 });
+    } else {
+      // Buscar la categoría por nombre y obtener su ID
+      const categoriaEncontrada = categorias.find(cat => cat.nombre === value);
+      if (categoriaEncontrada) {
+        setFilterCategoria(value);
+        setNuevoProducto({ ...nuevoProducto, categoriaId: categoriaEncontrada.id });
+      }
+    }
     setCurrentPage(1);
   };
 
@@ -154,7 +166,7 @@ export function ProductosPage() {
   // Total de ventas potenciales (solo stock destinado a ventas)
   const totalVentasPotenciales = productos.reduce((acum, producto) => {
     const stockVentas = producto.stockVentas ?? 0;
-    return acum + stockVentas * (producto.precio || 0);
+    return acum + stockVentas * (producto.precioBase || 0);
   }, 0);
 
   const handleCreateProducto = () => {
@@ -370,9 +382,9 @@ const uploadImage = async (file: File): Promise<string> => {
 
     const result: UploadResponse = await response.json();
     return result.url;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error uploading image:', err);
+    throw err;
   }
 };
 
@@ -591,26 +603,25 @@ const uploadImage = async (file: File): Promise<string> => {
                           className="elegante-input"
                         />
                       </div>
-                     
+                       {/* Configuración de Precios */}
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-orange-primary" />
+                          Precio *
+                        </Label>
+                        <Input
+                          type="number"
+                          step="1000"
+                          value={nuevoProducto.precioBase}
+                          onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioBase: parseFloat(e.target.value) || 0 })}
+                          className="elegante-input"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                    {/* Configuración de Precios */}
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-orange-primary" />
-                        Precio *
-                      </Label>
-                      <Input
-                        type="number"
-                        step="1000"
-                        value={nuevoProducto.precioBase}
-                        onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioBase: parseFloat(e.target.value) || 0 })}
-                        className="elegante-input"
-                        placeholder="0"
-                      />
-                    </div>
-
+                   
                     {/* Inventario - Solo Lectura */}
                     <div className="space-y-4">
                       <div className="p-4 bg-orange-primary/10 border border-orange-primary/30 rounded-lg">
@@ -786,24 +797,9 @@ const uploadImage = async (file: File): Promise<string> => {
               >
                 <option value="all">Todas las categorías</option>
                 {categorias.map((categoria) => (
-                  <option key={categoria} value={categoria}>{categoria}</option>
+                  <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>
                 ))}
               </select>
-            </div>
-
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-              <div className="text-sm text-gray-lightest">
-                Mostrando {displayedProductos.length} de {filteredProductos.length} productos
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest flex items-center gap-1">
-                  <Calculator className="w-4 h-4 text-orange-primary" />
-                  Ventas potenciales totales:
-                  <span className="text-orange-primary font-semibold">
-                    ${formatCurrency(totalVentasPotenciales)}
-                  </span>
-                </span>
-              </div>
             </div>
           </div>
 
@@ -828,7 +824,7 @@ const uploadImage = async (file: File): Promise<string> => {
                   const cantidadStatus = getCantidadStatus(stockTotal, producto.minCantidad);
                   const stockVentas = producto.stockVentas ?? 0;
                   const stockInsumos = producto.stockInsumos ?? 0;
-                  const totalVentasProducto = stockVentas * (producto.precio || 0);
+                  const totalVentasProducto = stockVentas * (producto.precioBase || 0);
                   return (
                     <tr key={producto.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
                       <td className="py-4 px-4">
@@ -844,7 +840,7 @@ const uploadImage = async (file: File): Promise<string> => {
                         <span className="text-gray-lighter">{producto.nombre}</span>
                       </td>
                       <td className="py-4 px-4">
-                        <span className="text-gray-lighter">{formatearPrecio(producto.precio)}</span>
+                        <span className="text-gray-lighter">{formatearPrecio(producto.precioBase)}</span>
                       </td>
                       <td className="py-4 px-4">
                         <span className="text-gray-lighter">{stockVentas}</span>
@@ -1014,139 +1010,152 @@ const uploadImage = async (file: File): Promise<string> => {
             </DialogHeader>
 
             {selectedProducto && (
-              <div className="grid grid-cols-4 gap-6 pt-4">
-                <div className="col-span-4 flex items-center gap-4 p-4 bg-gray-darker rounded-lg border border-gray-dark">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-dark flex items-center justify-center">
-                    {selectedProducto.imagen ? (
-                      <img src={selectedProducto.imagen} alt={selectedProducto.nombre} className="w-full h-full object-cover" />
-                    ) : (
-                      <Package className="w-8 h-8 text-gray-lighter" />
-                    )}
+              <div className="grid grid-cols-2 gap-6 pt-4">
+                {/* SECCIÓN 1: INFORMACIÓN PRINCIPAL */}
+                <div className="space-y-6">
+                  {/* Header con imagen y datos básicos */}
+                  <div className="flex items-center gap-4 p-4 bg-gray-darker rounded-lg border border-gray-dark">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-dark flex items-center justify-center">
+                      {selectedProducto.imagen ? (
+                        <img src={selectedProducto.imagen} alt={selectedProducto.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-8 h-8 text-gray-lighter" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-white-primary">{selectedProducto.nombre}</h3>
+                      <p className="text-gray-lighter">{selectedProducto.descripcion || 'Sin descripción'}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoriaColor(selectedProducto.categoria?.nombre || 'Sin categoría')}`}>
+                          {selectedProducto.categoria?.nombre || 'Sin categoría'}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${selectedProducto.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                          {selectedProducto.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white-primary">{selectedProducto.nombre}</h3>
-                    <p className="text-gray-lighter">{selectedProducto.descripcion}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoriaColor(selectedProducto.categoria)}`}>
-                        {selectedProducto.categoria}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${selectedProducto.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-                        {selectedProducto.activo ? 'Activo' : 'Inactivo'}
-                      </span>
+
+                  {/* Datos Básicos */}
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-orange-primary mb-3 flex items-center gap-2">
+                      <Tags className="w-4 h-4" /> Datos Básicos
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Nombre del Producto</Label>
+                        <p className="text-white-primary font-medium">{selectedProducto.nombre}</p>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Marca</Label>
+                        <p className="text-white-primary">{selectedProducto.marca || 'Sin marca'}</p>
+                      </div>
+
+                      <div className="col-span-2">
+                        <Label className="text-gray-lighter text-sm mb-1 block">Descripción</Label>
+                        <p className="text-white-primary">{selectedProducto.descripcion || 'Sin descripción'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Configuración de Precios */}
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-green-400 mb-3 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" /> Configuración de Precios
+                    </h3>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Precio Base</Label>
+                        <p className="text-white-primary text-lg">${formatCurrency(selectedProducto.precioBase)}</p>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">IVA</Label>
+                        <p className="text-white-primary text-lg">{selectedProducto.porcentajeIva}%</p>
+                      </div>
+
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Precio Final</Label>
+                        <p className="text-orange-primary font-semibold text-xl">{formatearPrecio(selectedProducto.precioBase)}</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-medium pt-3">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-gray-lighter text-sm">Valor IVA</Label>
+                        <p className="text-white-primary text-lg">${formatCurrency(selectedProducto.iva)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* COLUMNA 1: DATOS BÁSICOS */}
-                <div className="space-y-3">
-                  <h3 className="text-base font-semibold text-orange-primary mb-2 flex items-center gap-2">
-                    <Tags className="w-4 h-4" /> Datos Básicos
-                  </h3>
+                {/* SECCIÓN 2: INVENTARIO Y MULTIMEDIA */}
+                <div className="space-y-6">
+                  {/* Inventario y Estado */}
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                      <Boxes className="w-4 h-4" /> Inventario & Estado
+                    </h3>
 
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Nombre del Producto</Label>
-                    <p className="text-white-primary font-medium">{selectedProducto.nombre}</p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Categoría</Label>
-                    <p className="text-white-primary">{selectedProducto.categoria}</p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Marca</Label>
-                    <p className="text-white-primary">{selectedProducto.marca}</p>
-                  </div>
-                </div>
-
-                {/* COLUMNA 2: PRECIOS */}
-                <div className="space-y-3">
-                  <h3 className="text-base font-semibold text-green-400 mb-2 flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" /> Configuración de Precios
-                  </h3>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Precio Base</Label>
-                    <p className="text-white-primary text-lg">${formatCurrency(selectedProducto.precioBase)}</p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">IVA</Label>
-                    <p className="text-white-primary text-lg">{selectedProducto.porcentajeIva}% (${formatCurrency(selectedProducto.iva)})</p>
-                  </div>
-
-                  <div className="border-t border-gray-medium pt-3">
-                    <Label className="text-gray-lighter text-sm mb-1 block">Precio Final</Label>
-                    <p className="text-orange-primary font-semibold text-xl">{formatearPrecio(selectedProducto.precio)}</p>
-                  </div>
-                </div>
-
-                {/* COLUMNA 3: INVENTARIO Y MOVIMIENTOS */}
-                <div className="space-y-3">
-                  <h3 className="text-base font-semibold text-blue-400 mb-2 flex items-center gap-2">
-                    <Boxes className="w-4 h-4" /> Inventario & Estado
-                  </h3>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Stock para Ventas</Label>
-                    <p className="text-white-primary text-lg">
-                      {(selectedProducto.stockVentas ?? 0)} unidades
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Stock para Entregas</Label>
-                    <p className="text-white-primary text-lg">
-                      {(selectedProducto.stockInsumos ?? 0)} unidades
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Stock Total</Label>
-                    <p className="text-white-primary text-lg">
-                      {getStockTotal(selectedProducto)} unidades
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Cantidad Mínima</Label>
-                    <p className="text-white-primary text-lg">
-                      {selectedProducto.minCantidad} unidades
-                    </p>
-                  </div>
-                </div>
-
-                {/* COLUMNA 4: MULTIMEDIA */}
-                <div className="space-y-3">
-                  <h3 className="text-base font-semibold text-purple-400 mb-2 flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4" /> Multimedia
-                  </h3>
-
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">URL Imagen</Label>
-                    <p className="text-white-primary break-all">{selectedProducto.imagen || 'Sin imagen definida'}</p>
-                  </div>
-
-                  <div className="relative w-full h-32 rounded-lg overflow-hidden border-2 border-gray-dark bg-gray-darker flex items-center justify-center">
-                    {selectedProducto.imagen ? (
-                      <img
-                        src={selectedProducto.imagen}
-                        alt={selectedProducto.nombre}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-gray-500 flex flex-col items-center">
-                        <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
-                        <span className="text-xs">Sin imagen</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Stock Total</Label>
+                        <p className="text-white-primary text-lg font-semibold">
+                          {getStockTotal(selectedProducto)} unidades
+                        </p>
                       </div>
-                    )}
+
+                      <div>
+                        <Label className="text-gray-lighter text-sm mb-1 block">Cantidad Mínima</Label>
+                        <p className="text-white-primary text-lg">
+                          {selectedProducto.minCantidad} unidades
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Estado del stock */}
+                    <div className="border-t border-gray-medium pt-3">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-gray-lighter text-sm">Estado del Inventario</Label>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          getStockTotal(selectedProducto) <= selectedProducto.minCantidad 
+                            ? 'bg-red-600 text-white' 
+                            : 'bg-green-600 text-white'
+                        }`}>
+                          {getStockTotal(selectedProducto) <= selectedProducto.minCantidad ? 'Stock Bajo' : 'Stock Normal'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <Label className="text-gray-lighter text-sm mb-1 block">Descripción</Label>
-                    <p className="text-white-primary text-sm whitespace-pre-line">
-                      {selectedProducto.descripcion || 'Sin descripción registrada'}
-                    </p>
+                  {/* Multimedia */}
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-purple-400 mb-3 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" /> Multimedia
+                    </h3>
+
+                    <div>
+                      <Label className="text-gray-lighter text-sm mb-1 block">URL Imagen</Label>
+                      <p className="text-white-primary break-all text-sm">{selectedProducto.imagen || 'Sin imagen definida'}</p>
+                    </div>
+
+                    <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-dark bg-gray-darker flex items-center justify-center">
+                      {selectedProducto.imagen ? (
+                        <img
+                          src={selectedProducto.imagen}
+                          alt={selectedProducto.nombre}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-gray-500 flex flex-col items-center">
+                          <ImageIcon className="w-12 h-12 mb-2 opacity-50" />
+                          <span className="text-sm">Sin imagen</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

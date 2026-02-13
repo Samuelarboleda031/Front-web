@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { Input } from "../ui/input";
 import { Scissors, Plus, Edit, Trash2, Search, Eye, ChevronLeft, ChevronRight, ToggleRight, ToggleLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
@@ -6,93 +6,50 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { useCustomAlert } from "../ui/custom-alert";
+import { apiService, Servicio } from "../../services/api";
 
-const serviciosData = [
-  {
-    id: 1,
-    nombre: "Corte Caballero",
-    descripcion: "Corte clásico masculino con tijera y máquina",
-    duracion: 30,
-    precio: 35000,
-    activo: true
-  },
-  {
-    id: 2,
-    nombre: "Corte + Barba",
-    descripcion: "Corte completo con arreglo de barba y bigote",
-    duracion: 60,
-    precio: 55000,
-    activo: true
-  },
-  {
-    id: 3,
-    nombre: "Afeitado Clásico",
-    descripcion: "Afeitado tradicional con navaja y toalla caliente",
-    duracion: 30,
-    precio: 30000,
-    activo: true
-  },
-  {
-    id: 4,
-    nombre: "Corte Dama",
-    descripcion: "Corte femenino con lavado y secado",
-    duracion: 45,
-    precio: 45000,
-    activo: true
-  },
-  {
-    id: 5,
-    nombre: "Tratamiento Capilar",
-    descripcion: "Tratamiento nutritivo e hidratante para el cabello",
-    duracion: 90,
-    precio: 85000,
-    activo: true
-  },
-  {
-    id: 6,
-    nombre: "Peinado Evento",
-    descripcion: "Peinado especial para eventos y ocasiones importantes",
-    duracion: 60,
-    precio: 70000,
-    activo: true
-  },
-  {
-    id: 7,
-    nombre: "Tintura",
-    descripcion: "Coloración completa del cabello",
-    duracion: 120,
-    precio: 120000,
-    activo: true
-  },
-  {
-    id: 8,
-    nombre: "Mechas",
-    descripcion: "Aplicación de mechas y reflejos",
-    duracion: 150,
-    precio: 150000,
-    activo: false
-  }
-];
 
 export function ServiciosPage() {
   const { created, edited, deleted, AlertContainer } = useCustomAlert();
-  const [servicios, setServicios] = useState(serviciosData);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [editingServicio, setEditingServicio] = useState<any>(null);
-  const [selectedServicio, setSelectedServicio] = useState<any>(null);
-  const [servicioToDelete, setServicioToDelete] = useState<any>(null);
+  const [editingServicio, setEditingServicio] = useState<Servicio | null>(null);
+  const [selectedServicio, setSelectedServicio] = useState<Servicio | null>(null);
+  const [servicioToDelete, setServicioToDelete] = useState<Servicio | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const itemsPerPage = 5;
+
+  // Cargar servicios desde la API
+  const loadServicios = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.getServicios();
+      setServicios(data);
+    } catch (err: any) {
+      console.error('Error cargando servicios:', err);
+      setError(err.message || 'Error al cargar los servicios');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadServicios();
+  }, []);
 
   const [nuevoServicio, setNuevoServicio] = useState({
     nombre: '',
     descripcion: '',
     duracion: 30,
     precio: 0,
-    activo: true
+    estado: true
   });
 
   const filteredServicios = servicios.filter(servicio => {
@@ -106,75 +63,90 @@ export function ServiciosPage() {
   const displayedServicios = filteredServicios.slice(startIndex, startIndex + itemsPerPage);
 
 
-  const handleCreateServicio = () => {
-    const servicio = {
-      id: Date.now(),
-      ...nuevoServicio,
-      precio: parseFloat(nuevoServicio.precio.toString())
-    };
-    setServicios([...servicios, servicio]);
-    setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, activo: true });
-    setIsDialogOpen(false);
+  const handleCreateServicio = async () => {
+    try {
+      setSubmitting(true);
+      await apiService.createServicio(nuevoServicio);
+      await loadServicios(); // Recargar todos los servicios
+      setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, estado: true });
+      setIsDialogOpen(false);
 
-    created("Servicio creado ✔️", `El servicio "${servicio.nombre}" ha sido agregado exitosamente con una duración de ${servicio.duracion} minutos y precio de ${servicio.precio.toLocaleString('es-CO')}.`);
+      created("Servicio creado ✔️", `El servicio "${nuevoServicio.nombre}" ha sido agregado exitosamente.`);
+    } catch (err: any) {
+      console.error('Error creando servicio:', err);
+      setError(err.message || 'Error al crear el servicio');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleEditServicio = (servicio: any) => {
+  const handleEditServicio = (servicio: Servicio) => {
     setEditingServicio(servicio);
     setNuevoServicio({
       nombre: servicio.nombre,
       descripcion: servicio.descripcion,
       duracion: servicio.duracion,
       precio: servicio.precio,
-      activo: servicio.activo
+      estado: servicio.estado
     });
     setIsDialogOpen(true);
   };
 
-  const handleUpdateServicio = () => {
+  const handleUpdateServicio = async () => {
     if (editingServicio) {
-      const servicioActualizado = {
-        ...editingServicio,
-        ...nuevoServicio,
-        precio: parseFloat(nuevoServicio.precio.toString())
-      };
-      setServicios(servicios.map(s =>
-        s.id === editingServicio.id ? servicioActualizado : s
-      ));
-      setEditingServicio(null);
-      setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, activo: true });
-      setIsDialogOpen(false);
+      try {
+        setSubmitting(true);
+        await apiService.updateServicio(editingServicio.id, nuevoServicio);
+        await loadServicios(); // Recargar todos los servicios
+        setEditingServicio(null);
+        setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, estado: true });
+        setIsDialogOpen(false);
 
-      edited("Servicio editado ✔️", `El servicio "${servicioActualizado.nombre}" ha sido actualizado exitosamente con una duración de ${servicioActualizado.duracion} minutos y precio de ${servicioActualizado.precio.toLocaleString('es-CO')}.`);
+        edited("Servicio editado ✔️", `El servicio "${nuevoServicio.nombre}" ha sido actualizado exitosamente.`);
+      } catch (err: any) {
+        console.error('Error actualizando servicio:', err);
+        setError(err.message || 'Error al actualizar el servicio');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
-  const handleDeleteServicio = (servicio: any) => {
+  const handleDeleteServicio = (servicio: Servicio) => {
     setServicioToDelete(servicio);
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (servicioToDelete) {
-      setServicios(servicios.filter(s => s.id !== servicioToDelete.id));
-      setIsDeleteDialogOpen(false);
+      try {
+        await apiService.deleteServicio(servicioToDelete.id);
+        await loadServicios(); // Recargar todos los servicios
+        setIsDeleteDialogOpen(false);
 
-      deleted("Servicio eliminado ✔️", `El servicio "${servicioToDelete.nombre}" ha sido eliminado exitosamente del catálogo.`);
-      setServicioToDelete(null);
+        deleted("Servicio eliminado ✔️", `El servicio "${servicioToDelete.nombre}" ha sido eliminado exitosamente del catálogo.`);
+        setServicioToDelete(null);
+      } catch (err: any) {
+        console.error('Error eliminando servicio:', err);
+        setError(err.message || 'Error al eliminar el servicio');
+      }
     }
   };
 
-  const toggleActivo = (servicioId: number) => {
+  const toggleActivo = async (servicioId: number) => {
     const servicio = servicios.find(s => s.id === servicioId);
     if (!servicio) return;
 
-    setServicios(servicios.map(s =>
-      s.id === servicioId
-        ? { ...s, activo: !s.activo }
-        : s
-    ));
+    try {
+      const nuevoEstado = !servicio.estado;
+      await apiService.updateServicioStatus(servicioId, nuevoEstado);
+      await loadServicios(); // Recargar todos los servicios
 
-    edited(`Servicio ${!servicio.activo ? 'activado' : 'desactivado'} ✔️`, `El servicio "${servicio.nombre}" ha sido ${!servicio.activo ? 'activado' : 'desactivado'} exitosamente.`);
+      edited(`Servicio ${!servicio.estado ? 'activado' : 'desactivado'} ✔️`, `El servicio "${servicio.nombre}" ha sido ${!servicio.estado ? 'activado' : 'desactivado'} exitosamente.`);
+    } catch (err: any) {
+      console.error('Error actualizando estado del servicio:', err);
+      setError(err.message || 'Error al actualizar el estado del servicio');
+    }
   };
 
   return (
@@ -191,7 +163,7 @@ export function ServiciosPage() {
                     className="elegante-button-primary gap-2 flex items-center"
                     onClick={() => {
                       setEditingServicio(null);
-                      setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, activo: true });
+                      setNuevoServicio({ nombre: '', descripcion: '', duracion: 30, precio: 0, estado: true });
                     }}
                   >
                     <Plus className="w-4 h-4" />
@@ -213,86 +185,116 @@ export function ServiciosPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Servicio</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Descripción</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Duración</th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Precio</th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedServicios.map((servicio) => (
-                  <tr key={servicio.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-gray-medium flex items-center justify-center">
-                          <Scissors className="w-5 h-5 text-orange-primary" />
-                        </div>
-                        <span className="text-gray-lighter">{servicio.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{servicio.descripcion}</span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="text-gray-lighter">{servicio.duracion} min</span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <span className="text-gray-lighter">${servicio.precio.toLocaleString('es-CO')}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedServicio(servicio);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleEditServicio(servicio)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => toggleActivo(servicio.id)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={servicio.activo ? "Desactivar servicio" : "Activar servicio"}
-                        >
-                          {servicio.activo ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteServicio(servicio)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {displayedServicios.length === 0 && (
+            {/* Loading State */}
+            {loading && (
               <div className="text-center py-8">
-                <Scissors className="w-16 h-16 text-gray-medium mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white-primary mb-2">No se encontraron servicios</h3>
-                <p className="text-gray-lightest">Intenta con otros términos de búsqueda</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-primary mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold text-white-primary mb-2">Cargando servicios...</h3>
+                <p className="text-gray-lightest">Por favor espera un momento</p>
               </div>
+            )}
+
+            {/* Error State */}
+            {error && !loading && (
+              <div className="text-center py-8">
+                <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-4">
+                  <h3 className="text-lg font-semibold text-red-400 mb-2">Error al cargar los servicios</h3>
+                  <p className="text-red-300 mb-4">{error}</p>
+                  <button
+                    onClick={loadServicios}
+                    className="px-4 py-2 bg-orange-primary text-white rounded-lg hover:bg-orange-primary/80 transition-colors"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Data Table */}
+            {!loading && !error && (
+              <>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-dark">
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Servicio</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Descripción</th>
+                      <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Duración</th>
+                      <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Precio</th>
+                      <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedServicios.map((servicio) => (
+                      <tr key={servicio.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-xl bg-gray-medium flex items-center justify-center">
+                              <Scissors className="w-5 h-5 text-orange-primary" />
+                            </div>
+                            <span className="text-gray-lighter">{servicio.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">{servicio.descripcion}</span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-gray-lighter">{servicio.duracion} min</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-gray-lighter">${servicio.precio.toLocaleString('es-CO')}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedServicio(servicio);
+                                setIsDetailDialogOpen(true);
+                              }}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Ver detalles"
+                            >
+                              <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                            </button>
+                            <button
+                              onClick={() => handleEditServicio(servicio)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                            </button>
+                            <button
+                              onClick={() => toggleActivo(servicio.id)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Cambiar estado"
+                            >
+                              {servicio.estado ? (
+                                <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteServicio(servicio)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {displayedServicios.length === 0 && (
+                  <div className="text-center py-8">
+                    <Scissors className="w-16 h-16 text-gray-medium mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white-primary mb-2">No se encontraron servicios</h3>
+                    <p className="text-gray-lightest">Intenta con otros términos de búsqueda</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -374,8 +376,8 @@ export function ServiciosPage() {
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                checked={nuevoServicio.activo}
-                onChange={(e) => setNuevoServicio({ ...nuevoServicio, activo: e.target.checked })}
+                checked={nuevoServicio.estado}
+                onChange={(e) => setNuevoServicio({ ...nuevoServicio, estado: e.target.checked })}
                 className="rounded"
               />
               <Label className="text-white-primary">Servicio activo</Label>
@@ -387,9 +389,16 @@ export function ServiciosPage() {
               <button
                 onClick={editingServicio ? handleUpdateServicio : handleCreateServicio}
                 className="elegante-button-primary"
-                disabled={!nuevoServicio.nombre}
+                disabled={!nuevoServicio.nombre || submitting}
               >
-                {editingServicio ? 'Actualizar' : 'Crear'} Servicio
+                {submitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {editingServicio ? 'Actualizando...' : 'Creando...'}
+                  </>
+                ) : (
+                  <>{editingServicio ? 'Actualizar' : 'Crear'} Servicio</>
+                )}
               </button>
             </div>
           </DialogContent>

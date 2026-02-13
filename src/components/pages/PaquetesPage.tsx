@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Gift,
   Plus,
@@ -10,12 +10,9 @@ import {
   Clock,
   DollarSign,
   Scissors,
-  Users,
-  TrendingUp,
   Package,
   ChevronLeft,
   ChevronRight,
-  Settings,
   X,
   Trash2,
   Calculator,
@@ -27,78 +24,70 @@ import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
-
-const paquetesData = [
-  {
-    id: 1,
-    nombre: "Paquete Premium Completo",
-    descripcion: "El servicio más completo para el caballero moderno",
-    servicios: ["Corte de cabello", "Recorte de barba", "Perfilado de cejas"],
-    duracion: 90,
-    precio: 120000,
-    descuento: 15,
-    precioOriginal: 141000,
-    clientesAtendidos: 142,
-    categoria: "Premium",
-    activo: true
-  },
-  {
-    id: 2,
-    nombre: "Paquete Elegante Plus",
-    descripcion: "Elegancia y precisión en cada detalle",
-    servicios: ["Corte de cabello", "Afeitado de barba", "Perfilado de cejas"],
-    duracion: 85,
-    precio: 110000,
-    descuento: 12,
-    precioOriginal: 125000,
-    clientesAtendidos: 98,
-    categoria: "Premium",
-    activo: true
-  },
-  {
-    id: 3,
-    nombre: "Paquete Clásico Duo",
-    descripcion: "La combinación perfecta de corte y afeitado",
-    servicios: ["Corte de cabello", "Afeitado de barba"],
-    duracion: 70,
-    precio: 80000,
-    descuento: 10,
-    precioOriginal: 89000,
-    clientesAtendidos: 156,
-    categoria: "Clásico",
-    activo: true
-  },
-  {
-    id: 4,
-    nombre: "Paquete Estilo Moderno",
-    descripcion: "Corte moderno con detalles perfectos",
-    servicios: ["Corte de cabello", "Perfilado de cejas"],
-    duracion: 50,
-    precio: 65000,
-    descuento: 8,
-    precioOriginal: 71000,
-    clientesAtendidos: 89,
-    categoria: "Moderno",
-    activo: true
-  }
-];
+import { apiService, Paquete } from "../../services/api";
 
 const categorias = ["Premium", "Clásico", "Moderno", "Especial"];
-const metodosPago = ["Efectivo", "Tarjeta de crédito", "Tarjeta débito", "Transferencia", "Nequi", "Daviplata"];
 
 export function PaquetesPage() {
   const { created, edited, deleted, AlertContainer } = useCustomAlert();
   const { confirmCreateAction, DoubleConfirmationContainer } = useDoubleConfirmation();
-  const [paquetes, setPaquetes] = useState(paquetesData);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [editingPaquete, setEditingPaquete] = useState<any>(null);
-  const [selectedPaquete, setSelectedPaquete] = useState<any>(null);
+  const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
+  const [selectedPaquete, setSelectedPaquete] = useState<Paquete | null>(null);
+  const [detallePaquete, setDetallePaquete] = useState<any[]>([]);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("all");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(8);
+  const [itemsPerPage] = useState(8);
+
+  // Load paquetes from API
+  useEffect(() => {
+    const loadPaquetes = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getPaquetes();
+        setPaquetes(data);
+      } catch (error) {
+        console.error('Error loading paquetes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPaquetes();
+  }, []);
+
+  // Function to reload paquetes
+  const loadPaquetes = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getPaquetes();
+      setPaquetes(data);
+    } catch (error) {
+      console.error('Error loading paquetes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to load detalle paquete
+  const loadDetallePaquete = async (paqueteId: number) => {
+    try {
+      setLoadingDetalle(true);
+      const data = await apiService.getDetallePaquetesByPaqueteId(paqueteId);
+      setDetallePaquete(data);
+    } catch (error) {
+      console.error('Error loading detalle paquete:', error);
+      setDetallePaquete([]);
+    } finally {
+      setLoadingDetalle(false);
+    }
+  };
 
   const [servicioSeleccionado, setServicioSeleccionado] = useState('');
   const [serviciosAgregados, setServiciosAgregados] = useState<Array<{ nombre: string, precio: number }>>([]);
@@ -193,18 +182,6 @@ export function PaquetesPage() {
     });
   };
 
-  const actualizarPrecioServicio = (nombreServicio: string, nuevoPrecio: number) => {
-    const nuevosServicios = serviciosAgregados.map(s =>
-      s.nombre === nombreServicio ? { ...s, precio: nuevoPrecio } : s
-    );
-
-    setServiciosAgregados(nuevosServicios);
-    setNuevoPaquete({
-      ...nuevoPaquete,
-      precio: nuevosServicios.reduce((total, s) => total + s.precio, 0)
-    });
-  };
-
   // Funciones para cálculos automáticos
   const calcularSubtotal = () => {
     return nuevoPaquete.precio;
@@ -220,28 +197,33 @@ export function PaquetesPage() {
     return subtotal - descuento;
   };
 
-  const handleCreatePaquete = () => {
+  const handleCreatePaquete = async () => {
     if (!nuevoPaquete.nombre || !nuevoPaquete.descripcion || nuevoPaquete.servicios.length === 0) {
-      // Toast de error si faltan campos requeridos 
       return;
     }
 
-    const paquete = {
-      id: Date.now(),
-      ...nuevoPaquete,
-      precio: parseFloat(nuevoPaquete.precio.toString()),
-      precioOriginal: parseFloat(nuevoPaquete.precio.toString()) * (1 + nuevoPaquete.descuento / 100),
-      clientesAtendidos: Math.floor(Math.random() * 100) + 20
-    };
-    setPaquetes([...paquetes, paquete]);
-    setNuevoPaquete({ ...estadoInicialPaquete });
-    setServiciosAgregados([]);
-    setIsDialogOpen(false);
+    try {
+      const paqueteData = {
+        ...nuevoPaquete,
+        precio: parseFloat(nuevoPaquete.precio.toString()),
+        precioOriginal: parseFloat(nuevoPaquete.precio.toString()) * (1 + nuevoPaquete.descuento / 100),
+        clientesAtendidos: 0,
+        categoria: nuevoPaquete.categoria || 'General'
+      };
 
-    created("Paquete creado exitosamente", `El paquete "${paquete.nombre}" ha sido creado correctamente.`);
+      const createdPaquete = await apiService.createPaquete(paqueteData);
+      setPaquetes([...paquetes, createdPaquete]);
+      setNuevoPaquete({ ...estadoInicialPaquete });
+      setServiciosAgregados([]);
+      setIsDialogOpen(false);
+
+      created("Paquete creado exitosamente", `El paquete "${createdPaquete.nombre}" ha sido creado correctamente.`);
+    } catch (error) {
+      console.error('Error creating paquete:', error);
+    }
   };
 
-  const handleEditPaquete = (paquete: any) => {
+  const handleEditPaquete = (paquete: Paquete) => {
     setEditingPaquete(paquete);
     const serviciosArray = Array.isArray(paquete.servicios) ? paquete.servicios : [];
     const serviciosTexto = serviciosArray.join(', ');
@@ -265,39 +247,42 @@ export function PaquetesPage() {
       descuento: paquete.descuento || 0,
       categoria: paquete.categoria || '',
       activo: paquete.activo ?? true,
-      metodoPago: paquete.metodoPago || '',
-      porcentajeDescuento: paquete.porcentajeDescuento || 0
+      metodoPago: '',
+      porcentajeDescuento: 0
     });
 
     setServiciosAgregados(serviciosConPrecio);
     setIsDialogOpen(true);
   };
 
-  const handleUpdatePaquete = () => {
+  const handleUpdatePaquete = async () => {
     if (!editingPaquete) return;
 
     const nombrePaquete = nuevoPaquete.nombre;
     const tempPaqueteData = { ...nuevoPaquete };
-    const tempEditingPaquete = { ...editingPaquete };
 
     // Cerrar el modal temporalmente para evitar conflictos de z-index
     setIsDialogOpen(false);
 
     confirmCreateAction(
       `${nombrePaquete}`,
-      () => {
-        setPaquetes(paquetes.map(p =>
-          p.id === tempEditingPaquete.id ? {
-            ...p,
+      async () => {
+        try {
+          const updatedPaquete = await apiService.updatePaquete(editingPaquete.id, {
             ...tempPaqueteData,
             precio: parseFloat(tempPaqueteData.precio.toString()),
             precioOriginal: parseFloat(tempPaqueteData.precio.toString()) * (1 + tempPaqueteData.descuento / 100)
-          } : p
-        ));
-
-        setEditingPaquete(null);
-        setNuevoPaquete({ ...estadoInicialPaquete });
-        setServiciosAgregados([]);
+          });
+          
+          await loadPaquetes(); // Recargar todos los paquetes como en ServiciosPage
+          setEditingPaquete(null);
+          setNuevoPaquete({ ...estadoInicialPaquete });
+          setServiciosAgregados([]);
+          
+          edited("Paquete actualizado exitosamente ✔️", `El paquete "${nombrePaquete}" ha sido actualizado correctamente con la nueva información.`);
+        } catch (error) {
+          console.error('Error updating paquete:', error);
+        }
       },
       {
         confirmTitle: 'Actualizar Paquete',
@@ -309,16 +294,20 @@ export function PaquetesPage() {
     );
   };
 
-  const handleToggleEstadoPaquete = (paquete: any) => {
+  const handleToggleEstadoPaquete = (paquete: Paquete) => {
     const nombrePaquete = paquete.nombre;
     const nuevoEstado = !paquete.activo;
 
     confirmCreateAction(
       `${nombrePaquete}`,
-      () => {
-        setPaquetes(paquetes.map(p =>
-          p.id === paquete.id ? { ...p, activo: nuevoEstado } : p
-        ));
+      async () => {
+        try {
+          await apiService.updatePaqueteStatus(paquete.id, nuevoEstado);
+          await loadPaquetes(); // Recargar todos los paquetes como en ServiciosPage
+          edited(`Paquete ${nuevoEstado ? 'activado' : 'desactivado'} ✔️`, `El paquete "${nombrePaquete}" ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`);
+        } catch (error) {
+          console.error('Error updating paquete status:', error);
+        }
       },
       {
         confirmTitle: `${nuevoEstado ? 'Activar' : 'Desactivar'} Paquete`,
@@ -330,13 +319,19 @@ export function PaquetesPage() {
     );
   };
 
-  const handleEliminarPaquete = (paquete: any) => {
+  const handleEliminarPaquete = (paquete: Paquete) => {
     const nombrePaquete = paquete.nombre;
 
     confirmCreateAction(
       `${nombrePaquete}`,
-      () => {
-        setPaquetes(paquetes.filter(p => p.id !== paquete.id));
+      async () => {
+        try {
+          await apiService.deletePaquete(paquete.id);
+          await loadPaquetes(); // Recargar todos los paquetes como en ServiciosPage
+          deleted("Paquete eliminado exitosamente ✔️", `El paquete "${nombrePaquete}" ha sido eliminado permanentemente del sistema.`);
+        } catch (error) {
+          console.error('Error deleting paquete:', error);
+        }
       },
       {
         confirmTitle: 'Eliminar Paquete',
@@ -352,25 +347,8 @@ export function PaquetesPage() {
     const paquete = paquetes.find(p => p.id === paqueteId);
     if (!paquete) return;
 
-    setPaquetes(paquetes.map(p =>
-      p.id === paqueteId ? { ...p, activo: !p.activo } : p
-    ));
-
-    const nuevoEstado = !paquete.activo;
-    edited(
-      `Paquete ${nuevoEstado ? 'activado' : 'desactivado'}`,
-      `El paquete "${paquete.nombre}" ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`
-    );
+    handleToggleEstadoPaquete(paquete);
   };
-
-  const getCategoriaColor = (categoria: string) => {
-    // Todas las categorías ahora usan el mismo estilo gris uniforme
-    return "bg-gray-medium text-gray-lighter";
-  };
-
-  const totalClientesAtendidos = paquetes.reduce((sum, p) => sum + p.clientesAtendidos, 0);
-  const promedioDescuento = paquetes.reduce((sum, p) => sum + p.descuento, 0) / paquetes.length;
-  const paquetesActivos = paquetes.filter(p => p.activo).length;
 
   return (
     <>
@@ -438,92 +416,103 @@ export function PaquetesPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Paquete</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Servicios</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Duración</th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Precio</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedPaquetes.map((paquete) => (
-                  <tr key={paquete.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-orange-primary rounded-lg flex items-center justify-center">
-                          <Package className="w-5 h-5 text-black-primary" />
-                        </div>
-                        <span className="text-gray-lighter">{paquete.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="text-gray-lighter">{paquete.servicios.length} servicios</span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="text-gray-lighter">{paquete.duracion} min</span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <span className="text-gray-lighter">${paquete.precio.toLocaleString('es-CO')}</span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className="px-3 py-1 rounded-full text-xs bg-gray-medium text-gray-lighter">
-                        {paquete.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedPaquete(paquete);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver Detalle"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleEditPaquete(paquete)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleEstadoPaquete(paquete)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={paquete.activo ? "Desactivar paquete" : "Activar paquete"}
-                        >
-                          {paquete.activo ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEliminarPaquete(paquete)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {displayedPaquetes.length === 0 && (
+            {loading ? (
               <div className="text-center py-8">
-                <Gift className="w-16 h-16 text-gray-medium mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white-primary mb-2">No se encontraron paquetes</h3>
-                <p className="text-gray-lightest">Intenta con otros términos de búsqueda</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-primary mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold text-white-primary mb-2">Cargando paquetes...</h3>
+                <p className="text-gray-lightest">Por favor espera un momento</p>
               </div>
+            ) : (
+              <>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-dark">
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Paquete</th>
+                      <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Servicios</th>
+                      <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Duración</th>
+                      <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Precio</th>
+                      <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
+                      <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedPaquetes.map((paquete) => (
+                      <tr key={paquete.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-orange-primary rounded-lg flex items-center justify-center">
+                              <Package className="w-5 h-5 text-black-primary" />
+                            </div>
+                            <span className="text-gray-lighter">{paquete.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-gray-lighter">{paquete.servicios.length} servicios</span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="text-gray-lighter">{paquete.duracion} min</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-gray-lighter">${paquete.precio.toLocaleString('es-CO')}</span>
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <span className="px-3 py-1 rounded-full text-xs bg-gray-medium text-gray-lighter">
+                            {paquete.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedPaquete(paquete);
+                                setIsDetailDialogOpen(true);
+                                loadDetallePaquete(paquete.id); // Cargar detalles del paquete
+                              }}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Ver Detalle"
+                            >
+                              <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                            </button>
+                            <button
+                              onClick={() => handleEditPaquete(paquete)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Editar"
+                            >
+                              <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleEstadoPaquete(paquete)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title={paquete.activo ? "Desactivar paquete" : "Activar paquete"}
+                            >
+                              {paquete.activo ? (
+                                <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleEliminarPaquete(paquete)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {displayedPaquetes.length === 0 && !loading && (
+                  <div className="text-center py-8">
+                    <Gift className="w-16 h-16 text-gray-medium mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white-primary mb-2">No se encontraron paquetes</h3>
+                    <p className="text-gray-lightest">Intenta con otros términos de búsqueda</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -809,14 +798,48 @@ export function PaquetesPage() {
 
                   <div className="elegante-card">
                     <h4 className="font-semibold text-white-primary mb-3">Servicios Incluidos</h4>
-                    <div className="space-y-2">
-                      {selectedPaquete.servicios.map((servicio: string, index: number) => (
-                        <div key={index} className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-orange-primary rounded-full"></div>
-                          <span className="text-gray-lightest">{servicio}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {loadingDetalle ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-primary mx-auto mb-2"></div>
+                        <p className="text-gray-lightest text-sm">Cargando servicios...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {detallePaquete.length > 0 ? (
+                          detallePaquete.map((detalle: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-2 h-2 bg-orange-primary rounded-full"></div>
+                                <span className="text-gray-lightest font-medium">{detalle.nombreServicio}</span>
+                              </div>
+                              <span className="text-gray-lightest">
+                                ${detalle.precioServicio.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                          ))
+                        ) : selectedPaquete.servicios && selectedPaquete.servicios.length > 0 ? (
+                          // Fallback: mostrar servicios del paquete si no hay detalles
+                          selectedPaquete.servicios.map((servicio: string, index: number) => {
+                            const servicioInfo = serviciosDisponibles.find(s => s.nombre === servicio);
+                            return (
+                              <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-2 h-2 bg-orange-primary rounded-full"></div>
+                                  <span className="text-gray-lightest font-medium">{servicio}</span>
+                                </div>
+                                <span className="text-gray-lightest">
+                                  ${servicioInfo ? servicioInfo.precio.toLocaleString('es-CO') : '0'}
+                                </span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-gray-lightest">No hay servicios disponibles para este paquete</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="elegante-card">

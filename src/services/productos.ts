@@ -12,7 +12,10 @@ export interface ApiProducto {
   id: number;
   nombre: string;
   descripcion: string | null;
-  categoria: string | null;
+  categoria: {
+    id: number;
+    nombre: string;
+  } | null;
   precioBase: number;
   precio: number;
   iva: number;

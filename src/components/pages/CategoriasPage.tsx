@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -15,78 +15,24 @@ import {
   Hash,
   AlertCircle,
   Power,
-  PowerOff
+  PowerOff,
+  ToggleRight,
+  ToggleLeft
 } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
+import { categoriaService, Categoria } from "../../services/categoriaService";
 
-interface Categoria {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  fechaCreacion: string;
-  activo: boolean;
-}
-
-const categoriasData: Categoria[] = [
-  {
-    id: "CAT001",
-    nombre: "Cuidado Capilar",
-    descripcion: "Productos para el cuidado y mantenimiento del cabello",
-    fechaCreacion: "15-07-2025",
-    activo: true
-  },
-  {
-    id: "CAT002",
-    nombre: "Perfumería",
-    descripcion: "Fragancias y productos aromáticos",
-    fechaCreacion: "18-07-2025",
-    activo: true
-  },
-  {
-    id: "CAT003",
-    nombre: "Accesorios",
-    descripcion: "Complementos y accesorios para el cuidado personal",
-    fechaCreacion: "20-07-2025",
-    activo: false
-  },
-  {
-    id: "CAT004",
-    nombre: "Cuidado Facial",
-    descripcion: "Productos especializados para el cuidado de la piel",
-    fechaCreacion: "22-07-2025",
-    activo: true
-  },
-  {
-    id: "CAT005",
-    nombre: "Herramientas",
-    descripcion: "Instrumentos y herramientas profesionales",
-    fechaCreacion: "25-07-2025",
-    activo: false
-  }
-];
 
 export function CategoriasPage() {
   const { created, edited, deleted, AlertContainer } = useCustomAlert();
   const { confirmDeleteAction, confirmEditAction, confirmCreateAction, DoubleConfirmationContainer } = useDoubleConfirmation();
 
-  // Función para asegurar IDs únicos
-  const ensureUniqueIds = (categorias: Categoria[]): Categoria[] => {
-    const seen = new Set<string>();
-    return categorias.filter(categoria => {
-      if (seen.has(categoria.id)) {
-        console.warn(`Duplicate ID found: ${categoria.id}, removing duplicate`);
-        return false;
-      }
-      seen.add(categoria.id);
-      return true;
-    });
-  };
-
-  const [categorias, setCategorias] = useState<Categoria[]>(() => ensureUniqueIds(categoriasData));
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -100,18 +46,36 @@ export function CategoriasPage() {
   const [nuevaCategoria, setNuevaCategoria] = useState({
     nombre: '',
     descripcion: '',
-    activo: true
+    estado: true
   });
 
   const [editCategoria, setEditCategoria] = useState({
     nombre: '',
     descripcion: '',
-    activo: true
+    estado: true
   });
+
+  // Cargar categorías desde la API
+  const loadCategorias = async () => {
+    try {
+      setLoading(true);
+      const data = await categoriaService.getCategorias();
+      setCategorias(data);
+    } catch (error) {
+      console.error('Error cargando categorías:', error);
+      setError('Error al cargar las categorías');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCategorias();
+  }, []);
 
   const filteredCategorias = categorias.filter(categoria =>
     categoria.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    categoria.id.toLowerCase().includes(searchTerm.toLowerCase())
+    categoria.id.toString().includes(searchTerm)
   );
 
   const totalPages = Math.ceil(filteredCategorias.length / itemsPerPage);
@@ -138,114 +102,92 @@ export function CategoriasPage() {
     return true;
   };
 
-
-
-  const handleCreateCategoria = () => {
+  const handleCreateCategoria = async () => {
     if (!validateForm(nuevaCategoria)) {
       return;
     }
 
-    // Cerrar el modal temporalmente para evitar conflictos de z-index
-    const tempNuevaCategoria = { ...nuevaCategoria };
-
-    setIsDialogOpen(false);
-
-    confirmCreateAction(
-      nuevaCategoria.nombre,
-      () => {
-        // Generar ID único basado en los IDs existentes
-        const existingIds = categorias.map(cat => parseInt(cat.id.replace('CAT', '')));
-        const nextId = Math.max(...existingIds, 0) + 1;
-
-        const categoria: Categoria = {
-          id: `CAT${String(nextId).padStart(3, '0')}`,
-          fechaCreacion: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          ...tempNuevaCategoria
-        };
-
-        setCategorias(prev => ensureUniqueIds([categoria, ...prev]));
-        setNuevaCategoria({
-          nombre: '',
-          descripcion: '',
-          activo: true
-        });
-        setError('');
-      },
-      {
-        confirmTitle: 'Crear Nueva Categoría',
-        confirmMessage: `¿Estás seguro de que deseas crear la categoría "${nuevaCategoria.nombre}"?`,
-        successTitle: 'Categoría creada ✔️',
-        successMessage: `La categoría "${nuevaCategoria.nombre}" ha sido creada exitosamente y está disponible en el sistema.`,
-        requireInput: false
-      }
-    );
+    try {
+      await categoriaService.createCategoria({
+        nombre: nuevaCategoria.nombre,
+        descripcion: nuevaCategoria.descripcion,
+        estado: nuevaCategoria.estado
+      });
+      
+      await loadCategorias(); // Recargar las categorías
+      
+      setIsDialogOpen(false);
+      setNuevaCategoria({
+        nombre: '',
+        descripcion: '',
+        estado: true
+      });
+      setError('');
+      
+      created(nuevaCategoria.nombre, 'Categoría creada exitosamente');
+    } catch (error) {
+      console.error('Error creando categoría:', error);
+      setError('Error al crear la categoría');
+    }
   };
 
   const handleEditClick = (categoria: Categoria) => {
     setSelectedCategoria(categoria);
     setEditCategoria({
       nombre: categoria.nombre,
-      descripcion: categoria.descripcion,
-      activo: categoria.activo
+      descripcion: categoria.descripcion || '',
+      estado: categoria.estado
     });
     setError('');
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateCategoria = () => {
+  const handleUpdateCategoria = async () => {
     if (!selectedCategoria || !validateForm(editCategoria, true)) {
       return;
     }
 
-    // Cerrar el modal temporalmente para evitar conflictos de z-index
-    const tempEditCategoria = { ...editCategoria };
-    const tempSelectedCategoria = { ...selectedCategoria };
-
-    setIsEditDialogOpen(false);
-
-    confirmEditAction(
-      editCategoria.nombre,
-      () => {
-        const categoriaActualizada: Categoria = {
-          ...tempSelectedCategoria,
-          ...tempEditCategoria
-        };
-
-        setCategorias(prev => ensureUniqueIds(prev.map(c =>
-          c.id === tempSelectedCategoria.id ? categoriaActualizada : c
-        )));
-
-        setSelectedCategoria(null);
-        setError('');
-      },
-      {
-        confirmTitle: 'Confirmar Edición',
-        confirmMessage: `¿Estás seguro de que deseas actualizar la información de la categoría "${editCategoria.nombre}"?`,
-        successTitle: 'Categoría actualizada ✔️',
-        successMessage: `La información de la categoría "${editCategoria.nombre}" ha sido actualizada exitosamente.`,
-        requireInput: false
-      }
-    );
+    try {
+      await categoriaService.updateCategoria(selectedCategoria.id, {
+        id: selectedCategoria.id,
+        nombre: editCategoria.nombre,
+        descripcion: editCategoria.descripcion,
+        estado: editCategoria.estado
+      });
+      
+      await loadCategorias(); // Recargar las categorías
+      
+      setIsEditDialogOpen(false);
+      setSelectedCategoria(null);
+      setError('');
+      
+      edited(editCategoria.nombre, 'Categoría actualizada exitosamente');
+    } catch (error) {
+      console.error('Error actualizando categoría:', error);
+      setError('Error al actualizar la categoría');
+    }
+  };
+  const handleDeleteClick = async (categoria: Categoria) => {
+    try {
+      await categoriaService.deleteCategoria(categoria.id);
+      await loadCategorias(); // Recargar las categorías
+      deleted(categoria.nombre, 'Categoría eliminada exitosamente');
+    } catch (error) {
+      console.error('Error eliminando categoría:', error);
+      setError('Error al eliminar la categoría');
+    }
   };
 
-  const handleDeleteClick = (categoria: Categoria) => {
-    confirmDeleteAction(
-      categoria.nombre,
-      () => {
-        setCategorias(prev => ensureUniqueIds(prev.filter(c => c.id !== categoria.id)));
-
-      },
-      {
-        confirmTitle: 'Eliminar Categoría',
-        confirmMessage: `¿Estás seguro de que deseas eliminar la categoría "${categoria.nombre}" y toda su información asociada? Esta acción no se puede deshacer.`,
-        requireInput: false,
-        successTitle: 'Categoría eliminada ✔️',
-        successMessage: `La categoría "${categoria.nombre}" ha sido eliminada exitosamente del sistema.`
-      }
-    );
+  const handleToggleStatus = async (categoria: Categoria) => {
+    try {
+      await categoriaService.updateCategoriaStatus(categoria.id, !categoria.estado);
+      await loadCategorias(); // Recargar las categorías
+      edited(categoria.nombre, `Categoría ${!categoria.estado ? 'activada' : 'desactivada'} exitosamente`);
+    } catch (error) {
+      console.error('Error cambiando estado:', error);
+      setError('Error al cambiar el estado de la categoría');
+    }
   };
-
-
 
   return (
     <>
@@ -256,7 +198,6 @@ export function CategoriasPage() {
             <h1 className="text-2xl font-semibold text-white-primary">Gestión de Categorías</h1>
             <p className="text-sm text-gray-lightest mt-1">Administra las categorías de productos</p>
           </div>
-
         </div>
       </header>
 
@@ -274,7 +215,7 @@ export function CategoriasPage() {
                       setNuevaCategoria({
                         nombre: '',
                         descripcion: '',
-                        activo: true
+                        estado: true
                       });
                       setError('');
                     }}
@@ -324,12 +265,12 @@ export function CategoriasPage() {
                       <Label className="text-white-primary">Estado</Label>
                       <div className="flex items-center space-x-3">
                         <Switch
-                          checked={nuevaCategoria.activo}
-                          onCheckedChange={(checked) => setNuevaCategoria({ ...nuevaCategoria, activo: checked })}
+                          checked={nuevaCategoria.estado}
+                          onCheckedChange={(checked) => setNuevaCategoria({ ...nuevaCategoria, estado: checked })}
                           className="data-[state=checked]:bg-orange-primary"
                         />
-                        <span className={`text-sm font-medium ${nuevaCategoria.activo ? 'text-orange-primary' : 'text-gray-lightest'}`}>
-                          {nuevaCategoria.activo ? 'Activa' : 'Inactiva'}
+                        <span className={`text-sm font-medium ${nuevaCategoria.estado ? 'text-orange-primary' : 'text-gray-lightest'}`}>
+                          {nuevaCategoria.estado ? 'Activa' : 'Inactiva'}
                         </span>
                       </div>
                     </div>
@@ -381,7 +322,6 @@ export function CategoriasPage() {
                 <tr className="border-b border-gray-dark">
                   <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Nombre</th>
                   <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Descripción</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Fecha Creación</th>
                   <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
                   <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
                 </tr>
@@ -389,16 +329,20 @@ export function CategoriasPage() {
               <tbody>
                 {displayedCategorias.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center">
+                    <td colSpan={4} className="py-12 text-center">
                       <Tags className="w-12 h-12 text-gray-medium mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-white-primary mb-2">No hay categorías</h3>
+                      <h3 className="text-lg font-medium text-white-primary mb-2">
+                        {loading ? 'Cargando categorías...' : 'No hay categorías'}
+                      </h3>
                       <p className="text-gray-lightest">
-                        {searchTerm ? 'No se encontraron categorías con ese criterio de búsqueda.' : 'Comience agregando una nueva categoría.'}
+                        {loading ? 'Por favor espera un momento.' : 
+                         searchTerm ? 'No se encontraron categorías con ese criterio de búsqueda.' : 
+                         'Comience agregando una nueva categoría.'}
                       </p>
                     </td>
                   </tr>
                 ) : (
-                  displayedCategorias.map((categoria, index) => (
+                  displayedCategorias.map((categoria) => (
                     <tr
                       key={categoria.id}
                       className="border-b border-gray-dark hover:bg-gray-darker transition-colors"
@@ -414,12 +358,9 @@ export function CategoriasPage() {
                       <td className="py-4 px-4">
                         <span className="text-sm text-gray-lightest">{categoria.descripcion || 'Sin descripción'}</span>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-gray-lightest">{categoria.fechaCreacion}</span>
-                      </td>
                       <td className="py-4 px-4 text-center">
                         <div className="flex items-center justify-center">
-                          {categoria.activo ? (
+                          {categoria.estado ? (
                             <span className="elegante-tag bg-green-600 text-white text-xs">Activa</span>
                           ) : (
                             <span className="elegante-tag bg-red-600 text-white text-xs">Inactiva</span>
@@ -439,37 +380,21 @@ export function CategoriasPage() {
                             <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
                           </button>
                           <button
-                            onClick={() => {
-                              setSelectedCategoria(categoria);
-                              setEditCategoria({
-                                nombre: categoria.nombre,
-                                descripcion: categoria.descripcion,
-                                activo: categoria.activo
-                              });
-                              setIsEditDialogOpen(true);
-                            }}
+                            onClick={() => handleEditClick(categoria)}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
                           </button>
                           <button
-                            onClick={() => {
-                              setSelectedCategoria(categoria);
-                              setEditCategoria({
-                                nombre: categoria.nombre,
-                                descripcion: categoria.descripcion,
-                                activo: !categoria.activo
-                              });
-                              handleUpdateCategoria();
-                            }}
+                            onClick={() => handleToggleStatus(categoria)}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                            title={categoria.activo ? "Desactivar" : "Activar"}
+                            title={categoria.estado ? "Desactivar" : "Activar"}
                           >
-                            {categoria.activo ? (
-                              <PowerOff className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            {categoria.estado ? (
+                              <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
                             ) : (
-                              <Power className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                              <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
                             )}
                           </button>
                           <button
@@ -503,30 +428,26 @@ export function CategoriasPage() {
           </div>
         </div>
 
-        {/* Tabla antigua - OLD */}
-        <div style={{ display: 'none' }}>
-
-          {/* Paginación */}
-          <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-dark">
-            <div className="text-sm text-gray-lightest">
-              Página {currentPage} de {totalPages}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-lightest" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4 text-gray-lightest" />
-              </button>
-            </div>
+        {/* Paginación */}
+        <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-dark">
+          <div className="text-sm text-gray-lightest">
+            Página {currentPage} de {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-lightest" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-lightest" />
+            </button>
           </div>
         </div>
 
@@ -573,12 +494,12 @@ export function CategoriasPage() {
                 <Label className="text-white-primary">Estado</Label>
                 <div className="flex items-center space-x-3">
                   <Switch
-                    checked={editCategoria.activo}
-                    onCheckedChange={(checked) => setEditCategoria({ ...editCategoria, activo: checked })}
+                    checked={editCategoria.estado}
+                    onCheckedChange={(checked) => setEditCategoria({ ...editCategoria, estado: checked })}
                     className="data-[state=checked]:bg-orange-primary"
                   />
-                  <span className={`text-sm font-medium ${editCategoria.activo ? 'text-orange-primary' : 'text-gray-lightest'}`}>
-                    {editCategoria.activo ? 'Activa' : 'Inactiva'}
+                  <span className={`text-sm font-medium ${editCategoria.estado ? 'text-orange-primary' : 'text-gray-lightest'}`}>
+                    {editCategoria.estado ? 'Activa' : 'Inactiva'}
                   </span>
                 </div>
               </div>
@@ -623,8 +544,17 @@ export function CategoriasPage() {
                     <p className="font-semibold text-orange-primary">{selectedCategoria.id}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-light">Fecha de Creación</p>
-                    <p className="font-semibold text-white-primary">{selectedCategoria.fechaCreacion}</p>
+                    <p className="text-sm text-gray-light">Estado</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {selectedCategoria.estado ? (
+                        <Power className="w-4 h-4 text-orange-primary" />
+                      ) : (
+                        <PowerOff className="w-4 h-4 text-gray-lightest" />
+                      )}
+                      <span className={`font-semibold ${selectedCategoria.estado ? 'text-orange-primary' : 'text-gray-lightest'}`}>
+                        {selectedCategoria.estado ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -634,19 +564,6 @@ export function CategoriasPage() {
                 <div>
                   <p className="text-sm text-gray-light">Descripción</p>
                   <p className="text-white-primary">{selectedCategoria.descripcion || 'Sin descripción'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-light">Estado</p>
-                  <div className="flex items-center space-x-2 mt-1">
-                    {selectedCategoria.activo ? (
-                      <Power className="w-4 h-4 text-orange-primary" />
-                    ) : (
-                      <PowerOff className="w-4 h-4 text-gray-lightest" />
-                    )}
-                    <span className={`font-semibold ${selectedCategoria.activo ? 'text-orange-primary' : 'text-gray-lightest'}`}>
-                      {selectedCategoria.activo ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-gray-dark">

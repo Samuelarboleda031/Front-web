@@ -30,6 +30,38 @@ export interface UserRole {
   estado: boolean;
 }
 
+export interface Servicio {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  duracion: number;
+  precio: number;
+  estado: boolean;
+}
+
+export interface Paquete {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  servicios: string[];
+  duracion: number;
+  precio: number;
+  descuento: number;
+  precioOriginal: number;
+  clientesAtendidos: number;
+  categoria: string;
+  activo: boolean;
+}
+
+export interface DetallePaquete {
+  id: number;
+  paqueteId: number;
+  nombreServicio: string;
+  precioServicio: number;
+  cantidad: number;
+  subtotal: number;
+}
+
 class ApiService {
   private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const isGet = !options.method || options.method === 'GET';
@@ -91,8 +123,107 @@ class ApiService {
     if (data.fechaNacimiento !== undefined) mapped.FechaNacimiento = data.fechaNacimiento;
     if (data.fotoPerfil !== undefined) mapped.FotoPerfil = data.fotoPerfil;
     if (data.estado !== undefined) mapped.Estado = !!data.estado;
+    
+    // Campos para Servicios
+    if (data.descripcion !== undefined) mapped.Descripcion = data.descripcion;
+    if (data.duracion !== undefined) mapped.Duracion = Number(data.duracion);
+    if (data.precio !== undefined) mapped.Precio = Number(data.precio);
+    if (data.estado !== undefined) mapped.Activo = !!data.estado; // API usa Activo pero frontend usa estado
+    
+    // Campos para Paquetes
+    if (data.nombre !== undefined) mapped.Nombre = data.nombre;
+    if (data.servicios !== undefined) mapped.Servicios = data.servicios;
+    if (data.descuento !== undefined) mapped.Descuento = Number(data.descuento);
+    if (data.precioOriginal !== undefined) mapped.PrecioOriginal = Number(data.precioOriginal);
+    if (data.clientesAtendidos !== undefined) mapped.ClientesAtendidos = Number(data.clientesAtendidos);
+    if (data.categoria !== undefined) mapped.Categoria = data.categoria;
+    if (data.activo !== undefined) mapped.Activo = !!data.activo;
+    
+    // Campos para DetallePaquetes
+    if (data.paqueteId !== undefined) mapped.PaqueteId = Number(data.paqueteId);
+    if (data.nombreServicio !== undefined) mapped.NombreServicio = data.nombreServicio;
+    if (data.precioServicio !== undefined) mapped.PrecioServicio = Number(data.precioServicio);
+    if (data.cantidad !== undefined) mapped.Cantidad = Number(data.cantidad);
+    if (data.subtotal !== undefined) mapped.Subtotal = Number(data.subtotal);
 
     return mapped;
+  }
+
+  // Normalizar datos que vienen de la API para asegurar tipos correctos
+  private normalizeServicioData(data: any): Servicio {
+    console.log('🔍 Raw API data:', data);
+    console.log('🔍 estado value:', data.estado, 'type:', typeof data.estado);
+    console.log('🔍 Estado value:', data.Estado, 'type:', typeof data.Estado);
+    
+    const normalized = {
+      id: Number(data.id) || 0,
+      nombre: String(data.nombre || ''),
+      descripcion: String(data.descripcion || ''),
+      duracion: Number(data.duracion) || 0,
+      precio: Number(data.precio) || 0,
+      estado: Boolean(
+        data.estado === true || 
+        data.estado === 'true' || 
+        data.estado === 1 || 
+        data.estado === '1' ||
+        data.Estado === true || 
+        data.Estado === 'true' || 
+        data.Estado === 1 ||
+        data.Estado === '1' ||
+        // Si es null, undefined o false, se mantiene false
+        data.estado !== null && data.estado !== undefined && data.estado !== false && data.estado !== 'false' && data.estado !== 0 && data.estado !== '0'
+      )
+    };
+    
+    console.log('✅ Normalized estado:', normalized.estado);
+    return normalized;
+  }
+
+  private normalizePaqueteData(data: any): Paquete {
+    console.log('🔍 Raw Paquete API data:', data);
+    
+    const normalized = {
+      id: Number(data.id) || 0,
+      nombre: String(data.nombre || ''),
+      descripcion: String(data.descripcion || ''),
+      servicios: Array.isArray(data.servicios) ? data.servicios : [],
+      duracion: Number(data.duracion) || 0,
+      precio: Number(data.precio) || 0,
+      descuento: Number(data.descuento) || 0,
+      precioOriginal: Number(data.precioOriginal) || 0,
+      clientesAtendidos: Number(data.clientesAtendidos) || 0,
+      categoria: String(data.categoria || ''),
+      activo: Boolean(
+        data.activo === true || 
+        data.activo === 'true' || 
+        data.activo === 1 || 
+        data.activo === '1' ||
+        data.Activo === true || 
+        data.Activo === 'true' || 
+        data.Activo === 1 ||
+        data.Activo === '1' ||
+        data.activo !== null && data.activo !== undefined && data.activo !== false && data.activo !== 'false' && data.activo !== 0 && data.activo !== '0'
+      )
+    };
+    
+    console.log('✅ Normalized Paquete:', normalized);
+    return normalized;
+  }
+
+  private normalizeDetallePaqueteData(data: any): DetallePaquete {
+    console.log('🔍 Raw DetallePaquete API data:', data);
+    
+    const normalized = {
+      id: Number(data.id) || 0,
+      paqueteId: Number(data.paqueteId) || 0,
+      nombreServicio: String(data.nombreServicio || ''),
+      precioServicio: Number(data.precioServicio) || 0,
+      cantidad: Number(data.cantidad) || 1,
+      subtotal: Number(data.subtotal) || 0
+    };
+    
+    console.log('✅ Normalized DetallePaquete:', normalized);
+    return normalized;
   }
 
   async getUsuarios(): Promise<ApiUser[]> {
@@ -508,6 +639,286 @@ class ApiService {
       console.log(`✅ Todas las asignaciones del rol ${rolId} han sido eliminadas`);
     } catch (error: any) {
       console.error(`❌ Error eliminando asignaciones del rol ${rolId}:`, error);
+      throw error;
+    }
+  }
+
+  // ==================== MÉTODOS PARA SERVICIOS ====================
+  async getServicios(): Promise<Servicio[]> {
+    try {
+      console.log('📥 Obteniendo servicios desde:', `${API_BASE_URL}/Servicios`);
+      const response = await this.request('/Servicios');
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : [];
+      console.log('✅ Servicios obtenidos:', data);
+      const normalizedData = Array.isArray(data) ? data.map(item => this.normalizeServicioData(item)) : [];
+      console.log('✅ Servicios normalizados:', normalizedData);
+      return normalizedData;
+    } catch (error: any) {
+      console.error('❌ Error obteniendo servicios:', error);
+      throw error;
+    }
+  }
+
+  async getServicioById(id: number): Promise<Servicio | null> {
+    try {
+      console.log(`📥 Obteniendo servicio ${id} desde:`, `${API_BASE_URL}/Servicios/${id}`);
+      const response = await this.request(`/Servicios/${id}`);
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      console.log(`✅ Servicio ${id} obtenido:`, data);
+      return data ? this.normalizeServicioData(data) : null;
+    } catch (error: any) {
+      console.error(`❌ Error obteniendo servicio ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async createServicio(servicioData: Partial<Servicio>): Promise<Servicio> {
+    try {
+      const mapped = this.mapToApiFormat(servicioData);
+      console.log('📤 Creando servicio:', mapped);
+      const response = await this.request('/Servicios', {
+        method: 'POST',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log('✅ Servicio creado:', data);
+      return this.normalizeServicioData(data);
+    } catch (error: any) {
+      console.error('❌ Error creando servicio:', error);
+      throw error;
+    }
+  }
+
+  async updateServicio(id: number, servicioData: Partial<Servicio>): Promise<Servicio> {
+    try {
+      const mapped = this.mapToApiFormat({ ...servicioData, id });
+      console.log(`📤 Actualizando servicio ${id}:`, mapped);
+      const response = await this.request(`/Servicios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log(`✅ Servicio ${id} actualizado:`, data);
+      return this.normalizeServicioData(data);
+    } catch (error: any) {
+      console.error(`❌ Error actualizando servicio ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteServicio(id: number): Promise<void> {
+    try {
+      console.log(`🗑️ Eliminando servicio ${id}...`);
+      await this.request(`/Servicios/${id}`, {
+        method: 'DELETE',
+      });
+      console.log(`✅ Servicio ${id} eliminado`);
+    } catch (error: any) {
+      console.error(`❌ Error eliminando servicio ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async updateServicioStatus(id: number, estado: boolean) {
+  return fetch(`${API_BASE_URL}/servicios/${id}/estado`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ estado }) // 👈 ESTA es la clave
+  });
+}
+
+  // ==================== MÉTODOS PARA PAQUETES ====================
+  async getPaquetes(): Promise<Paquete[]> {
+    try {
+      console.log('📥 Obteniendo paquetes desde:', `${API_BASE_URL}/Paquetes`);
+      const response = await this.request('/Paquetes');
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : [];
+      console.log('✅ Paquetes obtenidos:', data);
+      const normalizedData = Array.isArray(data) ? data.map(item => this.normalizePaqueteData(item)) : [];
+      console.log('✅ Paquetes normalizados:', normalizedData);
+      return normalizedData;
+    } catch (error: any) {
+      console.error('❌ Error obteniendo paquetes:', error);
+      throw error;
+    }
+  }
+
+  async getPaqueteById(id: number): Promise<Paquete | null> {
+    try {
+      console.log(`📥 Obteniendo paquete ${id} desde:`, `${API_BASE_URL}/Paquetes/${id}`);
+      const response = await this.request(`/Paquetes/${id}`);
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      console.log(`✅ Paquete ${id} obtenido:`, data);
+      return data ? this.normalizePaqueteData(data) : null;
+    } catch (error: any) {
+      console.error(`❌ Error obteniendo paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async createPaquete(paqueteData: Partial<Paquete>): Promise<Paquete> {
+    try {
+      const mapped = this.mapToApiFormat(paqueteData);
+      console.log('📤 Creando paquete:', mapped);
+      const response = await this.request('/Paquetes', {
+        method: 'POST',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log('✅ Paquete creado:', data);
+      return this.normalizePaqueteData(data);
+    } catch (error: any) {
+      console.error('❌ Error creando paquete:', error);
+      throw error;
+    }
+  }
+
+  async updatePaquete(id: number, paqueteData: Partial<Paquete>): Promise<Paquete> {
+    try {
+      const mapped = this.mapToApiFormat({ ...paqueteData, id });
+      console.log(`📤 Actualizando paquete ${id}:`, mapped);
+      const response = await this.request(`/Paquetes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log(`✅ Paquete ${id} actualizado:`, data);
+      return this.normalizePaqueteData(data);
+    } catch (error: any) {
+      console.error(`❌ Error actualizando paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deletePaquete(id: number): Promise<void> {
+    try {
+      console.log(`🗑️ Eliminando paquete ${id}...`);
+      await this.request(`/Paquetes/${id}`, {
+        method: 'DELETE',
+      });
+      console.log(`✅ Paquete ${id} eliminado`);
+    } catch (error: any) {
+      console.error(`❌ Error eliminando paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async updatePaqueteStatus(id: number, activo: boolean): Promise<void> {
+    try {
+      console.log(`📤 Actualizando estado del paquete ${id} a ${activo}...`);
+      await this.request(`/Paquetes/${id}/estado`, {
+        method: 'PUT',
+        body: JSON.stringify({ estado: activo }), // 🔥 CAMBIAR A estado para coincidir con backend
+      });
+      console.log(`✅ Estado del paquete ${id} actualizado`);
+    } catch (error: any) {
+      console.error(`❌ Error actualizando estado del paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // ==================== MÉTODOS PARA DETALLE PAQUETES ====================
+  async getDetallePaquetes(): Promise<DetallePaquete[]> {
+    try {
+      console.log('📥 Obteniendo detalles de paquetes desde:', `${API_BASE_URL}/DetallePaquetes`);
+      const response = await this.request('/DetallePaquetes');
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : [];
+      console.log('✅ Detalles de paquetes obtenidos:', data);
+      const normalizedData = Array.isArray(data) ? data.map(item => this.normalizeDetallePaqueteData(item)) : [];
+      console.log('✅ Detalles de paquetes normalizados:', normalizedData);
+      return normalizedData;
+    } catch (error: any) {
+      console.error('❌ Error obteniendo detalles de paquetes:', error);
+      throw error;
+    }
+  }
+
+  async getDetallePaquetesByPaqueteId(paqueteId: number): Promise<DetallePaquete[]> {
+    try {
+      console.log(`📥 Obteniendo detalles del paquete ${paqueteId}...`);
+      const detalles = await this.getDetallePaquetes();
+      const filtered = detalles.filter(d => d.paqueteId === paqueteId);
+      console.log(`✅ Detalles del paquete ${paqueteId}:`, filtered);
+      return filtered;
+    } catch (error: any) {
+      console.error(`❌ Error obteniendo detalles del paquete ${paqueteId}:`, error);
+      throw error;
+    }
+  }
+
+  async createDetallePaquete(detalleData: Partial<DetallePaquete>): Promise<DetallePaquete> {
+    try {
+      const mapped = this.mapToApiFormat(detalleData);
+      console.log('📤 Creando detalle de paquete:', mapped);
+      const response = await this.request('/DetallePaquetes', {
+        method: 'POST',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log('✅ Detalle de paquete creado:', data);
+      return this.normalizeDetallePaqueteData(data);
+    } catch (error: any) {
+      console.error('❌ Error creando detalle de paquete:', error);
+      throw error;
+    }
+  }
+
+  async updateDetallePaquete(id: number, detalleData: Partial<DetallePaquete>): Promise<DetallePaquete> {
+    try {
+      const mapped = this.mapToApiFormat({ ...detalleData, id });
+      console.log(`📤 Actualizando detalle de paquete ${id}:`, mapped);
+      const response = await this.request(`/DetallePaquetes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log(`✅ Detalle de paquete ${id} actualizado:`, data);
+      return this.normalizeDetallePaqueteData(data);
+    } catch (error: any) {
+      console.error(`❌ Error actualizando detalle de paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteDetallePaquete(id: number): Promise<void> {
+    try {
+      console.log(`🗑️ Eliminando detalle de paquete ${id}...`);
+      await this.request(`/DetallePaquetes/${id}`, {
+        method: 'DELETE',
+      });
+      console.log(`✅ Detalle de paquete ${id} eliminado`);
+    } catch (error: any) {
+      console.error(`❌ Error eliminando detalle de paquete ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteDetallePaquetesByPaqueteId(paqueteId: number): Promise<void> {
+    try {
+      console.log(`🗑️ Eliminando todos los detalles del paquete ${paqueteId}...`);
+      const detalles = await this.getDetallePaquetesByPaqueteId(paqueteId);
+      
+      for (const detalle of detalles) {
+        if (detalle.id) {
+          await this.deleteDetallePaquete(detalle.id);
+        }
+      }
+      console.log(`✅ Todos los detalles del paquete ${paqueteId} han sido eliminados`);
+    } catch (error: any) {
+      console.error(`❌ Error eliminando detalles del paquete ${paqueteId}:`, error);
       throw error;
     }
   }

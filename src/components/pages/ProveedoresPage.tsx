@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "../ui/label";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
+import { proveedorService, Proveedor } from "../../services/proveedorService";
 
 // Tipos de proveedor
 const TIPOS_PROVEEDOR = [
@@ -38,30 +39,10 @@ const TIPOS_PROVEEDOR = [
   { value: 'Natural', label: 'Natural (Persona)' }
 ];
 
-interface Proveedor {
-  id: string;
-  nombre: string;
-  tipoProveedor: 'Juridico' | 'Natural';
-  nit: string;
-  correo: string;
-  numero: string;
-  direccion: string;
-  fechaCreacion: string;
-  activo: boolean;
-  // Campos específicos para Jurídico
-  razonSocial?: string;
-  representanteLegal?: string;
-  documentoRepresentante?: string;
-  telefonoRepresentante?: string;
-  correoRepresentante?: string;
-  sectorEconomico?: string;
-  anosOperacion?: number;
-  paginaWeb?: string;
-}
-
-const proveedoresData: Proveedor[] = [
+// Datos estáticos para fallback cuando la API no está disponible
+const proveedoresDataFallback: Proveedor[] = [
   {
-    id: "PRV001",
+    id: 1,
     nombre: "Suministros Barbería Pro",
     razonSocial: "Suministros Barbería Pro S.A.S",
     tipoProveedor: "Juridico",
@@ -80,7 +61,7 @@ const proveedoresData: Proveedor[] = [
     activo: true
   },
   {
-    id: "PRV002",
+    id: 2,
     nombre: "Perfumería Andina Ltda",
     razonSocial: "Perfumería Andina Ltda",
     tipoProveedor: "Juridico",
@@ -99,7 +80,7 @@ const proveedoresData: Proveedor[] = [
     activo: true
   },
   {
-    id: "PRV003",
+    id: 3,
     nombre: "Accesorios & Más Ltda",
     razonSocial: "Accesorios & Más Ltda",
     tipoProveedor: "Juridico",
@@ -118,7 +99,7 @@ const proveedoresData: Proveedor[] = [
     activo: false
   },
   {
-    id: "PRV004",
+    id: 4,
     nombre: "Carlos Andrés Martínez",
     tipoProveedor: "Natural",
     nit: "12345678-9",
@@ -133,7 +114,9 @@ const proveedoresData: Proveedor[] = [
 export function ProveedoresPage() {
   const { created, edited, deleted, AlertContainer } = useCustomAlert();
   const { confirmDeleteAction, confirmEditAction, DoubleConfirmationContainer } = useDoubleConfirmation();
-  const [proveedores, setProveedores] = useState<Proveedor[]>(proveedoresData);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -155,8 +138,52 @@ export function ProveedoresPage() {
     correoRepresentante: "",
     sectorEconomico: "",
     anosOperacion: 0,
-    paginaWeb: ""
+    paginaWeb: "",
+    personaContacto: "",
+    // Campos adicionales faltantes
+    apellidos: "",
+    cargoRepLegal: "",
+    ciudad: "",
+    departamento: "",
+    numeroIdentificacion: "",
+    numeroIdentificacionRepLegal: ""
   });
+
+  // Cargar proveedores desde la API
+  const cargarProveedores = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('📥 Loading providers...');
+      const data = await proveedorService.obtenerProveedoresJuridicos();
+      console.log('✅ Providers loaded:', data);
+      
+      // Asegurarse de que los datos sean un array válido
+      if (Array.isArray(data) && data.length > 0) {
+        setProveedores(data);
+      } else if (Array.isArray(data)) {
+        // Si el array está vacío, mantenerlo vacío pero no mostrar error
+        console.log('📭 No providers found, using empty array');
+        setProveedores([]);
+      } else {
+        // Si los datos no son un array, usar fallback
+        console.warn('⚠️ Invalid data format, using fallback');
+        setProveedores(proveedoresDataFallback);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando proveedores:', error);
+      setError('No se pudieron cargar los proveedores desde el servidor. Mostrando datos locales.');
+      // Usar datos de fallback en caso de error
+      setProveedores(proveedoresDataFallback);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    cargarProveedores();
+  }, []);
 
   const resetForm = () => {
     setFormData({
@@ -173,29 +200,59 @@ export function ProveedoresPage() {
       correoRepresentante: "",
       sectorEconomico: "",
       anosOperacion: 0,
-      paginaWeb: ""
+      paginaWeb: "",
+      personaContacto: "",
+      // Campos adicionales faltantes
+      apellidos: "",
+      cargoRepLegal: "",
+      ciudad: "",
+      departamento: "",
+      numeroIdentificacion: "",
+      numeroIdentificacionRepLegal: ""
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const nuevoProveedor: Proveedor = {
-      id: `PRV${(proveedores.length + 1).toString().padStart(3, '0')}`,
-      ...formData,
-      fechaCreacion: new Date().toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      }),
-      activo: true
-    };
+    try {
+      const nuevoProveedor = await proveedorService.crearProveedor({
+        ...formData,
+        fechaCreacion: new Date().toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }),
+        activo: true
+      });
 
-    setProveedores([...proveedores, nuevoProveedor]);
-    created("Proveedor creado", `El proveedor "${formData.nombre}" ha sido agregado exitosamente al sistema.`);
+      created("Proveedor creado", `El proveedor "${formData.nombre}" ha sido agregado exitosamente al sistema.`);
+      
+      // Refrescar datos desde la API
+      await cargarProveedores();
 
-    setIsDialogOpen(false);
-    resetForm();
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error creando proveedor:', error);
+      // En caso de error, agregar localmente
+      const nuevoProveedor: Proveedor = {
+        id: proveedores.length + 1,
+        ...formData,
+        fechaCreacion: new Date().toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        }),
+        activo: true
+      };
+
+      setProveedores([...proveedores, nuevoProveedor]);
+      created("Proveedor creado", `El proveedor "${formData.nombre}" ha sido agregado localmente.`);
+
+      setIsDialogOpen(false);
+      resetForm();
+    }
   };
 
   const handleEdit = (proveedor: Proveedor) => {
@@ -203,10 +260,10 @@ export function ProveedoresPage() {
     setFormData({
       nombre: proveedor.nombre,
       tipoProveedor: proveedor.tipoProveedor,
-      nit: proveedor.nit,
-      correo: proveedor.correo,
-      numero: proveedor.numero,
-      direccion: proveedor.direccion,
+      nit: proveedor.nit || "",
+      correo: proveedor.correo || "",
+      numero: proveedor.numero || proveedor.telefono || "",
+      direccion: proveedor.direccion || "",
       razonSocial: proveedor.razonSocial || "",
       representanteLegal: proveedor.representanteLegal || "",
       documentoRepresentante: proveedor.documentoRepresentante || "",
@@ -214,12 +271,20 @@ export function ProveedoresPage() {
       correoRepresentante: proveedor.correoRepresentante || "",
       sectorEconomico: proveedor.sectorEconomico || "",
       anosOperacion: proveedor.anosOperacion || 0,
-      paginaWeb: proveedor.paginaWeb || ""
+      paginaWeb: proveedor.paginaWeb || "",
+      personaContacto: (proveedor as any).personaContacto || "",
+      // Campos adicionales faltantes
+      apellidos: (proveedor as any).apellidos || "",
+      cargoRepLegal: (proveedor as any).cargoRepLegal || "",
+      ciudad: (proveedor as any).ciudad || "",
+      departamento: (proveedor as any).departamento || "",
+      numeroIdentificacion: (proveedor as any).numeroIdentificacion || "",
+      numeroIdentificacionRepLegal: (proveedor as any).numeroIdentificacionRepLegal || ""
     });
     setIsEditDialogOpen(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedProveedor) return;
@@ -232,15 +297,29 @@ export function ProveedoresPage() {
 
     confirmEditAction(
       formData.nombre,
-      () => {
-        const proveedorActualizado: Proveedor = {
-          ...tempSelectedProveedor,
-          ...tempFormData
-        };
+      async () => {
+        try {
+          if (tempSelectedProveedor.id) {
+            const proveedorActualizado = await proveedorService.actualizarProveedor(
+              tempSelectedProveedor.id,
+              tempFormData
+            );
+            
+            // Refrescar datos desde la API para obtener los datos más actualizados
+            await cargarProveedores();
+          }
+        } catch (error) {
+          console.error('Error actualizando proveedor:', error);
+          // Actualizar localmente en caso de error
+          const proveedorActualizado: Proveedor = {
+            ...tempSelectedProveedor,
+            ...tempFormData
+          };
 
-        setProveedores(proveedores.map(p =>
-          p.id === tempSelectedProveedor.id ? proveedorActualizado : p
-        ));
+          setProveedores(proveedores.map(p =>
+            p.id === tempSelectedProveedor.id ? proveedorActualizado : p
+          ));
+        }
 
         setSelectedProveedor(null);
         resetForm();
@@ -258,8 +337,18 @@ export function ProveedoresPage() {
   const handleDeleteClick = (proveedor: Proveedor) => {
     confirmDeleteAction(
       proveedor.nombre,
-      () => {
-        setProveedores(proveedores.filter(p => p.id !== proveedor.id));
+      async () => {
+        try {
+          if (proveedor.id) {
+            await proveedorService.eliminarProveedor(proveedor.id);
+          }
+          // Refrescar datos desde la API para sincronizar con el servidor
+          await cargarProveedores();
+        } catch (error) {
+          console.error('Error eliminando proveedor:', error);
+          // Eliminar localmente en caso de error
+          setProveedores(proveedores.filter(p => p.id !== proveedor.id));
+        }
       },
       {
         confirmTitle: 'Eliminar Proveedor',
@@ -271,17 +360,44 @@ export function ProveedoresPage() {
     );
   };
 
-  const handleToggleStatus = (proveedor: Proveedor) => {
-    const nuevoEstado = !proveedor.activo;
+  const handleToggleStatus = async (proveedor: Proveedor) => {
+    // Usar estado si está disponible, sino activo (compatibilidad)
+    const estadoActual = proveedor.estado !== undefined ? proveedor.estado : proveedor.activo;
+    const nuevoEstado = !estadoActual;
+    console.log(`🔄 Toggle status for provider ${proveedor.id}: ${estadoActual} -> ${nuevoEstado}`);
 
-    setProveedores(proveedores.map(p =>
-      p.id === proveedor.id ? { ...p, activo: nuevoEstado } : p
-    ));
+    try {
+      if (proveedor.id) {
+        await proveedorService.cambiarEstadoProveedor(proveedor.id, nuevoEstado);
+      }
+      
+      // Refrescar datos desde la API para sincronizar con el servidor
+      await cargarProveedores();
 
-    if (nuevoEstado) {
-      created("Proveedor activado", `El proveedor "${proveedor.nombre}" ha sido activado.`);
-    } else {
-      edited("Proveedor desactivado", `El proveedor "${proveedor.nombre}" ha sido desactivado.`);
+      if (nuevoEstado) {
+        created("Proveedor activado", `El proveedor "${proveedor.nombre}" ha sido activado.`);
+      } else {
+        edited("Proveedor desactivado", `El proveedor "${proveedor.nombre}" ha sido desactivado.`);
+      }
+    } catch (error) {
+      console.error('❌ Error cambiando estado del proveedor:', error);
+      
+      // Cambiar estado localmente en caso de error, pero solo si la lista actual no está vacía
+      if (proveedores.length > 0) {
+        setProveedores(proveedores.map(p =>
+          p.id === proveedor.id ? { ...p, estado: nuevoEstado, activo: nuevoEstado } : p
+        ));
+
+        if (nuevoEstado) {
+          created("Proveedor activado", `El proveedor "${proveedor.nombre}" ha sido activado localmente.`);
+        } else {
+          edited("Proveedor desactivado", `El proveedor "${proveedor.nombre}" ha sido desactivado localmente.`);
+        }
+      } else {
+        // Si la lista está vacía, recargar los datos
+        console.log('📥 Provider list is empty, reloading...');
+        await cargarProveedores();
+      }
     }
   };
 
@@ -385,6 +501,22 @@ export function ProveedoresPage() {
                         />
                       </div>
                     </div>
+
+                    {formData.tipoProveedor === 'Natural' && (
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-orange-primary" />
+                          Persona de Contacto
+                        </Label>
+                        <Input
+                          id="personaContacto"
+                          value={formData.personaContacto || ''}
+                          onChange={(e) => setFormData({ ...formData, personaContacto: e.target.value })}
+                          className="elegante-input"
+                          placeholder="Nombre de la persona de contacto (si es diferente)"
+                        />
+                      </div>
+                    )}
 
                     {formData.tipoProveedor === 'Juridico' && (
                       <>
@@ -558,6 +690,84 @@ export function ProveedoresPage() {
                       </div>
                     </div>
 
+                    {/* Campos Adicionales - Ciudad y Departamento */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-primary" />
+                          Ciudad
+                        </Label>
+                        <Input
+                          id="ciudad"
+                          value={formData.ciudad}
+                          onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
+                          className="elegante-input"
+                          placeholder="Ciudad"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-primary" />
+                          Departamento
+                        </Label>
+                        <Input
+                          id="departamento"
+                          value={formData.departamento}
+                          onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
+                          className="elegante-input"
+                          placeholder="Departamento"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Campos Específicos para Jurídico */}
+                    {formData.tipoProveedor === 'Juridico' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <IdCard className="w-4 h-4 text-orange-primary" />
+                              Número Identificación
+                            </Label>
+                            <Input
+                              id="numeroIdentificacion"
+                              value={formData.numeroIdentificacion}
+                              onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
+                              className="elegante-input"
+                              placeholder="Número de identificación"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <Briefcase className="w-4 h-4 text-orange-primary" />
+                              Cargo del Representante Legal
+                            </Label>
+                            <Input
+                              id="cargoRepLegal"
+                              value={formData.cargoRepLegal}
+                              onChange={(e) => setFormData({ ...formData, cargoRepLegal: e.target.value })}
+                              className="elegante-input"
+                              placeholder="Cargo del representante legal"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-white-primary flex items-center gap-2">
+                            <IdCard className="w-4 h-4 text-orange-primary" />
+                            Número Identificación Representante Legal
+                          </Label>
+                          <Input
+                            id="numeroIdentificacionRepLegal"
+                            value={formData.numeroIdentificacionRepLegal}
+                            onChange={(e) => setFormData({ ...formData, numeroIdentificacionRepLegal: e.target.value })}
+                            className="elegante-input"
+                            placeholder="Número de identificación del representante legal"
+                          />
+                        </div>
+                      </>
+                    )}
+
                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
                       <Button
                         type="button"
@@ -593,8 +803,17 @@ export function ProveedoresPage() {
             </div>
 
             <div className="flex items-center gap-4">
+              <button
+                onClick={cargarProveedores}
+                disabled={loading}
+                className="elegante-button-secondary text-sm flex items-center gap-2 disabled:opacity-50"
+                title="Actualizar lista de proveedores"
+              >
+                <Search className="w-4 h-4" />
+                {loading ? 'Actualizando...' : 'Actualizar'}
+              </button>
               <div className="text-sm text-gray-lightest">
-                Mostrando {currentProveedores.length} de {filteredProveedores.length} proveedores
+                {loading ? 'Cargando...' : `Mostrando ${currentProveedores.length} de ${filteredProveedores.length} proveedores`}
               </div>
             </div>
           </div>
@@ -613,7 +832,31 @@ export function ProveedoresPage() {
                 </tr>
               </thead>
               <tbody>
-                {currentProveedores.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 border-2 border-orange-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <h3 className="text-lg font-medium text-white-primary mb-2">Cargando proveedores...</h3>
+                        <p className="text-gray-lightest">Obteniendo información desde el servidor</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-white-primary mb-2">Error de conexión</h3>
+                      <p className="text-gray-lightest mb-4">{error}</p>
+                      <button
+                        onClick={cargarProveedores}
+                        className="elegante-button-primary text-sm"
+                      >
+                        Reintentar
+                      </button>
+                    </td>
+                  </tr>
+                ) : currentProveedores.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center">
                       <Truck className="w-12 h-12 text-gray-medium mx-auto mb-4" />
@@ -652,9 +895,10 @@ export function ProveedoresPage() {
                       </td>
                       <td className="py-4 px-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <span className={`elegante-tag text-xs bg-gray-medium text-gray-lighter
-                            }`}>
-                            {proveedor.activo ? 'Activo' : 'Inactivo'}
+                          <span className={`elegante-tag text-xs ${
+                            (proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                          }`}>
+                            {(proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? 'Activo' : 'Inactivo'}
                           </span>
                         </div>
                       </td>
@@ -677,9 +921,9 @@ export function ProveedoresPage() {
                           <button
                             onClick={() => handleToggleStatus(proveedor)}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                            title={proveedor.activo ? "Desactivar" : "Activar"}
+                            title={(proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? "Desactivar" : "Activar"}
                           >
-                            {proveedor.activo ? (
+                            {(proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? (
                               <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
                             ) : (
                               <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
@@ -700,6 +944,79 @@ export function ProveedoresPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación */}
+          {!loading && !error && filteredProveedores.length > 0 && (
+            <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-dark">
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-gray-lightest">
+                  Página {currentPage} de {totalPages}
+                </div>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="elegante-input text-sm w-auto"
+                >
+                  <option value={5}>5 por página</option>
+                  <option value={10}>10 por página</option>
+                  <option value={20}>20 por página</option>
+                  <option value={50}>50 por página</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Página anterior"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-lightest" />
+                </button>
+                
+                {/* Números de página */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded text-sm transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-orange-primary text-black-primary font-medium'
+                            : 'border border-gray-dark hover:bg-gray-darker text-gray-lightest'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Página siguiente"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-lightest" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Lista de proveedores - OLD */}
@@ -766,8 +1083,9 @@ export function ProveedoresPage() {
 
                     {/* Estado */}
                     <div className="flex items-center gap-2">
-                      <span className={`elegante-tag text-xs bg-gray-medium text-gray-lighter
-                        }`}>
+                      <span className={`elegante-tag text-xs ${
+                        proveedor.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                      }`}>
                         {proveedor.activo ? 'Activo' : 'Inactivo'}
                       </span>
                       <button
@@ -889,6 +1207,22 @@ export function ProveedoresPage() {
                   />
                 </div>
               </div>
+
+              {formData.tipoProveedor === 'Natural' && (
+                <div className="space-y-2">
+                  <Label className="text-white-primary flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-orange-primary" />
+                    Persona de Contacto
+                  </Label>
+                  <Input
+                    id="editPersonaContacto"
+                    value={formData.personaContacto || ''}
+                    onChange={(e) => setFormData({ ...formData, personaContacto: e.target.value })}
+                    className="elegante-input"
+                    placeholder="Nombre de la persona de contacto (si es diferente)"
+                  />
+                </div>
+              )}
 
               {formData.tipoProveedor === 'Juridico' && (
                 <>
@@ -1062,6 +1396,84 @@ export function ProveedoresPage() {
                 </div>
               </div>
 
+              {/* Campos Adicionales - Ciudad y Departamento */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-white-primary flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-orange-primary" />
+                    Ciudad
+                  </Label>
+                  <Input
+                    id="editCiudad"
+                    value={formData.ciudad}
+                    onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
+                    className="elegante-input"
+                    placeholder="Ciudad"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white-primary flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-orange-primary" />
+                    Departamento
+                  </Label>
+                  <Input
+                    id="editDepartamento"
+                    value={formData.departamento}
+                    onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
+                    className="elegante-input"
+                    placeholder="Departamento"
+                  />
+                </div>
+              </div>
+
+              {/* Campos Específicos para Jurídico */}
+              {formData.tipoProveedor === 'Juridico' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white-primary flex items-center gap-2">
+                        <IdCard className="w-4 h-4 text-orange-primary" />
+                        Número Identificación
+                      </Label>
+                      <Input
+                        id="editNumeroIdentificacion"
+                        value={formData.numeroIdentificacion}
+                        onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
+                        className="elegante-input"
+                        placeholder="Número de identificación"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white-primary flex items-center gap-2">
+                        <Briefcase className="w-4 h-4 text-orange-primary" />
+                        Cargo del Representante Legal
+                      </Label>
+                      <Input
+                        id="editCargoRepLegal"
+                        value={formData.cargoRepLegal}
+                        onChange={(e) => setFormData({ ...formData, cargoRepLegal: e.target.value })}
+                        className="elegante-input"
+                        placeholder="Cargo del representante legal"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white-primary flex items-center gap-2">
+                      <IdCard className="w-4 h-4 text-orange-primary" />
+                      Número Identificación Representante Legal
+                    </Label>
+                    <Input
+                      id="editNumeroIdentificacionRepLegal"
+                      value={formData.numeroIdentificacionRepLegal}
+                      onChange={(e) => setFormData({ ...formData, numeroIdentificacionRepLegal: e.target.value })}
+                      className="elegante-input"
+                      placeholder="Número de identificación del representante legal"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
                 <Button
                   type="button"
@@ -1211,9 +1623,9 @@ export function ProveedoresPage() {
                   Estado del Proveedor
                 </h4>
                 <div className="flex items-center gap-2">
-                  <span className={`elegante-tag ${selectedProveedor.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                  <span className={`elegante-tag ${(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
                     }`}>
-                    {selectedProveedor.activo ? 'Activo' : 'Inactivo'}
+                    {(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
               </div>
