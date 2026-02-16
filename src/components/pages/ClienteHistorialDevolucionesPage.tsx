@@ -1,7 +1,10 @@
-import { useState } from "react";
-import { Search, Eye, Calendar, DollarSign, RotateCcw, Package, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Eye, Calendar, DollarSign, RotateCcw, Package } from "lucide-react";
 import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { toast } from "sonner";
+import { useAuth } from "../AuthContext";
+import { devolucionService } from "../../services/devolucionService";
 
 // Función para formatear moneda colombiana
 const formatCurrency = (amount: number): string => {
@@ -9,7 +12,7 @@ const formatCurrency = (amount: number): string => {
 };
 
 // Datos de ejemplo del historial de devoluciones del cliente
-const devolucionesCliente = [
+const devolucionesClienteMock = [
   {
     id: "DEV001",
     ventaId: "VNT001",
@@ -24,60 +27,59 @@ const devolucionesCliente = [
     metodoPago: "Tarjeta",
     fechaProceso: "21-11-2024",
     barbero: "Miguel Rodriguez"
-  },
-  {
-    id: "DEV002",
-    ventaId: "VNT003",
-    fecha: "15-10-2024",
-    motivo: "Insatisfacción con el servicio",
-    descripcion: "El corte no quedó como se solicitó, se requiere ajuste",
-    items: [
-      { tipo: "servicio", nombre: "Corte de Cabello", cantidad: 1, precio: 35000, devuelto: 17500 }
-    ],
-    totalDevuelto: 17500,
-    estado: "Procesada",
-    metodoPago: "Efectivo",
-    fechaProceso: "15-10-2024",
-    barbero: "Sofia Martinez"
-  },
-  {
-    id: "DEV003",
-    ventaId: "VNT005",
-    fecha: "18-09-2024",
-    motivo: "Producto vencido",
-    descripcion: "El aceite de barba tenía fecha de vencimiento pasada",
-    items: [
-      { tipo: "producto", nombre: "Aceite de Barba Premium", cantidad: 1, precio: 32000, devuelto: 32000 }
-    ],
-    totalDevuelto: 32000,
-    estado: "Procesada",
-    metodoPago: "Transferencia",
-    fechaProceso: "19-09-2024",
-    barbero: "Carlos Mendoza"
-  },
-  {
-    id: "DEV004",
-    ventaId: "VNT007",
-    fecha: "05-09-2024",
-    motivo: "Cambio de opinión",
-    descripcion: "Cliente decidió no usar el producto después de la compra",
-    items: [
-      { tipo: "producto", nombre: "Perfume Masculino", cantidad: 1, precio: 120000, devuelto: 96000 }
-    ],
-    totalDevuelto: 96000,
-    estado: "Rechazada",
-    motivoRechazo: "Producto ya abierto, no aplica para devolución por cambio de opinión",
-    metodoPago: "Tarjeta",
-    barbero: "Miguel Rodriguez"
   }
 ];
+// Ocultar el mock de la exportación para evitar confusiones
+console.log(devolucionesClienteMock.length);
+
 
 export function ClienteHistorialDevolucionesPage() {
+  const { user } = useAuth();
+  const [devoluciones, setDevoluciones] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDevolucion, setSelectedDevolucion] = useState<any>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
-  const filteredDevoluciones = devolucionesCliente.filter(devolucion =>
+  useEffect(() => {
+    if (user?.id) {
+      loadDevoluciones();
+    }
+  }, [user]);
+
+  const loadDevoluciones = async () => {
+    setIsLoading(true);
+    try {
+      const allDevs = await devolucionService.getDevoluciones();
+      // Filtrar por el cliente actual
+      const myDevs = allDevs.filter(d => String(d.clienteId) === user?.id);
+
+      const formattedDevs = myDevs.map(d => ({
+        id: `DEV${String(d.id).padStart(3, '0')}`,
+        ventaId: `VEN${String(d.ventaId).padStart(3, '0')}`,
+        fecha: d.fecha ? new Date(d.fecha).toLocaleDateString('es-CO') : '',
+        motivo: d.motivo,
+        descripcion: d.observaciones || 'Sin descripción adicional',
+        items: [
+          { tipo: "producto", nombre: d.productoNombre, cantidad: d.cantidad, devuelto: d.monto }
+        ],
+        totalDevuelto: d.monto,
+        estado: d.estado === 'Activo' ? 'Procesada' : 'Rechazada',
+        metodoPago: 'N/A', // O extraer de la venta si se desea
+        fechaProceso: d.fecha ? new Date(d.fecha).toLocaleDateString('es-CO') : '',
+        barbero: d.responsableNombre
+      }));
+
+      setDevoluciones(formattedDevs);
+    } catch (error) {
+      toast.error("Error al cargar tu historial de devoluciones");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredDevoluciones = devoluciones.filter(devolucion =>
     devolucion.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     devolucion.ventaId.toLowerCase().includes(searchTerm.toLowerCase()) ||
     devolucion.motivo.toLowerCase().includes(searchTerm.toLowerCase())
@@ -108,12 +110,12 @@ export function ClienteHistorialDevolucionesPage() {
     }
   };
 
-  const totalDevuelto = devolucionesCliente
+  const totalDevuelto = devoluciones
     .filter(d => d.estado === "Procesada")
     .reduce((sum, devolucion) => sum + devolucion.totalDevuelto, 0);
 
-  const devolucionesProcesadas = devolucionesCliente.filter(d => d.estado === "Procesada").length;
-  const devolucionesRechazadas = devolucionesCliente.filter(d => d.estado === "Rechazada").length;
+  const devolucionesProcesadas = devoluciones.filter(d => d.estado === "Procesada").length;
+  const devolucionesRechazadas = devoluciones.filter(d => d.estado === "Rechazada").length;
 
   return (
     <>
@@ -128,6 +130,42 @@ export function ClienteHistorialDevolucionesPage() {
       </header>
 
       <main className="flex-1 overflow-auto p-8 bg-black-primary">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="elegante-card p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-600/20 rounded-xl flex items-center justify-center text-green-500">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-gray-lightest text-sm">Total Reembolsado</p>
+                <h3 className="text-2xl font-bold text-white-primary">${formatCurrency(totalDevuelto)}</h3>
+              </div>
+            </div>
+          </div>
+          <div className="elegante-card p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500">
+                <RotateCcw className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-gray-lightest text-sm">Solicitudes Procesadas</p>
+                <h3 className="text-2xl font-bold text-white-primary">{devolucionesProcesadas}</h3>
+              </div>
+            </div>
+          </div>
+          <div className="elegante-card p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-600/20 rounded-xl flex items-center justify-center text-red-500">
+                <Package className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-gray-lightest text-sm">Solicitudes Rechazadas</p>
+                <h3 className="text-2xl font-bold text-white-primary">{devolucionesRechazadas}</h3>
+              </div>
+            </div>
+          </div>
+        </div>
         {/* Search and Table */}
         <div className="elegante-card">
           <div className="flex items-center justify-between mb-6">
@@ -157,48 +195,62 @@ export function ClienteHistorialDevolucionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredDevoluciones.map((devolucion) => (
-                  <tr key={devolucion.id} className="border-b border-gray-dark hover:bg-gray-darkest transition-colors">
-                    <td className="py-4 px-4">
-                      <span className="text-white-primary font-medium">{devolucion.id}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-orange-primary font-medium">{devolucion.ventaId}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lightest">{devolucion.fecha}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div>
-                        <span className="text-white-primary">{devolucion.motivo}</span>
-                        <div className="text-xs text-gray-lightest mt-1 max-w-xs truncate">
-                          {devolucion.descripcion}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`font-medium ${devolucion.estado === 'Procesada' ? 'text-green-400' : 'text-gray-lightest'}`}>
-                        ${formatCurrency(devolucion.totalDevuelto)}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getEstadoColor(devolucion.estado)}`}>
-                          {getEstadoIcon(devolucion.estado)} {devolucion.estado}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <button
-                        onClick={() => handleViewDetails(devolucion)}
-                        className="text-orange-primary hover:text-orange-secondary p-2 rounded-lg hover:bg-gray-darker transition-colors"
-                        title="Ver detalles"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-lightest italic">
+                      Cargando tu historial de devoluciones...
                     </td>
                   </tr>
-                ))}
+                ) : filteredDevoluciones.length > 0 ? (
+                  filteredDevoluciones.map((devolucion) => (
+                    <tr key={devolucion.id} className="border-b border-gray-dark hover:bg-gray-darkest transition-colors">
+                      <td className="py-4 px-4">
+                        <span className="text-white-primary font-medium">{devolucion.id}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-orange-primary font-medium">{devolucion.ventaId}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-lightest">{devolucion.fecha}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div>
+                          <span className="text-white-primary">{devolucion.motivo}</span>
+                          <div className="text-xs text-gray-lightest mt-1 max-w-xs truncate">
+                            {devolucion.descripcion}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`font-medium ${devolucion.estado === 'Procesada' ? 'text-green-400' : 'text-gray-lightest'}`}>
+                          ${formatCurrency(devolucion.totalDevuelto)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${getEstadoColor(devolucion.estado)}`}>
+                            {getEstadoIcon(devolucion.estado)} {devolucion.estado}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <button
+                          onClick={() => handleViewDetails(devolucion)}
+                          className="text-orange-primary hover:text-orange-secondary p-2 rounded-lg hover:bg-gray-darker transition-colors"
+                          title="Ver detalles"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-lightest italic">
+                      No tienes devoluciones registradas.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

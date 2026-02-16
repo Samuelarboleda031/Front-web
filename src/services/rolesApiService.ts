@@ -1,26 +1,14 @@
-/**
- * Servicio Adapter: Roles con Módulos
- * 
- * Este servicio adapta los servicios reales (apiService, rolesModulosService)
- * a la interfaz que espera RolesPage.tsx
- */
+const API_BASE_URL = '/api';
 
-import { apiService } from './api';
-import { rolesModulosService } from './rolesModulosService';
-
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
-
-interface AuthHeaders extends Record<string, string> {
-  'Content-Type': string;
-  'Authorization'?: string;
-}
-
-const getAuthHeaders = (): AuthHeaders => {
+const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('authToken');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
   };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 // Tipos para RolesModulos (Permisos Granulares) - Basado en estructura del backend
@@ -110,7 +98,7 @@ class RolesApiService {
     // Si viene del array rolesModulos, extraer los IDs y permisos
     if (apiRole.rolesModulos && Array.isArray(apiRole.rolesModulos)) {
       moduloIds = apiRole.rolesModulos.map((rm: RolesModulos) => rm.moduloId);
-      
+
       // Mapear permisos por módulo
       apiRole.rolesModulos.forEach((rm: RolesModulos) => {
         permisosPorModulo[rm.moduloId] = {
@@ -144,57 +132,46 @@ class RolesApiService {
    */
   async getRolesWithModules(): Promise<RoleWithModules[]> {
     try {
-      // Primero intentar con include
-      let response = await fetch(`${API_BASE_URL}/roles?include=rolesmodulos,modulos`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
+      // Cargar usuarios en paralelo para el conteo satisfactorio
+      const [rolesRes, rolesModulosRes, usuariosRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/roles`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE_URL}/rolesmodulos`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE_URL}/usuarios`, { headers: getAuthHeaders() })
+      ]);
+
+      if (!rolesRes.ok) throw new Error(`Error roles: ${rolesRes.status}`);
+
+      const rolesRaw = await rolesRes.json();
+      const rolesModulosRaw = rolesModulosRes.ok ? await rolesModulosRes.json() : [];
+      const usuariosRaw = usuariosRes.ok ? await usuariosRes.json() : [];
+
+      const roles = Array.isArray(rolesRaw) ? rolesRaw : rolesRaw.data || [];
+      const rolesModulos = Array.isArray(rolesModulosRaw) ? rolesModulosRaw : rolesModulosRaw.data || [];
+      const usuarios = Array.isArray(usuariosRaw) ? usuariosRaw : usuariosRaw.data || [];
+
+      console.log('📋 Roles count:', roles.length);
+      console.log('📋 RolesModulos count:', rolesModulos.length);
+      console.log('📋 Usuarios count:', usuarios.length);
+
+      // Combinar todo
+      const data = roles.map((role: any) => {
+        // Filtrar módulos para este rol
+        const roleModulos = rolesModulos.filter((rm: any) =>
+          Number(rm.rolId) === Number(role.id)
+        );
+
+        // Contar usuarios para este rol
+        const userCount = usuarios.filter((u: any) =>
+          Number(u.rolId) === Number(role.id)
+        ).length;
+
+        return {
+          ...role,
+          rolesModulos: roleModulos,
+          usuariosAsignados: userCount
+        };
       });
 
-      let data: any;
-      
-      if (!response.ok) {
-        // Si falla, intentar endpoint simple
-        response = await fetch(`${API_BASE_URL}/roles`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-        
-        data = await response.json();
-        console.log('📋 Datos recibidos de API (endpoint simple):', data);
-        
-        // Si no incluye rolesmodulos, hacer llamada separada
-        console.log('🔍 Haciendo llamada separada para rolesmodulos...');
-        const rolesModulosResponse = await fetch(`${API_BASE_URL}/rolesmodulos`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-        
-        if (rolesModulosResponse.ok) {
-          const rolesModulosData = await rolesModulosResponse.json();
-          console.log('📋 Datos de rolesmodulos:', rolesModulosData);
-          
-          // Combinar roles con rolesmodulos
-          if (Array.isArray(data)) {
-            data = data.map((role: any) => {
-              const roleModulos = Array.isArray(rolesModulosData) 
-                ? rolesModulosData.filter((rm: any) => rm.rolId === role.id)
-                : [];
-              return {
-                ...role,
-                rolesModulos: roleModulos
-              };
-            });
-          }
-        }
-      } else {
-        data = await response.json();
-        console.log('📋 Datos recibidos de API (con include):', data);
-      }
-      
       // Normalizar cada rol
       const normalizedRoles = (Array.isArray(data) ? data : data.data || [])
         .map((role: any) => {
@@ -207,7 +184,7 @@ class RolesApiService {
           console.log('🔑 permisosPorModulo después de normalizar:', normalized.permisosPorModulo);
           return normalized;
         });
-      
+
       console.log('📊 Roles finales:', normalizedRoles);
       return normalizedRoles;
     } catch (error) {
@@ -246,15 +223,17 @@ class RolesApiService {
       if (!roleData.nombre?.trim()) {
         throw new Error('El nombre del rol es requerido');
       }
+      /*
       if (!roleData.modulos || roleData.modulos.length === 0) {
         throw new Error('Debe seleccionar al menos un módulo');
       }
+      */
 
       // Preparar payload - Crear el rol primero
       const rolePayload = {
-        nombre: roleData.nombre.trim(),
-        descripcion: roleData.descripcion?.trim() || '',
-        estado: true
+        Nombre: roleData.nombre.trim(),
+        Descripcion: roleData.descripcion?.trim() || '',
+        Estado: true
       };
 
       const roleResponse = await fetch(`${API_BASE_URL}/roles`, {
@@ -279,7 +258,7 @@ class RolesApiService {
           puedeEditar: true,
           puedeEliminar: true
         };
-        
+
         const rolesModulosPayload = {
           rolId: roleId,
           moduloId: moduloId,
@@ -309,15 +288,18 @@ class RolesApiService {
       if (!roleData.nombre?.trim()) {
         throw new Error('El nombre del rol es requerido');
       }
+      /*
       if (!roleData.modulos || roleData.modulos.length === 0) {
         throw new Error('Debe seleccionar al menos un módulo');
       }
+      */
 
       // Actualizar datos básicos del rol
       const updatePayload = {
-        nombre: roleData.nombre.trim(),
-        descripcion: roleData.descripcion?.trim() || '',
-        estado: roleData.estado
+        Id: roleId,
+        Nombre: roleData.nombre.trim(),
+        Descripcion: roleData.descripcion?.trim() || '',
+        Estado: roleData.estado
       };
 
       const updateResponse = await fetch(`${API_BASE_URL}/roles/${roleId}`, {
@@ -337,7 +319,7 @@ class RolesApiService {
 
       // Módulos a eliminar
       const modulosToDelete = currentModulos.filter(m => !roleData.modulos.includes(m));
-      
+
       // Módulos a agregar
       const modulosToAdd = roleData.modulos.filter(m => !currentModulos.includes(m));
 

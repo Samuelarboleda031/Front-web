@@ -24,7 +24,7 @@ import { useCustomAlert } from "../ui/custom-alert";
 import { rolesApiService, RoleWithModules, CreateRoleData, UpdateRoleData, PermisoModulo } from "@/services/rolesApiService";
 import { modulosService, Modulo } from "@/services/modulosService";
 
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+const API_BASE_URL = '/api';
 
 // Función para obtener headers de autenticación
 const getAuthHeaders = () => {
@@ -75,13 +75,13 @@ export function RolesPage() {
     try {
       setLoading(true);
       console.log('📋 Iniciando carga de roles y módulos...');
-      
+
       // Cargar roles y módulos en paralelo
       const [rolesData, modulosData] = await Promise.all([
         rolesApiService.getRolesWithModules(),
         modulosService.getModulos()
       ]);
-      
+
       // Adaptar módulos inline para evitar dependencias circulares
       const modulosAdaptados = modulosData.map(modulo => ({
         ...modulo,
@@ -90,7 +90,7 @@ export function RolesPage() {
         color: 'blue',
         descripcion: modulo.nombre
       }));
-      
+
       setRoles(rolesData);
       setModulosProyecto(modulosAdaptados);
       console.log('✅ Roles cargados correctamente:', rolesData.length);
@@ -128,12 +128,8 @@ export function RolesPage() {
       return false;
     }
 
-    if (roleData.modulos.length === 0) {
-      showError("Debe seleccionar al menos un módulo");
-      return false;
-    }
 
-    const modulosValidos = roleData.modulos.every(id => 
+    const modulosValidos = roleData.modulos.every(id =>
       modulosProyecto.find(m => m.id === id)
     );
     if (!modulosValidos) {
@@ -152,7 +148,7 @@ export function RolesPage() {
         const newModulos = prev.modulos.includes(moduloId)
           ? prev.modulos.filter((id: string) => id !== moduloId)
           : [...prev.modulos, moduloId];
-        
+
         // Si se selecciona un nuevo módulo, agregar permisos por defecto
         const newPermisosPorModulo = { ...prev.permisosPorModulo };
         if (!prev.modulos.includes(moduloId) && newModulos.includes(moduloId)) {
@@ -163,7 +159,7 @@ export function RolesPage() {
             puedeEliminar: false
           };
         }
-        
+
         return {
           ...prev,
           modulos: newModulos,
@@ -175,7 +171,7 @@ export function RolesPage() {
         const newModulos = prev.modulos.includes(moduloId)
           ? prev.modulos.filter((id: string) => id !== moduloId)
           : [...prev.modulos, moduloId];
-        
+
         // Si se selecciona un nuevo módulo, agregar todos los permisos por defecto
         const newPermisosPorModulo = { ...prev.permisos };
         if (!prev.modulos.includes(moduloId) && newModulos.includes(moduloId)) {
@@ -186,7 +182,7 @@ export function RolesPage() {
             puedeEliminar: true
           };
         }
-        
+
         return {
           ...prev,
           modulos: newModulos,
@@ -201,7 +197,7 @@ export function RolesPage() {
     if (isEditing) {
       setEditingRole((prev) => {
         if (!prev) return prev;
-        
+
         const newPermisosPorModulo = { ...prev.permisosPorModulo };
         if (!newPermisosPorModulo[moduloId]) {
           newPermisosPorModulo[moduloId] = {
@@ -211,12 +207,12 @@ export function RolesPage() {
             puedeEliminar: true
           };
         }
-        
+
         newPermisosPorModulo[moduloId] = {
           ...newPermisosPorModulo[moduloId],
           [permisoType]: !newPermisosPorModulo[moduloId][permisoType]
         };
-        
+
         return {
           ...prev,
           permisosPorModulo: newPermisosPorModulo
@@ -243,14 +239,14 @@ export function RolesPage() {
   }, []);
 
   // Función para crear nuevo rol
-  const handleCreateRole = useCallback (async () => {
+  const handleCreateRole = useCallback(async () => {
     if (!validateRoleData(nuevoRol)) return;
 
     try {
       setIsCreating(true);
       console.log('➕ Creando nuevo rol con módulos:', nuevoRol.modulos);
       console.log('🔑 Permisos a enviar:', nuevoRol.permisos);
-      
+
       const newRole = await rolesApiService.createRoleWithModules({
         nombre: nuevoRol.nombre.trim(),
         descripcion: nuevoRol.descripcion?.trim() || '',
@@ -280,14 +276,14 @@ export function RolesPage() {
   }, [nuevoRol, validateRoleData, loadRoles, showSuccess, showError]);
 
   // Función para editar rol
-  const handleEditRole = useCallback (async () => {
+  const handleEditRole = useCallback(async () => {
     if (!editingRole || !validateRoleData(editingRole)) return;
 
     try {
       setIsEditing(true);
       console.log('🔧 Actualizando rol con módulos:', editingRole.modulos);
       console.log('🔑 Permisos a actualizar:', editingRole.permisosPorModulo);
-      
+
       const updateData: UpdateRoleData = {
         nombre: editingRole.nombre.trim(),
         descripcion: editingRole.descripcion?.trim() || '',
@@ -295,23 +291,23 @@ export function RolesPage() {
         permisos: editingRole.permisosPorModulo || {},
         estado: editingRole.estado === true
       };
-      
+
       const updatedRole = await rolesApiService.updateRoleWithModules(
-        parseInt(editingRole.id), 
+        parseInt(editingRole.id),
         updateData
       );
-      
+
       // Validar que el rol actualizado tenga módulos
       if (!updatedRole.modulos || updatedRole.modulos.length === 0) {
         console.warn('⚠️ Rol actualizado sin módulos, recargando...');
         await loadRoles();
       } else {
-        setRoles(prev => prev.map(rol => 
+        setRoles(prev => prev.map(rol =>
           rol.id === editingRole.id ? updatedRole : rol
         ));
         console.log('✅ Rol actualizado con permisos:', updatedRole.permisosPorModulo);
       }
-      
+
       setIsEditDialogOpen(false);
       setEditingRole(null);
       showSuccess(`Rol "${updatedRole.nombre}" actualizado exitosamente`);
@@ -372,7 +368,7 @@ export function RolesPage() {
   }, [roles, showSuccess, showError]);
 
   // Función para eliminar rol
-  const handleDeleteRole = useCallback (async () => {
+  const handleDeleteRole = useCallback(async () => {
     if (roleToDelete) {
       try {
         setIsDeleting(true);
@@ -418,10 +414,10 @@ export function RolesPage() {
   const handleViewDetails = useCallback(async (rol: RoleWithModules) => {
     setSelectedRole(rol);
     setIsDetailDialogOpen(true);
-    
+
     // Cargar rolesmodulos específicos del rol
     const rolesModulosData = await loadRolesModulosByRole(rol.id);
-    
+
     // Actualizar el rol seleccionado con los datos de rolesmodulos
     setSelectedRole(prev => ({
       ...prev!,
@@ -434,19 +430,19 @@ export function RolesPage() {
   }, [modulosProyecto]);
 
   // Componente para mostrar la selección de módulos con permisos granulares
-  const ModuleSelector = useCallback(({ 
-    modulos, 
-    onToggle, 
+  const ModuleSelector = useCallback(({
+    modulos,
+    onToggle,
     onTogglePermiso,
-    isEditing = false, 
+    isEditing = false,
     showSelectAll = true,
     showPermisos = false,
     permisos = {}
-  }: { 
-    modulos: string[]; 
-    onToggle: (id: string, isEdit: boolean) => void; 
+  }: {
+    modulos: string[];
+    onToggle: (id: string, isEdit: boolean) => void;
     onTogglePermiso?: (id: string, permisoType: keyof PermisoModulo, isEdit: boolean) => void;
-    isEditing?: boolean; 
+    isEditing?: boolean;
     showSelectAll?: boolean;
     showPermisos?: boolean;
     permisos?: Record<string, PermisoModulo>;
@@ -492,8 +488,8 @@ export function RolesPage() {
               <div
                 key={modulo.id}
                 className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${isSelected
-                    ? 'border-orange-primary bg-orange-primary/20 shadow-md'
-                    : 'border-gray-dark bg-gray-darkest hover:border-gray-medium hover:bg-gray-dark'
+                  ? 'border-orange-primary bg-orange-primary/20 shadow-md'
+                  : 'border-gray-dark bg-gray-darkest hover:border-gray-medium hover:bg-gray-dark'
                   }`}
                 onClick={() => onToggle(modulo.id, isEditing)}
               >
@@ -512,7 +508,7 @@ export function RolesPage() {
                       )}
                     </h4>
                     <p className="text-xs text-gray-lightest mt-1">{modulo.descripcion}</p>
-                    
+
                     {showPermisos && isSelected && moduloPermisos && (
                       <div className="mt-2 p-2 bg-gray-darkest rounded text-xs">
                         <div className="grid grid-cols-2 gap-1">
@@ -558,8 +554,8 @@ export function RolesPage() {
                   </div>
 
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
-                      ? 'border-orange-primary bg-orange-primary'
-                      : 'border-gray-medium'
+                    ? 'border-orange-primary bg-orange-primary'
+                    : 'border-gray-medium'
                     }`}>
                     {isSelected && <Check className="w-3 h-3 text-black-primary" />}
                   </div>
@@ -722,14 +718,32 @@ export function RolesPage() {
                             <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
                           </button>
                           <button
-                            onClick={() => {
-                              // Preparar el rol para edición con el formato correcto
+                            onClick={async () => {
+                              // Cargar rolesmodulos específicos del rol antes de editar
+                              const rolesModulosData = await loadRolesModulosByRole(rol.id);
+
+                              // Construir mapa de permisos y lista de módulos
+                              const permisosMap: Record<string, any> = {};
+                              const modulosIds: string[] = [];
+
+                              rolesModulosData.forEach((rm: any) => {
+                                const modId = String(rm.moduloId);
+                                modulosIds.push(modId);
+                                permisosMap[modId] = {
+                                  puedeVer: rm.puedeVer,
+                                  puedeCrear: rm.puedeCrear,
+                                  puedeEditar: rm.puedeEditar,
+                                  puedeEliminar: rm.puedeEliminar
+                                };
+                              });
+
+                              // Preparar el rol para edición con los datos frescos
                               const rolParaEditar = {
                                 ...rol,
-                                // Extraer IDs de módulos desde rolesModulos
-                                modulos: rol.rolesModulos ? rol.rolesModulos.map((rm: any) => String(rm.moduloId)) : [],
-                                permisosPorModulo: rol.permisosPorModulo || {}
+                                modulos: modulosIds,
+                                permisosPorModulo: permisosMap
                               };
+
                               setEditingRole(rolParaEditar);
                               setIsEditDialogOpen(true);
                             }}
@@ -739,7 +753,7 @@ export function RolesPage() {
                           >
                             <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
                           </button>
-                          
+
                           <button
                             onClick={() => toggleRoleStatus(rol.id)}
                             className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
@@ -752,7 +766,7 @@ export function RolesPage() {
                               <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
                             )}
                           </button>
-                          
+
                           <button
                             onClick={() => {
                               setRoleToDelete(rol);
@@ -857,7 +871,7 @@ export function RolesPage() {
                         }
 
                         const IconComponent = modulo.icono;
-                        
+
                         return (
                           <div key={rolModulo.moduloId} className="flex items-center gap-3 p-3 bg-gray-darker rounded-lg">
                             <IconComponent className={`w-4 h-4 ${modulo.color}`} />
@@ -866,9 +880,9 @@ export function RolesPage() {
                               <p className="text-gray-lightest text-xs">{modulo.descripcion}</p>
                               <div className="mt-1 text-xs text-gray-lightest">
                                 <span className="text-orange-primary">
-                                  Permisos: {rolModulo.puedeVer ? '✓' : '✗'} Ver, 
-                                  {rolModulo.puedeCrear ? '✓' : '✗'} Crear, 
-                                  {rolModulo.puedeEditar ? '✓' : '✗'} Editar, 
+                                  Permisos: {rolModulo.puedeVer ? '✓' : '✗'} Ver,
+                                  {rolModulo.puedeCrear ? '✓' : '✗'} Crear,
+                                  {rolModulo.puedeEditar ? '✓' : '✗'} Editar,
                                   {rolModulo.puedeEliminar ? '✓' : '✗'} Eliminar
                                 </span>
                               </div>
@@ -923,7 +937,7 @@ export function RolesPage() {
                   onToggle={toggleModulo}
                   onTogglePermiso={togglePermiso}
                   isEditing={true}
-                  showPermisos={true}
+                  showPermisos={false} // Ocultar permisos granulares
                   permisos={editingRole.permisosPorModulo || {}}
                 />
               </div>

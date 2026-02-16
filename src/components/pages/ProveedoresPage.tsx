@@ -155,9 +155,9 @@ export function ProveedoresPage() {
       setLoading(true);
       setError(null);
       console.log('📥 Loading providers...');
-      const data = await proveedorService.obtenerProveedoresJuridicos();
+      const data = await proveedorService.obtenerProveedores();
       console.log('✅ Providers loaded:', data);
-      
+
       // Asegurarse de que los datos sean un array válido
       if (Array.isArray(data) && data.length > 0) {
         setProveedores(data);
@@ -227,7 +227,7 @@ export function ProveedoresPage() {
       });
 
       created("Proveedor creado", `El proveedor "${formData.nombre}" ha sido agregado exitosamente al sistema.`);
-      
+
       // Refrescar datos desde la API
       await cargarProveedores();
 
@@ -257,31 +257,44 @@ export function ProveedoresPage() {
 
   const handleEdit = (proveedor: Proveedor) => {
     setSelectedProveedor(proveedor);
+
+    // Configurar tipo de proveedor, con fallback a 'Juridico' si no está definido
+    const tipo = (proveedor.tipoProveedor === 'Natural' || proveedor.tipoProveedor === 'Juridico')
+      ? proveedor.tipoProveedor
+      : 'Juridico';
+
     setFormData({
-      nombre: proveedor.nombre,
-      tipoProveedor: proveedor.tipoProveedor,
-      nit: proveedor.nit || "",
+      nombre: proveedor.nombre || "",
+      tipoProveedor: tipo,
+      nit: proveedor.nit || proveedor.numeroIdentificacion || "",
       correo: proveedor.correo || "",
       numero: proveedor.numero || proveedor.telefono || "",
       direccion: proveedor.direccion || "",
+      ciudad: proveedor.ciudad || "",
+      departamento: proveedor.departamento || "",
+
+      // Contacto adicional (Natural)
+      personaContacto: proveedor.personaContacto || proveedor.contacto || "",
+
+      // Datos Jurídicos
       razonSocial: proveedor.razonSocial || "",
       representanteLegal: proveedor.representanteLegal || "",
+      numeroIdentificacionRepLegal: proveedor.numeroIdentificacionRepLegal || "",
+      cargoRepLegal: proveedor.cargoRepLegal || "",
       documentoRepresentante: proveedor.documentoRepresentante || "",
       telefonoRepresentante: proveedor.telefonoRepresentante || "",
       correoRepresentante: proveedor.correoRepresentante || "",
       sectorEconomico: proveedor.sectorEconomico || "",
       anosOperacion: proveedor.anosOperacion || 0,
       paginaWeb: proveedor.paginaWeb || "",
-      personaContacto: (proveedor as any).personaContacto || "",
-      // Campos adicionales faltantes
-      apellidos: (proveedor as any).apellidos || "",
-      cargoRepLegal: (proveedor as any).cargoRepLegal || "",
-      ciudad: (proveedor as any).ciudad || "",
-      departamento: (proveedor as any).departamento || "",
-      numeroIdentificacion: (proveedor as any).numeroIdentificacion || "",
-      numeroIdentificacionRepLegal: (proveedor as any).numeroIdentificacionRepLegal || ""
+
+      // Campos legacy o adicionales para evitar errores
+      apellidos: proveedor.apellidos || "",
+      numeroIdentificacion: proveedor.numeroIdentificacion || ""
     });
+
     setIsEditDialogOpen(true);
+    setIsDialogOpen(true); // Abrimos el mismo diálogo pero en modo edición
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -304,7 +317,7 @@ export function ProveedoresPage() {
               tempSelectedProveedor.id,
               tempFormData
             );
-            
+
             // Refrescar datos desde la API para obtener los datos más actualizados
             await cargarProveedores();
           }
@@ -370,7 +383,7 @@ export function ProveedoresPage() {
       if (proveedor.id) {
         await proveedorService.cambiarEstadoProveedor(proveedor.id, nuevoEstado);
       }
-      
+
       // Refrescar datos desde la API para sincronizar con el servidor
       await cargarProveedores();
 
@@ -381,7 +394,7 @@ export function ProveedoresPage() {
       }
     } catch (error) {
       console.error('❌ Error cambiando estado del proveedor:', error);
-      
+
       // Cambiar estado localmente en caso de error, pero solo si la lista actual no está vacía
       if (proveedores.length > 0) {
         setProveedores(proveedores.map(p =>
@@ -459,13 +472,14 @@ export function ProveedoresPage() {
                   <DialogHeader>
                     <DialogTitle className="text-white-primary flex items-center gap-2">
                       <Truck className="w-5 h-5 text-orange-primary" />
-                      Agregar Nuevo Proveedor
+                      {isEditDialogOpen ? 'Editar Proveedor' : 'Agregar Nuevo Proveedor'}
                     </DialogTitle>
                     <DialogDescription className="text-gray-lightest">
-                      Complete los datos del nuevo proveedor en el sistema
+                      {isEditDialogOpen ? 'Modifique los datos del proveedor seleccionado' : 'Complete los datos del nuevo proveedor en el sistema'}
                     </DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+                  <form onSubmit={isEditDialogOpen ? handleEditSubmit : handleSubmit} className="space-y-6 pt-4">
+                    {/* Sección 1: Información Básica e Identificación */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
@@ -478,6 +492,7 @@ export function ProveedoresPage() {
                           onChange={(e) => setFormData({ ...formData, tipoProveedor: e.target.value as 'Juridico' | 'Natural' })}
                           className="elegante-input w-full"
                           required
+                          disabled={isEditDialogOpen} // No permitir cambiar tipo al editar
                         >
                           {TIPOS_PROVEEDOR.map(tipo => (
                             <option key={tipo.value} value={tipo.value}>
@@ -490,7 +505,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <User className="w-4 h-4 text-orange-primary" />
-                          {formData.tipoProveedor === 'Juridico' ? 'Nombre de la Empresa' : 'Nombre Completo'}
+                          {formData.tipoProveedor === 'Juridico' ? 'Nombre Comercial' : 'Nombre Completo'}
                         </Label>
                         <Input
                           id="nombre"
@@ -502,175 +517,16 @@ export function ProveedoresPage() {
                       </div>
                     </div>
 
-                    {formData.tipoProveedor === 'Natural' && (
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <UserCheck className="w-4 h-4 text-orange-primary" />
-                          Persona de Contacto
-                        </Label>
-                        <Input
-                          id="personaContacto"
-                          value={formData.personaContacto || ''}
-                          onChange={(e) => setFormData({ ...formData, personaContacto: e.target.value })}
-                          className="elegante-input"
-                          placeholder="Nombre de la persona de contacto (si es diferente)"
-                        />
-                      </div>
-                    )}
-
-                    {formData.tipoProveedor === 'Juridico' && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-orange-primary" />
-                              Razón Social
-                            </Label>
-                            <Input
-                              id="razonSocial"
-                              value={formData.razonSocial}
-                              onChange={(e) => setFormData({ ...formData, razonSocial: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <UserCheck className="w-4 h-4 text-orange-primary" />
-                              Representante Legal
-                            </Label>
-                            <Input
-                              id="representanteLegal"
-                              value={formData.representanteLegal}
-                              onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <IdCard className="w-4 h-4 text-orange-primary" />
-                              Documento Representante
-                            </Label>
-                            <Input
-                              id="documentoRepresentante"
-                              value={formData.documentoRepresentante}
-                              onChange={(e) => setFormData({ ...formData, documentoRepresentante: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Phone className="w-4 h-4 text-orange-primary" />
-                              Teléfono Representante
-                            </Label>
-                            <Input
-                              id="telefonoRepresentante"
-                              value={formData.telefonoRepresentante}
-                              onChange={(e) => setFormData({ ...formData, telefonoRepresentante: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Mail className="w-4 h-4 text-orange-primary" />
-                              Correo Representante
-                            </Label>
-                            <Input
-                              id="correoRepresentante"
-                              type="email"
-                              value={formData.correoRepresentante}
-                              onChange={(e) => setFormData({ ...formData, correoRepresentante: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Briefcase className="w-4 h-4 text-orange-primary" />
-                              Sector Económico
-                            </Label>
-                            <Input
-                              id="sectorEconomico"
-                              value={formData.sectorEconomico}
-                              onChange={(e) => setFormData({ ...formData, sectorEconomico: e.target.value })}
-                              className="elegante-input"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-orange-primary" />
-                              Años de Operación
-                            </Label>
-                            <Input
-                              id="anosOperacion"
-                              type="number"
-                              min="0"
-                              value={formData.anosOperacion}
-                              onChange={(e) => setFormData({ ...formData, anosOperacion: parseInt(e.target.value) || 0 })}
-                              className="elegante-input"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Globe className="w-4 h-4 text-orange-primary" />
-                              Página Web
-                            </Label>
-                            <Input
-                              id="paginaWeb"
-                              value={formData.paginaWeb}
-                              onChange={(e) => setFormData({ ...formData, paginaWeb: e.target.value })}
-                              className="elegante-input"
-                              placeholder="www.ejemplo.com"
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <IdCard className="w-4 h-4 text-orange-primary" />
-                          NIT
+                          NIT / Identificación
                         </Label>
                         <Input
                           id="nit"
                           value={formData.nit}
                           onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
-                          className="elegante-input"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-orange-primary" />
-                          Correo Electrónico
-                        </Label>
-                        <Input
-                          id="correo"
-                          type="email"
-                          value={formData.correo}
-                          onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
-                          className="elegante-input"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-orange-primary" />
-                          Número de Teléfono
-                        </Label>
-                        <Input
-                          id="numero"
-                          value={formData.numero}
-                          onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                           className="elegante-input"
                           required
                         />
@@ -690,7 +546,37 @@ export function ProveedoresPage() {
                       </div>
                     </div>
 
-                    {/* Campos Adicionales - Ciudad y Departamento */}
+                    {/* Sección 2: Contacto Principal */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-orange-primary" />
+                          Teléfono Principal
+                        </Label>
+                        <Input
+                          id="numero"
+                          value={formData.numero}
+                          onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                          className="elegante-input"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-orange-primary" />
+                          Correo Principal
+                        </Label>
+                        <Input
+                          id="correo"
+                          type="email"
+                          value={formData.correo}
+                          onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                          className="elegante-input"
+                          required
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
@@ -720,52 +606,114 @@ export function ProveedoresPage() {
                       </div>
                     </div>
 
-                    {/* Campos Específicos para Jurídico */}
+                    {/* Sección 3: Datos Específicos */}
                     {formData.tipoProveedor === 'Juridico' && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
+                      <div className="border-t border-gray-700 pt-4 mt-4">
+                        <h4 className="text-orange-primary font-medium mb-4 flex items-center gap-2">
+                          <Briefcase className="w-4 h-4" /> Información Legal y Representante
+                        </h4>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                           <div className="space-y-2">
                             <Label className="text-white-primary flex items-center gap-2">
-                              <IdCard className="w-4 h-4 text-orange-primary" />
-                              Número Identificación
+                              <FileText className="w-4 h-4 text-gray-400" />
+                              Razón Social
                             </Label>
                             <Input
-                              id="numeroIdentificacion"
-                              value={formData.numeroIdentificacion}
-                              onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
+                              id="razonSocial"
+                              value={formData.razonSocial}
+                              onChange={(e) => setFormData({ ...formData, razonSocial: e.target.value })}
                               className="elegante-input"
-                              placeholder="Número de identificación"
                             />
                           </div>
                           <div className="space-y-2">
                             <Label className="text-white-primary flex items-center gap-2">
-                              <Briefcase className="w-4 h-4 text-orange-primary" />
-                              Cargo del Representante Legal
+                              <Globe className="w-4 h-4 text-gray-400" />
+                              Página Web
+                            </Label>
+                            <Input
+                              id="paginaWeb"
+                              value={formData.paginaWeb}
+                              onChange={(e) => setFormData({ ...formData, paginaWeb: e.target.value })}
+                              className="elegante-input"
+                              placeholder="www.ejemplo.com"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <UserCheck className="w-4 h-4 text-gray-400" />
+                              Representante Legal
+                            </Label>
+                            <Input
+                              id="representanteLegal"
+                              value={formData.representanteLegal}
+                              onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
+                              className="elegante-input"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <IdCard className="w-4 h-4 text-gray-400" />
+                              Documento Rep. Legal
+                            </Label>
+                            <Input
+                              id="numeroIdentificacionRepLegal"
+                              value={formData.numeroIdentificacionRepLegal}
+                              onChange={(e) => setFormData({ ...formData, numeroIdentificacionRepLegal: e.target.value })}
+                              className="elegante-input"
+                              placeholder="Cédula del representante"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <Briefcase className="w-4 h-4 text-gray-400" />
+                              Cargo Rep. Legal
                             </Label>
                             <Input
                               id="cargoRepLegal"
                               value={formData.cargoRepLegal}
                               onChange={(e) => setFormData({ ...formData, cargoRepLegal: e.target.value })}
                               className="elegante-input"
-                              placeholder="Cargo del representante legal"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <Briefcase className="w-4 h-4 text-gray-400" />
+                              Sector Económico
+                            </Label>
+                            <Input
+                              id="sectorEconomico"
+                              value={formData.sectorEconomico}
+                              onChange={(e) => setFormData({ ...formData, sectorEconomico: e.target.value })}
+                              className="elegante-input"
                             />
                           </div>
                         </div>
+                      </div>
+                    )}
 
+                    {formData.tipoProveedor === 'Natural' && (
+                      <div className="border-t border-gray-700 pt-4 mt-4">
                         <div className="space-y-2">
                           <Label className="text-white-primary flex items-center gap-2">
-                            <IdCard className="w-4 h-4 text-orange-primary" />
-                            Número Identificación Representante Legal
+                            <UserCheck className="w-4 h-4 text-orange-primary" />
+                            Persona de Contacto (Opcional)
                           </Label>
                           <Input
-                            id="numeroIdentificacionRepLegal"
-                            value={formData.numeroIdentificacionRepLegal}
-                            onChange={(e) => setFormData({ ...formData, numeroIdentificacionRepLegal: e.target.value })}
+                            id="personaContacto"
+                            value={formData.personaContacto || ''}
+                            onChange={(e) => setFormData({ ...formData, personaContacto: e.target.value })}
                             className="elegante-input"
-                            placeholder="Número de identificación del representante legal"
+                            placeholder="Nombre de contacto alternativo"
                           />
                         </div>
-                      </>
+                      </div>
                     )}
 
                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
@@ -774,6 +722,7 @@ export function ProveedoresPage() {
                         variant="outline"
                         onClick={() => {
                           setIsDialogOpen(false);
+                          setIsEditDialogOpen(false);
                           resetForm();
                         }}
                         className="elegante-button-secondary"
@@ -784,7 +733,7 @@ export function ProveedoresPage() {
                         type="submit"
                         className="elegante-button-primary"
                       >
-                        Agregar Proveedor
+                        {isEditDialogOpen ? 'Actualizar Proveedor' : 'Agregar Proveedor'}
                       </Button>
                     </div>
                   </form>
@@ -803,15 +752,6 @@ export function ProveedoresPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <button
-                onClick={cargarProveedores}
-                disabled={loading}
-                className="elegante-button-secondary text-sm flex items-center gap-2 disabled:opacity-50"
-                title="Actualizar lista de proveedores"
-              >
-                <Search className="w-4 h-4" />
-                {loading ? 'Actualizando...' : 'Actualizar'}
-              </button>
               <div className="text-sm text-gray-lightest">
                 {loading ? 'Cargando...' : `Mostrando ${currentProveedores.length} de ${filteredProveedores.length} proveedores`}
               </div>
@@ -895,9 +835,8 @@ export function ProveedoresPage() {
                       </td>
                       <td className="py-4 px-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <span className={`elegante-tag text-xs ${
-                            (proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                          }`}>
+                          <span className={`elegante-tag text-xs ${(proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                            }`}>
                             {(proveedor.estado !== undefined ? proveedor.estado : proveedor.activo) ? 'Activo' : 'Inactivo'}
                           </span>
                         </div>
@@ -975,7 +914,7 @@ export function ProveedoresPage() {
                 >
                   <ChevronLeft className="w-4 h-4 text-gray-lightest" />
                 </button>
-                
+
                 {/* Números de página */}
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -989,23 +928,22 @@ export function ProveedoresPage() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded text-sm transition-colors ${
-                          currentPage === pageNum
-                            ? 'bg-orange-primary text-black-primary font-medium'
-                            : 'border border-gray-dark hover:bg-gray-darker text-gray-lightest'
-                        }`}
+                        className={`w-8 h-8 rounded text-sm transition-colors ${currentPage === pageNum
+                          ? 'bg-orange-primary text-black-primary font-medium'
+                          : 'border border-gray-dark hover:bg-gray-darker text-gray-lightest'
+                          }`}
                       >
                         {pageNum}
                       </button>
                     );
                   })}
                 </div>
-                
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
@@ -1083,9 +1021,8 @@ export function ProveedoresPage() {
 
                     {/* Estado */}
                     <div className="flex items-center gap-2">
-                      <span className={`elegante-tag text-xs ${
-                        proveedor.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                      }`}>
+                      <span className={`elegante-tag text-xs ${proveedor.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                        }`}>
                         {proveedor.activo ? 'Activo' : 'Inactivo'}
                       </span>
                       <button
@@ -1157,347 +1094,6 @@ export function ProveedoresPage() {
           </div>
         </div>
       </main>
-
-      {/* Modal de Edición */}
-      {selectedProveedor && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-white-primary flex items-center gap-2">
-                <Edit className="w-5 h-5 text-orange-primary" />
-                Editar Proveedor
-              </DialogTitle>
-              <DialogDescription className="text-gray-lightest">
-                Modifique los datos del proveedor seleccionado
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleEditSubmit} className="space-y-6 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <Building className="w-4 h-4 text-orange-primary" />
-                    Tipo de Proveedor
-                  </Label>
-                  <select
-                    id="editTipoProveedor"
-                    value={formData.tipoProveedor}
-                    onChange={(e) => setFormData({ ...formData, tipoProveedor: e.target.value as 'Juridico' | 'Natural' })}
-                    className="elegante-input w-full"
-                    required
-                  >
-                    {TIPOS_PROVEEDOR.map(tipo => (
-                      <option key={tipo.value} value={tipo.value}>
-                        {tipo.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <User className="w-4 h-4 text-orange-primary" />
-                    {formData.tipoProveedor === 'Juridico' ? 'Nombre de la Empresa' : 'Nombre Completo'}
-                  </Label>
-                  <Input
-                    id="editNombre"
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    className="elegante-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              {formData.tipoProveedor === 'Natural' && (
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-orange-primary" />
-                    Persona de Contacto
-                  </Label>
-                  <Input
-                    id="editPersonaContacto"
-                    value={formData.personaContacto || ''}
-                    onChange={(e) => setFormData({ ...formData, personaContacto: e.target.value })}
-                    className="elegante-input"
-                    placeholder="Nombre de la persona de contacto (si es diferente)"
-                  />
-                </div>
-              )}
-
-              {formData.tipoProveedor === 'Juridico' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-orange-primary" />
-                        Razón Social
-                      </Label>
-                      <Input
-                        id="editRazonSocial"
-                        value={formData.razonSocial}
-                        onChange={(e) => setFormData({ ...formData, razonSocial: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-orange-primary" />
-                        Representante Legal
-                      </Label>
-                      <Input
-                        id="editRepresentanteLegal"
-                        value={formData.representanteLegal}
-                        onChange={(e) => setFormData({ ...formData, representanteLegal: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <IdCard className="w-4 h-4 text-orange-primary" />
-                        Documento Representante
-                      </Label>
-                      <Input
-                        id="editDocumentoRepresentante"
-                        value={formData.documentoRepresentante}
-                        onChange={(e) => setFormData({ ...formData, documentoRepresentante: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-orange-primary" />
-                        Teléfono Representante
-                      </Label>
-                      <Input
-                        id="editTelefonoRepresentante"
-                        value={formData.telefonoRepresentante}
-                        onChange={(e) => setFormData({ ...formData, telefonoRepresentante: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-orange-primary" />
-                        Correo Representante
-                      </Label>
-                      <Input
-                        id="editCorreoRepresentante"
-                        type="email"
-                        value={formData.correoRepresentante}
-                        onChange={(e) => setFormData({ ...formData, correoRepresentante: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-orange-primary" />
-                        Sector Económico
-                      </Label>
-                      <Input
-                        id="editSectorEconomico"
-                        value={formData.sectorEconomico}
-                        onChange={(e) => setFormData({ ...formData, sectorEconomico: e.target.value })}
-                        className="elegante-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-orange-primary" />
-                        Años de Operación
-                      </Label>
-                      <Input
-                        id="editAnosOperacion"
-                        type="number"
-                        min="0"
-                        value={formData.anosOperacion}
-                        onChange={(e) => setFormData({ ...formData, anosOperacion: parseInt(e.target.value) || 0 })}
-                        className="elegante-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-orange-primary" />
-                        Página Web
-                      </Label>
-                      <Input
-                        id="editPaginaWeb"
-                        value={formData.paginaWeb}
-                        onChange={(e) => setFormData({ ...formData, paginaWeb: e.target.value })}
-                        className="elegante-input"
-                        placeholder="www.ejemplo.com"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <IdCard className="w-4 h-4 text-orange-primary" />
-                    NIT
-                  </Label>
-                  <Input
-                    id="editNit"
-                    value={formData.nit}
-                    onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
-                    className="elegante-input"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-orange-primary" />
-                    Correo Electrónico
-                  </Label>
-                  <Input
-                    id="editCorreo"
-                    type="email"
-                    value={formData.correo}
-                    onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
-                    className="elegante-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-orange-primary" />
-                    Número de Teléfono
-                  </Label>
-                  <Input
-                    id="editNumero"
-                    value={formData.numero}
-                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                    className="elegante-input"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-orange-primary" />
-                    Dirección
-                  </Label>
-                  <Input
-                    id="editDireccion"
-                    value={formData.direccion}
-                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    className="elegante-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Campos Adicionales - Ciudad y Departamento */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-orange-primary" />
-                    Ciudad
-                  </Label>
-                  <Input
-                    id="editCiudad"
-                    value={formData.ciudad}
-                    onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
-                    className="elegante-input"
-                    placeholder="Ciudad"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white-primary flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-orange-primary" />
-                    Departamento
-                  </Label>
-                  <Input
-                    id="editDepartamento"
-                    value={formData.departamento}
-                    onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
-                    className="elegante-input"
-                    placeholder="Departamento"
-                  />
-                </div>
-              </div>
-
-              {/* Campos Específicos para Jurídico */}
-              {formData.tipoProveedor === 'Juridico' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <IdCard className="w-4 h-4 text-orange-primary" />
-                        Número Identificación
-                      </Label>
-                      <Input
-                        id="editNumeroIdentificacion"
-                        value={formData.numeroIdentificacion}
-                        onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
-                        className="elegante-input"
-                        placeholder="Número de identificación"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-orange-primary" />
-                        Cargo del Representante Legal
-                      </Label>
-                      <Input
-                        id="editCargoRepLegal"
-                        value={formData.cargoRepLegal}
-                        onChange={(e) => setFormData({ ...formData, cargoRepLegal: e.target.value })}
-                        className="elegante-input"
-                        placeholder="Cargo del representante legal"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white-primary flex items-center gap-2">
-                      <IdCard className="w-4 h-4 text-orange-primary" />
-                      Número Identificación Representante Legal
-                    </Label>
-                    <Input
-                      id="editNumeroIdentificacionRepLegal"
-                      value={formData.numeroIdentificacionRepLegal}
-                      onChange={(e) => setFormData({ ...formData, numeroIdentificacionRepLegal: e.target.value })}
-                      className="elegante-input"
-                      placeholder="Número de identificación del representante legal"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditDialogOpen(false);
-                    setSelectedProveedor(null);
-                    resetForm();
-                  }}
-                  className="elegante-button-secondary"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  className="elegante-button-primary"
-                >
-                  Actualizar Proveedor
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Modal de Detalle */}
       {selectedProveedor && (

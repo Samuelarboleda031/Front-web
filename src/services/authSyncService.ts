@@ -24,17 +24,21 @@ export interface SyncResult {
   error?: string;
 }
 
-// Mapeo de roles según la documentación
+// Mapeo de roles según la documentación y análisis de Firebase
 export enum AppRole {
   ADMIN = 1,
-  CLIENTE = 3
+  BARBERO = 2,
+  CLIENTE = 3,
+  RECEPCIONISTA = 4,
+  GERENTE = 5,
+  CAJERO = 6
 }
 
 export class AuthSyncService {
   // Sincronizar usuario de Firebase con la API
   async syncUsuarioConApi(
-    firebaseProfile: UserProfile, 
-    rolId: number, 
+    firebaseProfile: UserProfile,
+    rolId: number,
     additionalData?: Partial<SyncUser>
   ): Promise<SyncResult> {
     try {
@@ -43,7 +47,7 @@ export class AuthSyncService {
       }
 
       const correo = firebaseProfile.email;
-      
+
       // 1. Buscar si el usuario ya existe en la API
       let usuarioExistente: ApiUser | null = null;
       try {
@@ -57,8 +61,8 @@ export class AuthSyncService {
 
       if (usuarioExistente) {
         // 2. Actualizar usuario existente si es necesario
-        const necesitaActualizacion = 
-          usuarioExistente.rolId !== rolId || 
+        const necesitaActualizacion =
+          usuarioExistente.rolId !== rolId ||
           usuarioExistente.estado !== true ||
           additionalData;
 
@@ -104,6 +108,10 @@ export class AuthSyncService {
         }
       }
 
+      // 4. AUTO-CREAR PERFIL ASOCIADO (Análisis Paso 5)
+      // Esta es la parte crítica de la implementación de Firebase: asegurar que cada Usuario tenga su perfil
+      await this.ensuresProfileExists(usuarioSincronizado, rolId, firebaseProfile);
+
       return { success: true, user: usuarioSincronizado };
 
     } catch (error) {
@@ -112,10 +120,65 @@ export class AuthSyncService {
     }
   }
 
+  /**
+   * Asegura que exista un perfil de Cliente o Barbero para el usuario sincronizado
+   * Implementa el Paso 5 del diagrama de interacción
+   */
+  private async ensuresProfileExists(apiUser: ApiUser, rolId: number, profile: UserProfile): Promise<void> {
+    try {
+      // Determinar si es Cliente o Barbero
+      const isCliente = rolId === AppRole.CLIENTE || rolId === AppRole.CAJERO; // Ajustar según lógica de negocio
+      const isBarbero = rolId === AppRole.BARBERO;
+
+      if (isCliente) {
+        const { clientesService } = await import('./clientesService');
+        const clientes = await clientesService.getClientes();
+        const existeCliente = clientes.some(c => c.usuarioId === apiUser.id || c.correo === apiUser.correo);
+
+        if (!existeCliente) {
+          console.log('🔄 Sincronización Firebase: Creando perfil de Cliente automático...');
+          await clientesService.createCliente({
+            usuarioId: apiUser.id,
+            nombre: apiUser.nombre || profile.displayName?.split(' ')[0] || 'Nuevo',
+            apellido: apiUser.apellido || profile.displayName?.split(' ').slice(1).join(' ') || 'Cliente',
+            documento: apiUser.documento || `G-${Date.now()}`, // Documento temporal basado en Google/Firebase
+            correo: apiUser.correo,
+            telefono: apiUser.telefono || undefined,
+            fotoPerfil: apiUser.fotoPerfil || profile.photoURL || undefined
+          });
+          console.log('✅ Perfil de Cliente vinculado exitosamente');
+        }
+      } else if (isBarbero) {
+        const { barberosService } = await import('./barberosService');
+        const barberos = await barberosService.getBarberos();
+        const existeBarbero = barberos.some(b => b.usuarioId === apiUser.id || b.correo === apiUser.correo);
+
+        if (!existeBarbero) {
+          console.log('🔄 Sincronización Firebase: Creando perfil de Barbero automático...');
+          await barberosService.createBarbero({
+            usuarioId: apiUser.id,
+            nombre: apiUser.nombre || profile.displayName?.split(' ')[0] || 'Nuevo',
+            apellido: apiUser.apellido || profile.displayName?.split(' ').slice(1).join(' ') || 'Barbero',
+            documento: apiUser.documento || `B-${Date.now()}`,
+            correo: apiUser.correo,
+            telefono: apiUser.telefono || 'N/A',
+            especialidad: "General",
+            estado: true,
+            fotoPerfil: apiUser.fotoPerfil || profile.photoURL || undefined
+          });
+          console.log('✅ Perfil de Barbero vinculado exitosamente');
+        }
+      }
+    } catch (error) {
+      console.error('⚠️ Error al asegurar perfil asociado (Cliente/Barbero):', error);
+      // No bloqueamos el login si falla la creación del perfil, pero lo registramos
+    }
+  }
+
   // Autenticar usuario y sincronizar con API
   async authenticateAndSync(
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     rolId: number,
     additionalData?: Partial<SyncUser>
   ): Promise<SyncResult> {
@@ -151,8 +214,8 @@ export class AuthSyncService {
 
   // Registrar nuevo usuario con Firebase y sincronizar
   async registerAndSync(
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     rolId: number,
     userData: Partial<SyncUser>
   ): Promise<SyncResult> {
@@ -265,11 +328,14 @@ export class AuthSyncService {
   }
 
   // Convertir rolId a nombre de rol
-  private getRoleName(rolId: number | null): string {
+  getRoleName(rolId: number | null): string {
     switch (rolId) {
       case AppRole.ADMIN:
         return 'admin';
+      case AppRole.BARBERO:
+        return 'barbero';
       case AppRole.CLIENTE:
+      case AppRole.CAJERO:
         return 'cliente';
       default:
         return 'cliente';
@@ -281,14 +347,16 @@ export class AuthSyncService {
     if (typeof roleName === 'number') {
       return roleName || AppRole.CLIENTE;
     }
-    
+
     if (roleName === null) {
       return AppRole.CLIENTE;
     }
-    
+
     switch (roleName.toLowerCase()) {
       case 'admin':
         return AppRole.ADMIN;
+      case 'barbero':
+        return AppRole.BARBERO;
       case 'cliente':
         return AppRole.CLIENTE;
       default:

@@ -37,6 +37,7 @@ export interface Cliente {
 
 // Interface para crear cliente
 export interface CreateClienteData {
+  usuarioId?: number; // Agregado para vinculación
   nombre: string;
   apellido: string;
   documento: string;
@@ -54,7 +55,7 @@ export interface UpdateClienteData extends CreateClienteData {
   estado?: boolean; // Agregar campo estado
 }
 
-const API_BASE_URL = 'http://edwisbarber.somee.com/api/clientes';
+const API_BASE_URL = '/api/clientes';
 
 class ClientesService {
   // Mapear datos de la API al formato del componente
@@ -84,20 +85,25 @@ class ClientesService {
     };
   }
 
-  // Mapear datos del componente a la API
-  mapComponentToApi(componenteCliente: CreateClienteData | UpdateClienteData): Partial<ClienteAPI> {
-    const baseData: Partial<ClienteAPI> = {
-      nombre: componenteCliente.nombre,
-      apellido: componenteCliente.apellido,
-      documento: componenteCliente.documento,
-      correo: componenteCliente.correo,
-      telefono: componenteCliente.telefono,
-      fechaNacimiento: componenteCliente.fechaNacimiento,
+  // Mapear datos del componente a la API (PascalCase para .NET)
+  mapComponentToApi(componenteCliente: CreateClienteData | UpdateClienteData): any {
+    const baseData: any = {
+      UsuarioId: componenteCliente.usuarioId,
+      Nombre: componenteCliente.nombre,
+      Apellido: componenteCliente.apellido,
+      Documento: componenteCliente.documento,
+      Correo: componenteCliente.correo,
+      Telefono: componenteCliente.telefono,
+      FechaNacimiento: componenteCliente.fechaNacimiento,
+      Direccion: componenteCliente.direccion,
+      Barrio: componenteCliente.barrio,
+      FotoPerfil: componenteCliente.fotoPerfil,
+      Estado: true // Por defecto activo
     };
 
     // Si es actualización, agregar id
     if ('id' in componenteCliente) {
-      baseData.id = componenteCliente.id;
+      baseData.Id = componenteCliente.id;
     }
 
     return baseData;
@@ -135,7 +141,10 @@ class ClientesService {
   async createCliente(clienteData: CreateClienteData): Promise<ClienteAPI> {
     try {
       const apiData = this.mapComponentToApi(clienteData);
-      
+
+      console.log('🔵 Creando cliente - Datos originales:', clienteData);
+      console.log('🔵 Creando cliente - Datos mapeados (enviados):', apiData);
+
       const response = await fetch(API_BASE_URL, {
         method: 'POST',
         headers: {
@@ -145,7 +154,9 @@ class ClientesService {
       });
 
       if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Error del servidor:', errorText);
+        throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
       }
 
       return await response.json();
@@ -159,10 +170,10 @@ class ClientesService {
   async updateCliente(id: number, clienteData: UpdateClienteData): Promise<ClienteAPI> {
     try {
       const apiData = this.mapComponentToApi(clienteData);
-      
+
       console.log('PUT request data:', JSON.stringify(apiData, null, 2));
       console.log('PUT request URL:', `${API_BASE_URL}/${id}`);
-      
+
       const response = await fetch(`${API_BASE_URL}/${id}`, {
         method: 'PUT',
         headers: {
@@ -214,35 +225,23 @@ class ClientesService {
   }
 
   // Cambiar estado de un cliente (activar/desactivar)
-  async toggleClienteEstado(id: number, estado: boolean): Promise<ClienteAPI> {
+  async toggleClienteEstado(id: number, estado: boolean): Promise<void> {
     try {
-      // Primero obtener el cliente actual para tener todos sus datos
-      const currentCliente = await this.getClienteById(id);
-      
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
-        method: 'PUT',
+      console.log(`🔄 Cambiando estado del cliente ${id} a ${estado}`);
+
+      const response = await fetch(`${API_BASE_URL}/${id}/estado`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...currentCliente,
-          estado // Solo actualizar el campo estado
-        }),
+        body: JSON.stringify({ estado }),
       });
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
-      // Manejar respuesta 204 No Content
-      if (response.status === 204) {
-        return {
-          ...currentCliente,
-          estado // Devolver el cliente con el estado actualizado
-        };
-      }
-
-      return await response.json();
+      console.log(`✅ Estado del cliente ${id} actualizado a ${estado}`);
     } catch (error) {
       console.error('Error cambiando estado del cliente:', error);
       throw error;

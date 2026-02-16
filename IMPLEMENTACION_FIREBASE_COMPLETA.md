@@ -218,9 +218,10 @@ else if (apiUser.rolId === 2) {
 |-------|--------|-----------------|---------------|
 | 1 | Admin | - | ❌ No requiere |
 | 2 | Barbero | `Barberos` | ✅ Sí |
-| 3 | Cajero | - | ❌ No requiere |
-| 4 | Supervisor | - | ❌ No requiere |
-| 5 | Cliente (Invitado) | `Clientes` | ✅ Sí |
+| 3 | Cliente | `Clientes` | ✅ Sí |
+| 4 | Recepcionista | - | ❌ No requiere |
+| 5 | Gerente | - | ❌ No requiere |
+| 6 | Cajero | `Clientes` (opcional) | ⚠️ Depende de lógica |
 
 ---
 

@@ -273,12 +273,12 @@ export function PaquetesPage() {
             precio: parseFloat(tempPaqueteData.precio.toString()),
             precioOriginal: parseFloat(tempPaqueteData.precio.toString()) * (1 + tempPaqueteData.descuento / 100)
           });
-          
+
           await loadPaquetes(); // Recargar todos los paquetes como en ServiciosPage
           setEditingPaquete(null);
           setNuevoPaquete({ ...estadoInicialPaquete });
           setServiciosAgregados([]);
-          
+
           edited("Paquete actualizado exitosamente ✔️", `El paquete "${nombrePaquete}" ha sido actualizado correctamente con la nueva información.`);
         } catch (error) {
           console.error('Error updating paquete:', error);
@@ -780,19 +780,15 @@ export function PaquetesPage() {
 
                 <div className="space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="elegante-card">
-                      <div className="text-center">
-                        <Clock className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                        <h4 className="text-xl font-bold text-white-primary">{selectedPaquete.duracion} min</h4>
-                        <p className="text-gray-lightest text-sm">Duración</p>
-                      </div>
+                    <div className="bg-gray-darkest border border-gray-dark p-6 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 hover:border-blue-400/30">
+                      <Clock className="w-8 h-8 text-blue-400 mb-2" />
+                      <span className="text-2xl font-bold text-white-primary">{selectedPaquete.duracion} min</span>
+                      <span className="text-gray-lightest text-sm">Duración</span>
                     </div>
-                    <div className="elegante-card">
-                      <div className="text-center">
-                        <Scissors className="w-8 h-8 text-primary-orange mx-auto mb-2" />
-                        <h4 className="text-xl font-bold text-white-primary">{selectedPaquete.servicios.length}</h4>
-                        <p className="text-gray-lightest text-sm">Servicios</p>
-                      </div>
+                    <div className="bg-gray-darkest border border-gray-dark p-6 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 hover:border-orange-primary/30">
+                      <Scissors className="w-8 h-8 text-orange-primary mb-2" />
+                      <span className="text-2xl font-bold text-white-primary">{selectedPaquete.servicios.length}</span>
+                      <span className="text-gray-lightest text-sm">Servicios</span>
                     </div>
                   </div>
 

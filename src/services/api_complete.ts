@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+const API_BASE_URL = '/api';
 
 // Interfaces existentes
 export interface ApiUser {
@@ -171,7 +171,7 @@ class ApiService {
   }
 
   // ============= MÉTODOS EXISTENTES (USUARIOS) =============
-  
+
   async getUsuarios(): Promise<ApiUser[]> {
     try {
       console.log('Fetching usuarios from:', `${API_BASE_URL}/usuarios`);
@@ -287,7 +287,7 @@ class ApiService {
     try {
       const usuarios = await this.getUsuarios();
       const user = usuarios.find(u => u.correo === correo);
-      
+
       if (!user) {
         console.log('Usuario no encontrado:', correo);
         return null;
@@ -319,7 +319,7 @@ class ApiService {
   }
 
   // ============= MÉTODOS PARA ROLES (MEJORADOS) =============
-  
+
   async getRoles(): Promise<UserRole[]> {
     try {
       const response = await this.request('/roles');
@@ -524,7 +524,7 @@ class ApiService {
   }
 
   // ============= NUEVOS MÉTODOS PARA CITAS =============
-  
+
   async getCitas(filtros?: {
     fecha?: string;
     barbero?: string;
@@ -534,16 +534,16 @@ class ApiService {
     try {
       let endpoint = '/citas';
       const params = new URLSearchParams();
-      
+
       if (filtros?.fecha) params.append('fecha', filtros.fecha);
       if (filtros?.barbero) params.append('barbero', filtros.barbero);
       if (filtros?.estado) params.append('estado', filtros.estado);
       if (filtros?.cliente) params.append('cliente', filtros.cliente);
-      
+
       if (params.toString()) {
         endpoint += '?' + params.toString();
       }
-      
+
       const response = await this.request(endpoint);
       const text = await response.text();
       return text ? JSON.parse(text) : [];
@@ -610,16 +610,13 @@ class ApiService {
     }
   }
 
-  async updateEstadoCita(id: number, estado: string): Promise<Cita> {
+  async updateEstadoCita(id: number, estado: string): Promise<void> {
     try {
-      const response = await this.request(`/citas/${id}/estado`, {
-        method: 'PATCH',
+      await this.request(`/citas/${id}/estado`, {
+        method: 'PUT',
         body: JSON.stringify({ estado }),
       });
-      const text = await response.text();
-      const result = text ? JSON.parse(text) : {};
-      console.log(`✅ Estado de cita actualizado a ${estado}:`, result);
-      return result;
+      console.log(`✅ Estado de cita actualizado a ${estado}`);
     } catch (error: any) {
       console.error('❌ Error updating estado cita:', error);
       throw error;
@@ -627,7 +624,7 @@ class ApiService {
   }
 
   // ============= NUEVOS MÉTODOS PARA HORARIOS =============
-  
+
   async getHorarios(filtros?: {
     barbero?: string;
     activo?: boolean;
@@ -636,15 +633,15 @@ class ApiService {
     try {
       let endpoint = '/horarios';
       const params = new URLSearchParams();
-      
+
       if (filtros?.barbero) params.append('barbero', filtros.barbero);
       if (filtros?.activo !== undefined) params.append('activo', filtros.activo.toString());
       if (filtros?.tipo) params.append('tipo', filtros.tipo);
-      
+
       if (params.toString()) {
         endpoint += '?' + params.toString();
       }
-      
+
       const response = await this.request(endpoint);
       const text = await response.text();
       return text ? JSON.parse(text) : [];
@@ -714,7 +711,7 @@ class ApiService {
   async toggleEstadoHorario(id: number): Promise<Horario> {
     try {
       const response = await this.request(`/horarios/${id}/estado`, {
-        method: 'PATCH',
+        method: 'PUT',
       });
       const text = await response.text();
       const result = text ? JSON.parse(text) : {};
@@ -727,7 +724,7 @@ class ApiService {
   }
 
   // ============= MÉTODOS MEJORADOS PARA ROLES-MÓDULOS =============
-  
+
   async getModulosDeRol(rolId: number): Promise<RolesModulos[]> {
     try {
       const response = await this.request(`/rolesmodulos/role/${rolId}`);
@@ -742,10 +739,10 @@ class ApiService {
   async asignarPermisosARol(rolId: number, permisos: { moduloId: number; puedeVer: boolean; puedeCrear: boolean; puedeEditar: boolean; puedeEliminar: boolean }[]): Promise<void> {
     try {
       console.log(`🔧 Asignando permisos al rol ${rolId}`);
-      
+
       // Primero eliminar las asignaciones existentes
       await this.eliminarPermisosDeRol(rolId);
-      
+
       // Luego crear las nuevas asignaciones
       for (const permiso of permisos) {
         const rolModulo: Partial<RolesModulos> = {
@@ -756,10 +753,10 @@ class ApiService {
           puedeEditar: permiso.puedeEditar,
           puedeEliminar: permiso.puedeEliminar
         };
-        
+
         await this.createRolModulo(rolModulo);
       }
-      
+
       console.log(`✅ Permisos asignados correctamente al rol ${rolId}`);
     } catch (error: any) {
       console.error('❌ Error asignando permisos al rol:', error);
@@ -770,13 +767,13 @@ class ApiService {
   async eliminarPermisosDeRol(rolId: number): Promise<void> {
     try {
       const rolesModulos = await this.getRolesModulosByRole(rolId);
-      
+
       for (const rolModulo of rolesModulos) {
         if (rolModulo.id) {
           await this.deleteRolModulo(rolModulo.id);
         }
       }
-      
+
       console.log(`✅ Todos los permisos eliminados del rol ${rolId}`);
     } catch (error: any) {
       console.error('❌ Error eliminando permisos del rol:', error);
@@ -791,7 +788,7 @@ class ApiService {
       if (!usuario || !usuario.rolId) {
         throw new Error('Usuario no encontrado o sin rol asignado');
       }
-      
+
       // Luego obtener los permisos del rol
       return await this.getModulosDeRol(usuario.rolId);
     } catch (error: any) {
@@ -804,11 +801,11 @@ class ApiService {
     try {
       const permisos = await this.getPermisosDeUsuario(usuarioId);
       const permisoModulo = permisos.find(p => p.moduloId === moduloId);
-      
+
       if (!permisoModulo || !permisoModulo.puedeVer) {
         return false;
       }
-      
+
       switch (accion) {
         case 'ver':
           return permisoModulo.puedeVer;
@@ -848,7 +845,7 @@ class ApiService {
   }
 
   // ============= MÉTODOS PARA SERVICIOS =============
-  
+
   async getServicios(): Promise<Servicio[]> {
     try {
       const response = await this.request('/servicios');
@@ -905,7 +902,7 @@ class ApiService {
   }
 
   // ============= MÉTODOS PARA PRODUCTOS =============
-  
+
   async getProductos(): Promise<Producto[]> {
     try {
       const response = await this.request('/productos');

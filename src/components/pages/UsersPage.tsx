@@ -17,6 +17,9 @@ import {
 import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
 import { apiService, ApiUser } from "../../services/api";
+import { clientesService } from "../../services/clientesService";
+import { barberosService } from "../../services/barberosService";
+import { rolesApiService, RoleWithModules } from "../../services/rolesApiService";
 
 // DTOs para la comunicación con la API
 // Estos objetos definen la estructura de datos que se envía y recibe del backend
@@ -25,7 +28,7 @@ interface UsuarioInput {
   apellido: string;          // Apellido del usuario
   correo: string;            // Correo electrónico (único)
   contrasena?: string;       // Contraseña (opcional para actualizaciones)
-  rolId: number;            // ID del rol (1:Admin, 2:Barbero, 3:Recepcionista, 4:Gerente, 5:Cajero, 6:Cliente)
+  rolId: number;            // ID del rol (1:Admin, 2:Barbero, 3:Cliente, 4:Recepcionista, 5:Gerente, 6:Cajero)
   tipoDocumento?: string;   // Tipo de documento (Cédula, Pasaporte, etc.)
   documento?: string;       // Número de documento
   telefono?: string;         // Teléfono del usuario
@@ -43,80 +46,64 @@ interface UploadResponse {
 }
 
 
-const roles = ["Admin", "Barbero", "Cliente", "Recepcionista", "Gerente", "Cajero"];
 const tiposDocumento = ["Cédula", "Cédula de Extranjería", "Pasaporte"];
 
-// Mapear datos de la API al formato del componente
-const mapApiUserToComponent = (apiUser: ApiUser): any => {
-  // Mapeo de IDs de roles a nombres
-  const roleMap: { [key: number]: string } = {
-    1: "Admin",
-    2: "Barbero", 
-    3: "Recepcionista",
-    4: "Gerente",
-    5: "Cajero",
-    6: "Cliente"
-  };
-
-  return {
-    id: apiUser.id,
-    nombres: apiUser.nombre,
-    apellidos: apiUser.apellido,
-    tipoDocumento: apiUser.tipoDocumento || "Cédula",
-    documento: apiUser.documento || "",
-    correo: apiUser.correo,
-    celular: apiUser.telefono || "",
-    direccion: apiUser.direccion || "",
-    barrio: apiUser.barrio || "",
-    fechaNacimiento: apiUser.fechaNacimiento || "",
-    password: apiUser.contrasena || "",
-    status: apiUser.estado,
-    fechaCreacion: new Date().toLocaleDateString('es-ES'),
-    avatar: `${apiUser.nombre?.split(' ')[0]?.[0] || ''}${apiUser.apellido?.split(' ')[0]?.[0] || ''}`.toUpperCase(),
-    imagenUrl: apiUser.fotoPerfil || "",
-    rol: apiUser.rol?.nombre || roleMap[apiUser.rolId || 6] || "Cliente"
-  };
-};
-
-// Mapear datos del componente al formato de la API (DTO)
-const mapComponentToApiUser = (componentUser: any): UsuarioInput => {
-  // Mapeo de roles a IDs basado en la API
-  const roleMap: { [key: string]: number } = {
-    "Admin": 1,
-    "Barbero": 2,
-    "Recepcionista": 3,
-    "Gerente": 4,
-    "Cajero": 5,
-    "Cliente": 6
-  };
-
-  const apiUser: any = {
-    nombre: componentUser.nombres,
-    apellido: componentUser.apellidos,
-    tipoDocumento: componentUser.tipoDocumento,
-    documento: componentUser.documento,
-    correo: componentUser.correo,
-    telefono: componentUser.celular,
-    direccion: componentUser.direccion,
-    barrio: componentUser.barrio,
-    contrasena: componentUser.password,
-    estado: componentUser.status,
-    fotoPerfil: componentUser.imagenUrl,
-    rolId: roleMap[componentUser.rol] || 6
-  };
-
-  // Solo incluir fechaNacimiento si tiene un valor válido
-  if (componentUser.fechaNacimiento && componentUser.fechaNacimiento.trim() !== '') {
-    apiUser.fechaNacimiento = componentUser.fechaNacimiento;
-  }
-
-  return apiUser;
-};
-
 export function UsersPage() {
-  const { success, error, AlertContainer } = useCustomAlert();
+  const { success: showSuccess, error: showError, AlertContainer } = useCustomAlert();
   const [users, setUsers] = useState<any[]>([]); // Estado principal - única fuente de verdad
+  const [availableRoles, setAvailableRoles] = useState<RoleWithModules[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Mapear datos de la API al formato del componente (dentro del componente para usar availableRoles si es necesario)
+  const mapApiUserToComponent = (apiUser: ApiUser): any => {
+    return {
+      id: apiUser.id,
+      nombres: apiUser.nombre,
+      apellidos: apiUser.apellido,
+      tipoDocumento: apiUser.tipoDocumento || "Cédula",
+      documento: apiUser.documento || "",
+      correo: apiUser.correo,
+      celular: apiUser.telefono || "",
+      direccion: apiUser.direccion || "",
+      barrio: apiUser.barrio || "",
+      fechaNacimiento: apiUser.fechaNacimiento || "",
+      password: apiUser.contrasena || "",
+      status: apiUser.estado,
+      fechaCreacion: new Date().toLocaleDateString('es-ES'),
+      avatar: `${apiUser.nombre?.split(' ')[0]?.[0] || ''}${apiUser.apellido?.split(' ')[0]?.[0] || ''}`.toUpperCase(),
+      imagenUrl: apiUser.fotoPerfil || "",
+      rol: apiUser.rol?.nombre || (availableRoles.find(r => Number(r.id) === apiUser.rolId)?.nombre) || "Cliente"
+    };
+  };
+
+  // Mapear datos del componente al formato de la API (DTO)
+  const mapComponentToApiUser = (componentUser: any): UsuarioInput => {
+    // Buscar el ID del rol basado en el nombre seleccionado
+    const foundRole = availableRoles.find(r => r.nombre === componentUser.rol);
+    const rolId = foundRole ? Number(foundRole.id) : 3; // Default: Cliente
+
+    const apiUser: any = {
+      nombre: componentUser.nombres,
+      apellido: componentUser.apellidos,
+      tipoDocumento: componentUser.tipoDocumento,
+      documento: componentUser.documento,
+      correo: componentUser.correo,
+      telefono: componentUser.celular,
+      direccion: componentUser.direccion,
+      barrio: componentUser.barrio,
+      contrasena: componentUser.password,
+      estado: componentUser.status === 'active' || componentUser.status === true,
+      fotoPerfil: componentUser.imagenUrl,
+      rolId: rolId
+    };
+
+    // Solo incluir fechaNacimiento si tiene un valor válido
+    if (componentUser.fechaNacimiento && componentUser.fechaNacimiento.trim() !== '') {
+      apiUser.fechaNacimiento = componentUser.fechaNacimiento;
+    }
+
+    return apiUser;
+  };
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -149,40 +136,65 @@ export function UsersPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [userPreviewUrl, setUserPreviewUrl] = useState<string>('');
 
-  // Cargar usuarios desde la API
-  const loadUsers = async () => {
+  // Cargar usuarios y roles desde la API
+  const loadInitialData = async () => {
     try {
       setLoading(true);
+
+      // Cargar roles primero para que mapApiUserToComponent los tenga disponibles
+      const roles = await rolesApiService.getRolesWithModules();
+      setAvailableRoles(roles);
+
       const apiUsers = await apiService.getUsuarios();
-      const mappedUsers = apiUsers.map(mapApiUserToComponent);
-      setUsers(mappedUsers); // Única fuente de verdad
+
+      // Mapear usuarios usando la función interna que conoce los roles
+      const mappedUsers = apiUsers.map((apiUser) => ({
+        id: apiUser.id,
+        nombres: apiUser.nombre,
+        apellidos: apiUser.apellido,
+        tipoDocumento: apiUser.tipoDocumento || "Cédula",
+        documento: apiUser.documento || "",
+        correo: apiUser.correo,
+        celular: apiUser.telefono || "",
+        direccion: apiUser.direccion || "",
+        barrio: apiUser.barrio || "",
+        fechaNacimiento: apiUser.fechaNacimiento || "",
+        password: apiUser.contrasena || "",
+        status: apiUser.estado,
+        fechaCreacion: new Date().toLocaleDateString('es-ES'),
+        avatar: `${apiUser.nombre?.split(' ')[0]?.[0] || ''}${apiUser.apellido?.split(' ')[0]?.[0] || ''}`.toUpperCase(),
+        imagenUrl: apiUser.fotoPerfil || "",
+        rol: apiUser.rol?.nombre || (roles.find(r => Number(r.id) === apiUser.rolId)?.nombre) || "Cliente"
+      }));
+
+      setUsers(mappedUsers);
     } catch (error: any) {
-      console.error('Error loading users:', error);
-      error('Error al cargar usuarios', 'No se pudieron cargar los usuarios desde el servidor. Por favor, intenta nuevamente.');
+      console.error('Error loading initial data:', error);
+      toast.error('Error al cargar datos del sistema');
     } finally {
       setLoading(false);
     }
   };
 
-  // Cargar usuarios al montar el componente
+  // Cargar datos al montar el componente
   useEffect(() => {
-    loadUsers();
+    loadInitialData();
   }, []);
 
   // Filtros de usuario
- const filteredUsers = users.filter((user: any) => {
-  const searchMatch =
-    user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.documento.includes(searchTerm) ||
-    user.correo.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredUsers = users.filter((user: any) => {
+    const searchMatch =
+      user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.documento.includes(searchTerm) ||
+      user.correo.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const statusMatch =
-    filterStatus === "all" ||
-    user.status === (filterStatus === "true");
+    const statusMatch =
+      filterStatus === "all" ||
+      user.status === (filterStatus === "true");
 
-  return searchMatch && statusMatch;
-});
+    return searchMatch && statusMatch;
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -212,30 +224,30 @@ export function UsersPage() {
     userFileInputRef.current?.click();
   };
 
-// Función para subir imágenes al servidor usando el endpoint /api/upload
-// Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
-// Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
-const uploadImage = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append('file', file);
+  // Función para subir imágenes al servidor usando el endpoint /api/upload
+  // Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
+  // Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
 
-  try {
-    const response = await fetch('http://edwisbarber.somee.com/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error(`Error al subir imagen: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Error al subir imagen: ${response.statusText}`);
+      }
+
+      const result: UploadResponse = await response.json();
+      return result.url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
     }
-
-    const result: UploadResponse = await response.json();
-    return result.url;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw error;
-  }
-};
+  };
 
   const handleUserImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -244,19 +256,19 @@ const uploadImage = async (file: File): Promise<string> => {
     // Validar tipo de archivo
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      error('Formato no válido', 'Solo se permiten imágenes en formato JPG, PNG, GIF o WebP');
+      showError('Formato no válido', 'Solo se permiten imágenes en formato JPG, PNG, GIF o WebP');
       return;
     }
 
     // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      error('Archivo muy grande', 'La imagen no puede superar los 5MB');
+      showError('Archivo muy grande', 'La imagen no puede superar los 5MB');
       return;
     }
 
     try {
       setUploadingImage(true);
-      
+
       // Mostrar preview mientras se sube
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -268,7 +280,7 @@ const uploadImage = async (file: File): Promise<string> => {
       // Subir al servidor
       const imageUrl = await uploadImage(file);
       setNewUser((prev) => ({ ...prev, imagenUrl: imageUrl }));
-      
+
       toast.success('Imagen subida exitosamente', {
         style: {
           background: 'var(--color-gray-darkest)',
@@ -278,7 +290,7 @@ const uploadImage = async (file: File): Promise<string> => {
       });
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      error('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
+      showError('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
       // Limpiar preview si falló
       setUserPreviewUrl('');
       if (userFileInputRef.current) {
@@ -299,22 +311,72 @@ const uploadImage = async (file: File): Promise<string> => {
 
   const handleCreateUser = async () => {
     if (!newUser.nombres || !newUser.apellidos || !newUser.documento || !newUser.correo || !newUser.celular || !newUser.rol) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
+      showError("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
       return;
     }
 
     try {
       const apiUserData = mapComponentToApiUser(newUser);
+
+      // 1. Crear el Usuario base
       const createdUser = await apiService.createUsuario(apiUserData);
       const mappedUser = mapApiUserToComponent(createdUser);
-      
+
+      // 2. Crear perfil asociado según el Rol (Cliente o Barbero)
+      const roleId = apiUserData.rolId;
+      console.log(`👤 Usuario creado con ID: ${createdUser.id}, Rol ID: ${roleId}`);
+
+      try {
+        // Lógica para Clientes (Rol 3 = AppRole.CLIENTE) y Cajeros (Rol 6 = AppRole.CAJERO)
+        // Ambos roles necesitan un perfil en la tabla Clientes para poder realizar transacciones
+        if (roleId === 3 || roleId === 6) {
+          console.log(`🔄 Creando perfil de Cliente asociado para rol ${roleId}...`);
+          await clientesService.createCliente({
+            usuarioId: createdUser.id,
+            nombre: createdUser.nombre,
+            apellido: createdUser.apellido,
+            documento: createdUser.documento || newUser.documento, // Fallback al input
+            correo: createdUser.correo,
+            telefono: createdUser.telefono || newUser.celular,
+            fechaNacimiento: createdUser.fechaNacimiento || undefined,
+            direccion: createdUser.direccion || newUser.direccion,
+            barrio: createdUser.barrio || newUser.barrio,
+            fotoPerfil: createdUser.fotoPerfil || undefined
+          });
+          toast.success("Perfil de Cliente creado automáticamente");
+        }
+        // Lógica para Barberos (Rol 2 = AppRole.BARBERO)
+        else if (roleId === 2) {
+          console.log('🔄 Creando perfil de Barbero asociado...');
+          await barberosService.createBarbero({
+            usuarioId: createdUser.id,
+            nombre: createdUser.nombre,
+            apellido: createdUser.apellido,
+            documento: createdUser.documento || newUser.documento,
+            correo: createdUser.correo,
+            telefono: createdUser.telefono || newUser.celular,
+            especialidad: "General", // Valor por defecto
+            fotoPerfil: createdUser.fotoPerfil || undefined,
+            estado: true
+          });
+          toast.success("Perfil de Barbero creado automáticamente");
+        }
+        // Otros roles (Admin, Recepcionista, Gerente) no requieren perfil adicional
+        else {
+          console.log(`ℹ️ Rol ${roleId} no requiere perfil adicional (Admin/Recepcionista/Gerente)`);
+        }
+      } catch (profileError) {
+        console.error("❌ Error creando perfil asociado:", profileError);
+        toast.warning("Usuario creado, pero hubo un error creando el perfil asociado (Cliente/Barbero).");
+      }
+
       setUsers([mappedUser, ...users]);
       setIsCreateDialogOpen(false);
-      success("¡Usuario creado exitosamente!", `El usuario "${mappedUser.nombres} ${mappedUser.apellidos}" ha sido registrado en el sistema y está disponible en la lista de usuarios.`);
+      showSuccess("¡Usuario creado exitosamente!", `El usuario "${mappedUser.nombres} ${mappedUser.apellidos}" ha sido registrado en el sistema.`);
     } catch (error: any) {
       console.error('Error creating user:', error);
       if (typeof error === 'function') {
-        error('Error al crear usuario', 'No se pudo crear el usuario. Por favor, verifica los datos e intenta nuevamente.');
+        showError('Error al crear usuario', 'No se pudo crear el usuario. Por favor, verifica los datos e intenta nuevamente.');
       } else {
         // Mostrar error con toast si no es función
         toast.error('Error al crear usuario', {
@@ -358,29 +420,29 @@ const uploadImage = async (file: File): Promise<string> => {
 
   const handleUpdateUser = async () => {
     if (!newUser.nombres || !newUser.apellidos || !newUser.documento || !newUser.correo || !newUser.celular || !newUser.rol) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
+      showError("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombres, apellidos, documento, correo, celular y rol.");
       return;
     }
 
     try {
       const apiUserData = mapComponentToApiUser(newUser);
       await apiService.updateUsuario(editingUser.id, apiUserData);
-      
+
       const updatedUser = {
         ...editingUser,
         ...newUser,
         avatar: newUser.nombres.split(' ').map(n => n[0]).join('').toUpperCase() +
           newUser.apellidos.split(' ').map(n => n[0]).join('').toUpperCase()
       };
-      
+
       setUsers(users.map((u: any) => u.id === editingUser.id ? updatedUser : u));
-      success("Usuario actualizado", `Los datos de ${newUser.nombres} ${newUser.apellidos} han sido actualizados exitosamente.`);
+      showSuccess("Usuario actualizado", `Los datos de ${newUser.nombres} ${newUser.apellidos} han sido actualizados exitosamente.`);
       setIsDialogOpen(false);
       setEditingUser(null);
       resetForm();
     } catch (error: any) {
       console.error('Error updating user:', error);
-      error('Error al actualizar usuario', 'No se pudo actualizar el usuario. Por favor, verifica los datos e intenta nuevamente.');
+      showError('Error al actualizar usuario', 'No se pudo actualizar el usuario. Por favor, verifica los datos e intenta nuevamente.');
     }
   };
 
@@ -398,52 +460,49 @@ const uploadImage = async (file: File): Promise<string> => {
     try {
       await apiService.deleteUsuario(userToDelete.id);
       setUsers(users.filter(u => u.id !== userToDelete.id));
-      success("Usuario eliminado", `El usuario ${userToDelete.nombres} ${userToDelete.apellidos} ha sido eliminado del sistema.`);
+      showSuccess("Usuario eliminado", `El usuario ${userToDelete.nombres} ${userToDelete.apellidos} ha sido eliminado del sistema.`);
       setUserToDelete(null);
       setIsDeleteDialogOpen(false);
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      error('Error al eliminar usuario', 'No se pudo eliminar el usuario. Por favor, intenta nuevamente.');
+      showError('Error al eliminar usuario', 'No se pudo eliminar el usuario. Por favor, intenta nuevamente.');
     }
   };
 
   const toggleUserStatus = async (userId: number) => {
-  const user = users.find(u => u.id === userId);
-  if (!user) return;
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
 
-  const newStatus = !user.status; // 🔥 si es false → true, si es true → false
+    const newStatus = !user.status; // 🔥 si es false → true, si es true → false
 
- 
-  try {
-    const loadingToast = toast.loading("Cambiando estado...");
 
-    // Convertir datos del usuario al formato de API y pasarlos para evitar el 404
-    const userData = mapComponentToApiUser(user);
-    
-    // Actualizar solo el estado (BOOLEAN) con datos locales
-    await apiService.updateUsuarioStatus(userId, newStatus, userData);
+    try {
+      const loadingToast = toast.loading("Cambiando estado...");
 
-    // Actualizar estado localmente
-    setUsers(prev =>
-      prev.map(u =>
-        u.id === userId
-          ? { ...u, status: newStatus }
-          : u
-      )
-    );
+      // Actualizar solo el estado (BOOLEAN)
+      await apiService.updateUsuarioStatus(userId, newStatus);
 
-    toast.dismiss(loadingToast);
+      // Actualizar estado localmente
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === userId
+            ? { ...u, status: newStatus }
+            : u
+        )
+      );
 
-    success(
-      newStatus ? "Usuario activado" : "Usuario desactivado",
-      `${user.nombres} ahora está ${newStatus ? "activo" : "inactivo"}`
-    );
+      toast.dismiss(loadingToast);
 
-  } catch (err) {
-    toast.dismiss();
-    error("Error", "No se pudo cambiar el estado");
-  }
-};
+      showSuccess(
+        newStatus ? "Usuario activado" : "Usuario desactivado",
+        `${user.nombres} ahora está ${newStatus ? "activo" : "inactivo"}`
+      );
+
+    } catch (err) {
+      toast.dismiss();
+      showError("Error", "No se pudo cambiar el estado");
+    }
+  };
 
 
   return (
@@ -517,65 +576,65 @@ const uploadImage = async (file: File): Promise<string> => {
                   </DialogHeader>
                   {/* Foto de Perfil y Contraseña */}
                   <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Camera className="w-4 h-4 text-orange-primary" />
-                          Foto de Perfil
-                        </Label>
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            {uploadingImage ? (
-                              <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                                <Loader2 className="w-6 h-6 text-orange-primary animate-spin" />
-                              </div>
-                            ) : userPreviewUrl ? (
-                              <div className="relative">
-                                <img
-                                  src={userPreviewUrl}
-                                  alt="Vista previa"
-                                  className="w-16 h-16 rounded-full object-cover border-2 border-orange-primary"
-                                />
-                                <button
-                                  onClick={removeUserProfileImage}
-                                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
-                                  type="button"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                                <User className="w-6 h-6 text-gray-lightest" />
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={triggerUserFileSelect}
-                            disabled={uploadingImage}
-                            className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                            type="button"
-                          >
-                            {uploadingImage ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Subiendo...
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="w-3 h-3" />
-                                {userPreviewUrl ? 'Cambiar' : 'Subir'}
-                              </>
-                            )}
-                          </button>
+                    <div className="space-y-2">
+                      <Label className="text-white-primary flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-orange-primary" />
+                        Foto de Perfil
+                      </Label>
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          {uploadingImage ? (
+                            <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                              <Loader2 className="w-6 h-6 text-orange-primary animate-spin" />
+                            </div>
+                          ) : userPreviewUrl ? (
+                            <div className="relative">
+                              <img
+                                src={userPreviewUrl}
+                                alt="Vista previa"
+                                className="w-16 h-16 rounded-full object-cover border-2 border-orange-primary"
+                              />
+                              <button
+                                onClick={removeUserProfileImage}
+                                className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
+                                type="button"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                              <User className="w-6 h-6 text-gray-lightest" />
+                            </div>
+                          )}
                         </div>
-                        <input
-                          ref={userFileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleUserImageUpload}
-                          className="hidden"
-                        />
+                        <button
+                          onClick={triggerUserFileSelect}
+                          disabled={uploadingImage}
+                          className="elegante-button-secondary text-xs px-3 py-1.5 gap-1.5 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          type="button"
+                        >
+                          {uploadingImage ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Subiendo...
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-3 h-3" />
+                              {userPreviewUrl ? 'Cambiar' : 'Subir'}
+                            </>
+                          )}
+                        </button>
                       </div>
+                      <input
+                        ref={userFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUserImageUpload}
+                        className="hidden"
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
@@ -658,8 +717,8 @@ const uploadImage = async (file: File): Promise<string> => {
                           className="elegante-input w-full"
                         >
                           <option value="">Selecciona un rol</option>
-                          {roles.map(rol => (
-                            <option key={rol} value={rol}>{rol}</option>
+                          {availableRoles.filter(r => r.estado).map(rol => (
+                            <option key={rol.id} value={rol.nombre}>{rol.nombre}</option>
                           ))}
                         </select>
                       </div>
@@ -817,8 +876,8 @@ const uploadImage = async (file: File): Promise<string> => {
                           <Users className="w-12 h-12 text-gray-lighter mb-4" />
                           <p className="text-gray-lighter">No se encontraron usuarios</p>
                           <p className="text-gray-lightest text-sm mt-2">
-                            {searchTerm || filterStatus !== "all" 
-                              ? "Intenta ajustar los filtros de búsqueda" 
+                            {searchTerm || filterStatus !== "all"
+                              ? "Intenta ajustar los filtros de búsqueda"
                               : "Crea tu primer usuario usando el botón 'Nuevo Usuario'"}
                           </p>
                         </div>

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+const API_BASE_URL = '/api';
 
 export interface Proveedor {
   id?: number;
@@ -76,44 +76,19 @@ class ProveedorService {
     }
   }
 
-  // Mapeo específico para proveedores Jurídicos desde API
-  private mapFromApiToJuridico(apiData: any): Proveedor {
-    return {
-      id: apiData.id,
-      nombre: apiData.nombre,
-      nit: apiData.nit,
-      correo: apiData.correo,
-      telefono: apiData.telefono,
-      direccion: apiData.direccion,
-      estado: apiData.estado,
-      tipoProveedor: 'Juridico' as const,
-      razonSocial: apiData.razonSocial,
-      representanteLegal: apiData.representanteLegal,
-      numeroIdentificacionRepLegal: apiData.numeroIdentificacionRepLegal,
-      cargoRepLegal: apiData.cargoRepLegal,
-      ciudad: apiData.ciudad,
-      departamento: apiData.departamento,
-      contacto: apiData.contacto,
-      numeroIdentificacion: apiData.numeroIdentificacion,
-      tipoIdentificacion: apiData.tipoIdentificacion,
-      compras: apiData.compras || [],
-      // Alias para compatibilidad
-      numero: apiData.telefono,
-      activo: apiData.estado,
-      fechaCreacion: new Date().toLocaleDateString('es-CO')
-    };
-  }
 
-  // Mapeo específico para proveedores Naturales
+  // Mapeo específico para proveedores Naturales (JSON de envío)
   private mapNatural(data: Partial<Proveedor>) {
     return {
       nombre: data.nombre,
-      numeroIdentificacion: data.numeroIdentificacion || "",
+      numeroIdentificacion: data.nit || data.numeroIdentificacion || "",
       correo: data.correo || "",
-      telefono: data.telefono || data.numero || "",
+      telefono: data.numero || data.telefono || "",
       direccion: data.direccion || "",
       ciudad: data.ciudad || "",
-      departamento: data.departamento || ""
+      departamento: data.departamento || "",
+      contacto: data.personaContacto || data.contacto || "",
+      estado: true
     };
   }
 
@@ -134,7 +109,7 @@ class ProveedorService {
     // Priorizar estado sobre activo para la API
     if (data.estado !== undefined) mapped.Estado = !!data.estado;
     else if (data.activo !== undefined) mapped.Estado = !!data.activo;
-    
+
     // Campos específicos para Jurídico (según tu API)
     if (data.razonSocial !== undefined) mapped.RazonSocial = data.razonSocial;
     if (data.representanteLegal !== undefined) mapped.RepresentanteLegal = data.representanteLegal;
@@ -142,7 +117,7 @@ class ProveedorService {
     if (data.cargoRepLegal !== undefined) mapped.CargoRepLegal = data.cargoRepLegal;
     if (data.ciudad !== undefined) mapped.Ciudad = data.ciudad;
     if (data.departamento !== undefined) mapped.Departamento = data.departamento;
-    
+
     // Campos adicionales que tu API podría necesitar
     if (data.documentoRepresentante !== undefined) mapped.DocumentoRepresentante = data.documentoRepresentante;
     if (data.telefonoRepresentante !== undefined) mapped.TelefonoRepresentante = data.telefonoRepresentante;
@@ -157,20 +132,61 @@ class ProveedorService {
     return mapped;
   }
 
-  async obtenerProveedoresJuridicos(): Promise<Proveedor[]> {
+  // Mapeo genérico desde API
+  private mapFromApi(apiData: any): Proveedor {
+    return {
+      id: apiData.id,
+      nombre: apiData.nombre,
+      nit: apiData.nit,
+      correo: apiData.correo,
+      telefono: apiData.telefono,
+      direccion: apiData.direccion,
+      estado: apiData.estado,
+      tipoProveedor: (apiData.tipoProveedor as 'Juridico' | 'Natural') || 'Juridico', // Fallback si viene vacío
+      razonSocial: apiData.razonSocial,
+      representanteLegal: apiData.representanteLegal,
+      numeroIdentificacionRepLegal: apiData.numeroIdentificacionRepLegal,
+      cargoRepLegal: apiData.cargoRepLegal,
+      ciudad: apiData.ciudad,
+      departamento: apiData.departamento,
+      contacto: apiData.contacto,
+      numeroIdentificacion: apiData.numeroIdentificacion,
+      tipoIdentificacion: apiData.tipoIdentificacion,
+      compras: apiData.compras || [],
+      // Alias para compatibilidad
+      numero: apiData.telefono || apiData.numero,
+      activo: apiData.estado,
+      fechaCreacion: apiData.fechaCreacion || new Date().toLocaleDateString('es-CO'),
+      // Campos opcionales que podrían venir
+      sectorEconomico: apiData.sectorEconomico,
+      anosOperacion: apiData.anosOperacion,
+      paginaWeb: apiData.paginaWeb,
+      documentoRepresentante: apiData.documentoRepresentante,
+      telefonoRepresentante: apiData.telefonoRepresentante,
+      correoRepresentante: apiData.correoRepresentante,
+      personaContacto: apiData.personaContacto,
+      apellidos: apiData.apellidos
+    };
+  }
+
+  async obtenerProveedores(): Promise<Proveedor[]> {
     try {
-      console.log('📥 Obteniendo proveedores jurídicos desde:', `${API_BASE_URL}/Proveedores/juridicos`);
-      const response = await this.request('/Proveedores/juridicos');
+      console.log('📥 Obteniendo todos los proveedores desde:', `${API_BASE_URL}/Proveedores`);
+      const response = await this.request('/Proveedores');
       const text = await response.text();
       const data = text ? JSON.parse(text) : [];
-      console.log('✅ Proveedores jurídicos obtenidos:', data);
-      
-      // Mapear los datos de la API al formato del frontend
-      return Array.isArray(data) ? data.map(item => this.mapFromApiToJuridico(item)) : [];
+      console.log('✅ Proveedores obtenidos:', data);
+
+      // Mapear los datos de la API al formato del frontend usando el mapeador genérico
+      return Array.isArray(data) ? data.map(item => this.mapFromApi(item)) : [];
     } catch (error) {
-      console.error('❌ Error obteniendo proveedores jurídicos:', error);
+      console.error('❌ Error obteniendo proveedores:', error);
       throw error;
     }
+  }
+
+  async obtenerProveedoresJuridicos(): Promise<Proveedor[]> {
+    return this.obtenerProveedores();
   }
 
   async obtenerProveedorPorId(id: number): Promise<Proveedor | null> {
@@ -187,38 +203,60 @@ class ProveedorService {
     }
   }
 
+  // Mapeo específico para crear Proveedor Jurídico (JSON de envío)
+  private mapToApiFormatJson(data: Partial<Proveedor>): any {
+    return {
+      nombre: data.nombre,
+      nit: data.nit,
+      correo: data.correo || "",
+      telefono: data.numero || data.telefono || "", // Asegurar que no sea null
+      direccion: data.direccion || "",
+      razonSocial: data.razonSocial || "",
+      representanteLegal: data.representanteLegal || "",
+      numeroIdentificacionRepLegal: data.numeroIdentificacionRepLegal || "",
+      cargoRepLegal: data.cargoRepLegal || "",
+      ciudad: data.ciudad || "",
+      departamento: data.departamento || "",
+      documentoRepresentante: data.documentoRepresentante || "",
+      telefonoRepresentante: data.telefonoRepresentante || "",
+      correoRepresentante: data.correoRepresentante || "",
+      sectorEconomico: data.sectorEconomico || "",
+      anosOperacion: data.anosOperacion || 0,
+      paginaWeb: data.paginaWeb || "",
+      estado: true
+    };
+  }
+
   async crearProveedor(proveedorData: Partial<Proveedor>): Promise<Proveedor> {
     try {
-      // Usar el mapeo específico según el tipo de proveedor
-      const apiBody = proveedorData.tipoProveedor === 'Natural'
+      if (!proveedorData.tipoProveedor) {
+        throw new Error("El tipoProveedor es obligatorio (Natural o Juridico)");
+      }
+
+      const esNatural = proveedorData.tipoProveedor === 'Natural';
+
+      const endpoint = esNatural
+        ? '/Proveedores/natural'
+        : '/Proveedores/juridico';
+
+      const apiBody = esNatural
         ? this.mapNatural(proveedorData)
-        : this.mapFromApiToJuridico(proveedorData);
-      
-      console.log('🔵 Creando proveedor - Datos originales:', proveedorData);
-      console.log('🔵 Creando proveedor - Tipo:', proveedorData.tipoProveedor);
-      console.log('🔵 Creando proveedor - Datos mapeados (enviados):', apiBody);
+        : this.mapToApiFormatJson(proveedorData);
 
-      // Determinar el endpoint correcto según el tipo de proveedor
-      const endpoint = proveedorData.tipoProveedor === 'Natural' 
-        ? '/PRoveedores/naturales'  // Plural según API
-        : '/Proveedores/juridicos'; // Plural según API real
-
-      console.log(`🎯 Usando endpoint: ${endpoint} para tipo ${proveedorData.tipoProveedor}`);
+      console.log('🔵 Creando proveedor - Endpoint:', endpoint);
+      console.log('🔵 Body enviado:', apiBody);
 
       const response = await this.request(endpoint, {
         method: 'POST',
         body: JSON.stringify(apiBody),
       });
 
-      const text = await response.text();
-      if (!text) return { ...proveedorData, id: 0 } as Proveedor;
+      const result = await response.json();
+      console.log('✅ Proveedor creado:', result);
 
-      const result = JSON.parse(text);
-      console.log('✅ Proveedor creado exitosamente:', result);
-      return result;
+      return this.mapFromApi(result);
     } catch (error: any) {
       console.error('❌ Error creando proveedor:', error);
-      console.error('❌ Datos que causaron el error:', proveedorData);
       throw error;
     }
   }
@@ -259,22 +297,10 @@ class ProveedorService {
   async cambiarEstadoProveedor(id: number, estado: boolean): Promise<void> {
     try {
       console.log(`🔄 Cambiando estado del proveedor ${id} a ${estado}`);
-      
-      // Primero obtener el proveedor actual para mantener todos los datos requeridos
-      const proveedorActual = await this.obtenerProveedorPorId(id);
-      if (!proveedorActual) {
-        throw new Error('Proveedor no encontrado');
-      }
 
-      // Actualizar solo el estado pero manteniendo todos los demás datos requeridos
-      const apiBody = this.mapToApiFormat({
-        ...proveedorActual,
-        estado: estado
-      });
-
-      await this.request(`/proveedores/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(apiBody),
+      await this.request(`/Proveedores/${id}/estado`, {
+        method: 'POST',
+        body: JSON.stringify({ estado: estado }),
       });
 
       console.log(`✅ Estado del proveedor ${id} actualizado a ${estado}`);

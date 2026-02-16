@@ -76,11 +76,11 @@ export function BarberosPage() {
       (barbero.apellidos || barbero.apellido || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (barbero.correo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (barbero.documento || '').includes(searchTerm);
-    
-    const statusMatch = filterStatus === "all" || 
+
+    const statusMatch = filterStatus === "all" ||
       (filterStatus === "active" && barbero.status === 'active') ||
       (filterStatus === "inactive" && barbero.status === 'inactive');
-    
+
     return searchMatch && statusMatch;
   });
 
@@ -181,10 +181,10 @@ export function BarberosPage() {
         ...newBarbero,
         id: editingBarbero.id
       });
-      
+
       const updatedBarbero = await barberosService.updateBarbero(editingBarbero.id, apiData);
       const mappedBarbero = barberosService.mapApiToComponent(updatedBarbero);
-      
+
       setBarberos(barberos.map(b => b.id === editingBarbero.id ? mappedBarbero : b));
       resetForm();
       setIsDialogOpen(false);
@@ -227,58 +227,22 @@ export function BarberosPage() {
         return;
       }
 
-      console.log('Barbero actual:', barbero);
       const nuevoEstado = barbero.status === 'active' ? 'inactive' : 'active';
-      console.log('Nuevo estado (string):', nuevoEstado);
-      
-      // Conversión explícita a boolean para la API
       const estadoBoolean = nuevoEstado === 'active';
-      console.log('Estado boolean final:', estadoBoolean);
-      
-      // Enviar todos los campos requeridos por la API (no soporta actualización parcial)
-      const datosParaAPI = {
-        id: barberoId,
-        usuarioId: barbero.usuarioId,
-        nombre: barbero.nombre || barbero.nombres,
-        apellido: barbero.apellido || barbero.apellidos,
-        documento: barbero.documento,
-        correo: barbero.correo,
-        telefono: barbero.telefono || barbero.celular,
-        especialidad: barbero.especialidad || '',
-        fotoPerfil: barbero.fotoPerfil || barbero.imagenUrl || '',
-        estado: estadoBoolean,
-        // Campos adicionales que la API podría esperar
-        tipoDocumento: barbero.tipoDocumento || 'Cédula',
-        direccion: barbero.direccion || '',
-        barrio: barbero.barrio || '',
-        fechaNacimiento: barbero.fechaNacimiento || '',
-        rol: barbero.rol || 'Barbero'
-      };
-      console.log('Datos para API (completos):', datosParaAPI);
-      
-      const updatedBarbero = await barberosService.updateBarbero(barberoId, datosParaAPI);
-      console.log('Respuesta de API:', updatedBarbero);
-      
-      // Si la API devuelve una respuesta vacía, construir el objeto actualizado manualmente
-      let mappedBarbero;
-      if (!updatedBarbero || Object.keys(updatedBarbero).length === 0) {
-        console.log('API devolvió respuesta vacía, construyendo objeto actualizado');
-        mappedBarbero = {
-          ...barbero,
-          status: nuevoEstado as 'active' | 'inactive',
-          estado: estadoBoolean
-        };
-      } else {
-        // Si la API devuelve datos, mapearlos normalmente
-        mappedBarbero = barberosService.mapApiToComponent(updatedBarbero);
-      }
-      
-      console.log('Barbero mapeado final:', mappedBarbero);
-      
-      setBarberos(barberos.map(b => b.id === barberoId ? mappedBarbero as Barbero : b));
+
+      // Usar el nuevo método específico para estado
+      await barberosService.updateBarberoStatus(barberoId, estadoBoolean);
+
+      // Actualizar localmente
+      setBarberos(prev => prev.map(b =>
+        b.id === barberoId
+          ? { ...b, status: nuevoEstado as 'active' | 'inactive' }
+          : b
+      ));
+
       success(
         `Barbero ${nuevoEstado === 'active' ? 'activado' : 'desactivado'}`,
-        `El barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" ha sido ${nuevoEstado === 'active' ? 'activado' : 'desactivado'} exitosamente.`
+        `El barbero "${barbero.nombre || barbero.nombres} ${barbero.apellido || barbero.apellidos}" ha sido ${nuevoEstado === 'active' ? 'activado' : 'desactivado'} exitosamente.`
       );
     } catch (err: unknown) {
       console.error('Error cambiando estado del barbero:', err);
@@ -548,25 +512,25 @@ export function BarberosPage() {
                       </div>
                     </div>
 
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
-                    <button
-                      onClick={() => {
-                        setIsDialogOpen(false);
-                        resetForm();
-                        setEditingBarbero(null);
-                      }}
-                      className="elegante-button-secondary"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={editingBarbero ? handleUpdateBarbero : handleCreateBarbero}
-                      className="elegante-button-primary"
-                    >
-                      {editingBarbero ? 'Actualizar Barbero' : 'Crear Barbero'}
-                    </button>
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
+                      <button
+                        onClick={() => {
+                          setIsDialogOpen(false);
+                          resetForm();
+                          setEditingBarbero(null);
+                        }}
+                        className="elegante-button-secondary"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={editingBarbero ? handleUpdateBarbero : handleCreateBarbero}
+                        className="elegante-button-primary"
+                      >
+                        {editingBarbero ? 'Actualizar Barbero' : 'Crear Barbero'}
+                      </button>
+                    </div>
                   </div>
-                </div>
                 </DialogContent>
               </Dialog>
 
@@ -606,77 +570,77 @@ export function BarberosPage() {
               </div>
             ) : (
               <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Barbero</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Documento</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Contacto</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Dirección</th>
-                  <th className="text-center py-3 px-4 text-white-primary font-bold text-sm"
-                    style={{ paddingLeft: '65px' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedBarberos.map(barbero => (
-                  <tr key={barbero.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-lighter" />
-                        </div>
-                        <span className="text-gray-lighter">{barbero.nombre || barbero.nombres} {barbero.apellido || barbero.apellidos}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{barbero.documento}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{barbero.telefono || barbero.celular}</span>
-                    </td>
-                    <td className="py-4 px-4 text-center text-gray-lighter">{barbero.direccion}</td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedBarbero(barbero);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleEditBarbero(barbero)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => toggleBarberoStatus(barbero.id)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={barbero.status === 'active' ? "Desactivar barbero" : "Activar barbero"}
-                        >
-                          {barbero.status === 'active' ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBarbero(barbero)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
+                <thead>
+                  <tr className="border-b border-gray-dark">
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Barbero</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Documento</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Contacto</th>
+                    <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Dirección</th>
+                    <th className="text-center py-3 px-4 text-white-primary font-bold text-sm"
+                      style={{ paddingLeft: '65px' }}>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedBarberos.map(barbero => (
+                    <tr key={barbero.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
+                            <User className="w-5 h-5 text-gray-lighter" />
+                          </div>
+                          <span className="text-gray-lighter">{barbero.nombre || barbero.nombres} {barbero.apellido || barbero.apellidos}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-lighter">{barbero.documento}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-lighter">{barbero.telefono || barbero.celular}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center text-gray-lighter">{barbero.direccion}</td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedBarbero(barbero);
+                              setIsDetailDialogOpen(true);
+                            }}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                          </button>
+                          <button
+                            onClick={() => handleEditBarbero(barbero)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                          </button>
+                          <button
+                            onClick={() => toggleBarberoStatus(barbero.id)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title={barbero.status === 'active' ? "Desactivar barbero" : "Activar barbero"}
+                          >
+                            {barbero.status === 'active' ? (
+                              <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                            ) : (
+                              <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBarbero(barbero)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 

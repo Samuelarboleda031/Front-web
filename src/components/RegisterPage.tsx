@@ -19,7 +19,12 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
     email: '',
     password: '',
     confirmPassword: '',
-    telefono: ''
+    telefono: '',
+    tipoDocumento: '',
+    documento: '',
+    direccion: '',
+    barrio: '',
+    fechaNacimiento: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -27,6 +32,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [captchaValidated, setCaptchaValidated] = useState<boolean>(false);
+  // Default role is always 'cliente'
 
   const validatePassword = (password: string) => {
     const validations = {
@@ -35,13 +41,13 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
       hasUpperCase: /[A-Z]/.test(password),
       hasLowerCase: /[a-z]/.test(password)
     };
-    
+
     return validations;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Verificar que el captcha esté validado
     if (!captchaValidated) {
       setError('Completa la verificación "No soy un robot" para continuar');
@@ -71,8 +77,32 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
       return;
     }
 
+    if (!formData.apellido.trim()) {
+      setError('El apellido es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.documento.trim()) {
+      setError('El número de documento es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.tipoDocumento) {
+      setError('El tipo de documento es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
     if (!formData.email.trim()) {
       setError('El email es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.telefono.trim()) {
+      setError('El teléfono es obligatorio');
       setIsLoading(false);
       return;
     }
@@ -92,7 +122,12 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         telefono: formData.telefono.trim() || undefined,
-        role: 'cliente' // Rol asignado automáticamente
+        role: 'cliente',
+        documento: formData.documento.trim() || undefined,
+        tipoDocumento: formData.tipoDocumento || undefined,
+        direccion: formData.direccion.trim() || undefined,
+        barrio: formData.barrio.trim() || undefined,
+        fechaNacimiento: formData.fechaNacimiento || undefined
       });
 
       if (result.success) {
@@ -131,7 +166,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
               ¡Cuenta creada exitosamente!
             </h1>
             <p className="text-gray-lightest mb-6">
-              Tu cuenta ha sido creada y ya estás autenticado. Serás redirigido al dashboard en unos momentos.
+              Tu cuenta ha sido creada como <strong>Cliente</strong> y ya estás autenticado. Serás redirigido en unos momentos.
             </p>
             <div className="w-8 h-8 border-2 border-orange-primary border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
@@ -162,7 +197,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
 
         {/* Formulario de registro */}
         <div className="elegante-card">
-          <form onSubmit={handleRegister} className="space-y-6">
+          <form onSubmit={handleRegister} className="space-y-4">
             {error && (
               <div className="flex items-center space-x-2 p-3 rounded-lg bg-red-900/20 border border-red-600/30">
                 <AlertCircle className="w-5 h-5 text-red-400" />
@@ -170,48 +205,77 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
               </div>
             )}
 
-            {/* Información de rol automático */}
-            <div className="p-3 bg-blue-600/10 border border-blue-600/30 rounded-lg">
-              <p className="text-blue-400 text-sm text-center">
-                🎯 Te registrarás automáticamente como <strong>Cliente</strong>. 
-                Si necesitas acceso de administrador, contacta al soporte.
-              </p>
-            </div>
+            {/* Role selection removed - defaulting to 'cliente' */}
+ {/* Documentación */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="tipoDocumento" className="text-white-primary">Tipo de Documento</Label>
+                <select
+                  id="tipoDocumento"
+                  value={formData.tipoDocumento}
+                  onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value })}
+                  className="elegante-input w-full pl-2"
+                >
+                  <option value="">Selecciona tipo</option>
+                  <option value="Cédula">Cédula</option>
+                  <option value="Cédula de Extranjería">Cédula de Extranjería</option>
+                  <option value="Pasaporte">Pasaporte</option>
+                </select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-white-primary">Nombre</Label>
-              <div className="relative">
-                <Input
-                  id="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Tu nombre"
-                  className="elegante-input pl-10"
-                  required
-                />
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
+              <div className="space-y-2">
+                <Label htmlFor="documento" className="text-white-primary">Número de Documento</Label>
+                <div className="relative">
+                  <Input
+                    id="documento"
+                    type="text"
+                    value={formData.documento}
+                    onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+                    placeholder="No. Documento"
+                    className="elegante-input pl-10"
+                  />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="apellido" className="text-white-primary">Apellido</Label>
-              <div className="relative">
-                <Input
-                  id="apellido"
-                  type="text"
-                  value={formData.apellido}
-                  onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                  placeholder="Tu apellido"
-                  className="elegante-input pl-10"
-                  required
-                />
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
+            {/* Información Personal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-white-primary">Nombre *</Label>
+                <div className="relative">
+                  <Input
+                    id="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Tu nombre"
+                    className="elegante-input pl-10"
+                    required
+                  />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="apellido" className="text-white-primary">Apellido *</Label>
+                <div className="relative">
+                  <Input
+                    id="apellido"
+                    type="text"
+                    value={formData.apellido}
+                    onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
+                    placeholder="Tu apellido"
+                    className="elegante-input pl-10"
+                    required
+                  />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
+                </div>
               </div>
             </div>
-
+            {/* Contacto */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-white-primary">Email</Label>
+              <Label htmlFor="email" className="text-white-primary">Email *</Label>
               <div className="relative">
                 <Input
                   id="email"
@@ -227,7 +291,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="telefono" className="text-white-primary">Teléfono (opcional)</Label>
+              <Label htmlFor="telefono" className="text-white-primary">Teléfono</Label>
               <div className="relative">
                 <Input
                   id="telefono"
@@ -239,6 +303,44 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
                 />
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter" />
               </div>
+            </div>
+
+            {/* Ubicación y Fecha */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="direccion" className="text-white-primary">Dirección</Label>
+                <Input
+                  id="direccion"
+                  type="text"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                  placeholder="Dirección completa"
+                  className="elegante-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="barrio" className="text-white-primary">Barrio</Label>
+                <Input
+                  id="barrio"
+                  type="text"
+                  value={formData.barrio}
+                  onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
+                  placeholder="Barrio"
+                  className="elegante-input"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fechaNacimiento" className="text-white-primary">Fecha de Nacimiento</Label>
+              <Input
+                id="fechaNacimiento"
+                type="date"
+                value={formData.fechaNacimiento}
+                onChange={(e) => setFormData({ ...formData, fechaNacimiento: e.target.value })}
+                className="elegante-input"
+              />
             </div>
 
             <div className="space-y-2">
@@ -262,7 +364,7 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              
+
               {/* Validaciones de contraseña */}
               {formData.password && (
                 <div className="mt-3 p-3 bg-gray-darker rounded-lg border border-gray-dark">
@@ -320,10 +422,9 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
 
             <Button
               type="submit"
-              disabled={isLoading || !formData.name || !formData.email || !formData.password || !formData.confirmPassword || formData.password !== formData.confirmPassword || !passwordValidations.minLength || !captchaValidated}
-              className={`elegante-button-primary w-full flex items-center justify-center ${
-                !captchaValidated ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              disabled={isLoading || !formData.name || !formData.apellido || !formData.tipoDocumento || !formData.documento || !formData.email || !formData.telefono || !formData.password || !formData.confirmPassword || formData.password !== formData.confirmPassword || !passwordValidations.minLength || !captchaValidated}
+              className={`elegante-button-primary w-full flex items-center justify-center ${!captchaValidated ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {isLoading ? (
                 <>
@@ -347,19 +448,6 @@ export function RegisterPage({ onBack }: RegisterPageProps) {
             >
               <ArrowLeft className="w-4 h-4" />
               Volver al inicio de sesión
-            </button>
-          </div>
-        </div>
-
-        {/* Información adicional */}
-        <div className="mt-6 p-4 bg-orange-primary/5 border border-orange-primary/20 rounded-lg">
-          <div className="text-center">
-            <h4 className="font-medium text-white-primary mb-2">¿Ya tienes una cuenta?</h4>
-            <button
-              onClick={onBack}
-              className="text-sm text-orange-primary hover:text-orange-secondary transition-colors underline"
-            >
-              Iniciar sesión aquí
             </button>
           </div>
         </div>

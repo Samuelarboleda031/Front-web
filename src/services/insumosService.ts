@@ -12,12 +12,12 @@ export interface Insumo {
   precio: number;
 }
 
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+const API_BASE_URL = '/api';
 
 class InsumosService {
   private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -164,9 +164,9 @@ class InsumosService {
       console.log(`🔍 Obteniendo insumo ${id}...`);
       const response = await this.request(`/Productos/${id}`);
       const text = await response.text();
-      
+
       if (!text) return null;
-      
+
       const p: any = JSON.parse(text);
       const categoria =
         typeof p?.categoria === 'string'

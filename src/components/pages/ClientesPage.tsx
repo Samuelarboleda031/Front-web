@@ -412,8 +412,8 @@ export function ClientesPage() {
       direccion: cliente.direccion,
       barrio: cliente.barrio,
       fechaNacimiento: cliente.fechaNacimiento
-      ? cliente.fechaNacimiento.split("T")[0]
-      : "",
+        ? cliente.fechaNacimiento.split("T")[0]
+        : "",
       fotoPerfil: cliente.fotoPerfil || ''
     });
 
@@ -513,17 +513,17 @@ export function ClientesPage() {
   // Función para formatear fecha para la API
   const formatDateForAPI = (dateString: string): string => {
     if (!dateString) return '';
-    
+
     const date = new Date(dateString);
     const year = date.getFullYear();
-    
+
     // Validar que el año sea razonable (entre 1900 y año actual + 100)
     const currentYear = new Date().getFullYear();
     if (year < 1900 || year > currentYear + 100) {
       console.warn('Año inválido:', year);
       return '';
     }
-    
+
     return date.toISOString().split('T')[0];
   };
 
@@ -613,13 +613,13 @@ export function ClientesPage() {
       }
 
       const nuevoEstado = !cliente.activo;
-      
+
       // Cambiar estado en la API
-      const updatedClienteAPI = await clientesService.toggleClienteEstado(parseInt(clienteId), nuevoEstado);
-      const mappedCliente = clientesService.mapApiToComponent(updatedClienteAPI);
-      
-      setClientes(clientes.map(c => c.id === clienteId ? mappedCliente : c));
-      
+      await clientesService.toggleClienteEstado(parseInt(clienteId), nuevoEstado);
+
+      // Actualizar localmente
+      setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, activo: nuevoEstado } : c));
+
       success(
         `Cliente ${nuevoEstado ? 'activado' : 'desactivado'}`,
         `El cliente ${mappedCliente.nombre} ${mappedCliente.apellido} ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`
@@ -790,90 +790,90 @@ export function ClientesPage() {
               </div>
             ) : (
               <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-gray-lightest font-medium text-sm">Documento</th>
-                  <th className="text-left py-3 px-4 text-gray-lightest font-medium text-sm">Cliente</th>
-                  <th className="text-center py-3 px-4 text-gray-lightest font-medium text-sm">Teléfono</th>
-                  <th className="text-center py-3 px-4 text-gray-lightest font-medium text-sm">Saldo a Favor</th>
-                  <th className="text-right py-3 px-4 text-gray-lightest font-medium text-sm">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedClientes.map((cliente) => (
-                  <tr key={cliente.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-2">
-                        <IdCard className="w-4 h-4 text-orange-primary" />
-                        <span className="text-gray-lighter">{cliente.numeroDocumento}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-3">
-                        {cliente.fotoPerfil ? (
-                          <img
-                            src={cliente.fotoPerfil}
-                            alt={`Foto de ${cliente.nombre}`}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-orange-primary"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                            <UserIcon className="w-5 h-5 text-gray-lightest" />
-                          </div>
-                        )}
-                        <span className="text-gray-lighter">{cliente.nombre} {cliente.apellido}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{cliente.telefono}</span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      {cliente.saldoAFavor > 0 ? (
-                        <span className="text-gray-lighter">${formatCurrency(cliente.saldoAFavor)}</span>
-                      ) : (
-                        <span className="text-gray-medium">$0</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleViewCliente(cliente)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleEditCliente(cliente)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar cliente"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                           <button
-                          onClick={() => toggleClienteStatus(cliente.id)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={cliente.activo ? "Desactivar cliente" : "Activar cliente"}
-                        >
-                          {cliente.activo ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCliente(cliente)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar cliente"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
+                <thead>
+                  <tr className="border-b border-gray-dark">
+                    <th className="text-left py-3 px-4 text-gray-lightest font-medium text-sm">Documento</th>
+                    <th className="text-left py-3 px-4 text-gray-lightest font-medium text-sm">Cliente</th>
+                    <th className="text-center py-3 px-4 text-gray-lightest font-medium text-sm">Teléfono</th>
+                    <th className="text-center py-3 px-4 text-gray-lightest font-medium text-sm">Saldo a Favor</th>
+                    <th className="text-right py-3 px-4 text-gray-lightest font-medium text-sm">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedClientes.map((cliente) => (
+                    <tr key={cliente.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center space-x-2">
+                          <IdCard className="w-4 h-4 text-orange-primary" />
+                          <span className="text-gray-lighter">{cliente.numeroDocumento}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center space-x-3">
+                          {cliente.fotoPerfil ? (
+                            <img
+                              src={cliente.fotoPerfil}
+                              alt={`Foto de ${cliente.nombre}`}
+                              className="w-10 h-10 rounded-full object-cover border-2 border-orange-primary"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
+                              <UserIcon className="w-5 h-5 text-gray-lightest" />
+                            </div>
+                          )}
+                          <span className="text-gray-lighter">{cliente.nombre} {cliente.apellido}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-lighter">{cliente.telefono}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        {cliente.saldoAFavor > 0 ? (
+                          <span className="text-gray-lighter">${formatCurrency(cliente.saldoAFavor)}</span>
+                        ) : (
+                          <span className="text-gray-medium">$0</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleViewCliente(cliente)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                          </button>
+                          <button
+                            onClick={() => handleEditCliente(cliente)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Editar cliente"
+                          >
+                            <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                          </button>
+                          <button
+                            onClick={() => toggleClienteStatus(cliente.id)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title={cliente.activo ? "Desactivar cliente" : "Activar cliente"}
+                          >
+                            {cliente.activo ? (
+                              <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                            ) : (
+                              <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCliente(cliente)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Eliminar cliente"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 

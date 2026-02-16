@@ -3,7 +3,7 @@ import { authSyncService, AppRole } from '../services/authSyncService';
 import { firebaseAuthService } from '../services/firebase';
 import { apiService } from '../services/api';
 
-export type UserRole = 'admin' | 'cliente';
+export type UserRole = 'admin' | 'cliente' | 'barbero';
 
 export interface User {
   id: string;
@@ -28,6 +28,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendEmailVerification: () => Promise<{ success: boolean; error?: string }>;
+  verifyPasswordReset: (token: string) => Promise<{ success: boolean; email?: string; error?: string }>;
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   isAdmin: () => boolean;
   isCliente: () => boolean;
   getAllUsers: () => Promise<User[]>;
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // 1. Verificar si hay usuario guardado en localStorage
         const storedUser = authSyncService.getStoredUser();
-        
+
         if (storedUser) {
           setUser(storedUser);
           setIsAuthenticated(true);
@@ -78,16 +80,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (firebaseProfile.email) {
             // Intentar obtener rolId por defecto (cliente)
             const syncResult = await authSyncService.syncUsuarioConApi(
-              firebaseProfile, 
+              firebaseProfile,
               AppRole.CLIENTE
             );
-            
+
             if (syncResult.success && syncResult.user) {
               const userData: User = {
                 id: syncResult.user.id.toString(),
                 email: syncResult.user.correo,
                 name: `${syncResult.user.nombre || ''} ${syncResult.user.apellido || ''}`.trim() || syncResult.user.correo,
-        role: authSyncService.getRolId(syncResult.user.rolId || 0) === AppRole.ADMIN ? 'admin' : 'cliente',
+                role: (() => {
+                  const roleName = authSyncService.getRoleName(syncResult.user.rolId || 0);
+                  return roleName as UserRole;
+                })(),
                 telefono: syncResult.user.telefono ?? undefined,
                 fotoPerfil: syncResult.user.fotoPerfil ?? undefined,
                 firebaseUid: firebaseProfile.uid,
@@ -123,18 +128,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string, rolId?: number): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      
+
       // Autenticar con Firebase primero
       const userCredential = await firebaseAuthService.signIn(email, password);
       const firebaseProfile = firebaseAuthService.getUserProfile(userCredential.user);
-      
+
       // Buscar usuario existente en la API para obtener su rol
       let selectedRolId = rolId;
       if (!selectedRolId) {
         try {
           const usuarios = await apiService.getUsuarios();
           const usuarioExistente = usuarios.find(u => u.correo.toLowerCase() === email.toLowerCase());
-          
+
           if (usuarioExistente && usuarioExistente.rolId) {
             // Usar el rol existente del usuario
             selectedRolId = usuarioExistente.rolId;
@@ -149,28 +154,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           selectedRolId = AppRole.CLIENTE;
         }
       }
-      
+
       // Sincronizar con API usando el rol detectado
       const result = await authSyncService.syncUsuarioConApi(firebaseProfile, selectedRolId);
-      
+
       if (result.success && result.user) {
         const userData: User = {
           id: result.user.id.toString(),
           email: result.user.correo,
           name: `${result.user.nombre || ''} ${result.user.apellido || ''}`.trim() || result.user.correo,
-          role: authSyncService.getRolId(result.user.rolId) === AppRole.ADMIN ? 'admin' : 'cliente',
+          role: authSyncService.getRoleName(result.user.rolId) as UserRole,
           telefono: result.user.telefono ?? undefined,
           fotoPerfil: result.user.fotoPerfil ?? undefined,
           firebaseUid: firebaseProfile.uid,
           emailVerified: firebaseProfile.emailVerified
         };
-        
+
         // Guardar en localStorage
         localStorage.setItem('barbershop_user', JSON.stringify(userData));
-        
+
         setUser(userData);
         setIsAuthenticated(true);
-        
+
         return { success: true };
       } else {
         return { success: false, error: result.error || 'Error en la autenticación' };
@@ -186,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (userData: RegisterData): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      
+
       // Validaciones básicas
       if (!userData.name || !userData.email || !userData.password) {
         return { success: false, error: 'Todos los campos son obligatorios' };
@@ -198,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Determinar rolId
       const rolId = userData.role ? authSyncService.getRolId(userData.role) : AppRole.CLIENTE;
-      
+
       // Preparar datos adicionales para la API
       const additionalData = {
         nombre: userData.name,
@@ -213,25 +218,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Registrar en Firebase y sincronizar con API
       const result = await authSyncService.registerAndSync(
-        userData.email, 
-        userData.password, 
-        rolId, 
+        userData.email,
+        userData.password,
+        rolId,
         additionalData
       );
-      
+
       if (result.success && result.user) {
         const newUser: User = {
           id: result.user.id.toString(),
           email: result.user.correo,
           name: `${result.user.nombre || ''} ${result.user.apellido || ''}`.trim() || result.user.correo,
-          role: authSyncService.getRolId(result.user.rolId) === AppRole.ADMIN ? 'admin' : 'cliente',
+          role: authSyncService.getRoleName(result.user.rolId) as UserRole,
           telefono: result.user.telefono ?? undefined,
           fotoPerfil: result.user.fotoPerfil ?? undefined
         };
-        
+
         setUser(newUser);
         setIsAuthenticated(true);
-        
+
         return { success: true };
       } else {
         return { success: false, error: result.error || 'Error en el registro' };
@@ -251,7 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: u.id.toString(),
         name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.correo,
         email: u.correo,
-        role: authSyncService.getRolId(u.rolId || 0) === AppRole.ADMIN ? 'admin' : 'cliente',
+        role: authSyncService.getRoleName(u.rolId || 0) as UserRole,
         telefono: u.telefono || undefined,
         fotoPerfil: u.fotoPerfil || undefined
       }));
@@ -270,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: u.id.toString(),
           name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.correo,
           email: u.correo,
-          role: authSyncService.getRolId(u.rolId || 0) === AppRole.ADMIN ? 'admin' : 'cliente',
+          role: authSyncService.getRoleName(u.rolId || 0) as UserRole,
           telefono: u.telefono || undefined,
           fotoPerfil: u.fotoPerfil || undefined
         }));
@@ -284,12 +289,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const usuario = await apiService.getUsuarioById(parseInt(userId));
       if (!usuario) return null;
-      
+
       return {
         id: usuario.id.toString(),
         name: `${usuario.nombre || ''} ${usuario.apellido || ''}`.trim() || usuario.correo,
         email: usuario.correo,
-        role: authSyncService.getRolId(usuario.rolId || 0) === AppRole.ADMIN ? 'admin' : 'cliente',
+        role: authSyncService.getRoleName(usuario.rolId || 0) as UserRole,
         telefono: usuario.telefono || undefined,
         fotoPerfil: usuario.fotoPerfil || undefined
       };
@@ -365,18 +370,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = async (rolId?: number): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      
+
       // Primero autenticar con Google para obtener el email
       const userCredential = await firebaseAuthService.signInWithGoogle();
       const firebaseProfile = firebaseAuthService.getUserProfile(userCredential.user);
-      
+
       // Buscar usuario existente en la API para obtener su rol
       let selectedRolId = rolId;
       if (!selectedRolId && firebaseProfile.email) {
         try {
           const usuarios = await apiService.getUsuarios();
           const usuarioExistente = usuarios.find(u => u.correo.toLowerCase() === firebaseProfile.email!.toLowerCase());
-          
+
           if (usuarioExistente && usuarioExistente.rolId) {
             // Usar el rol existente del usuario
             selectedRolId = usuarioExistente.rolId;
@@ -391,33 +396,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           selectedRolId = AppRole.CLIENTE;
         }
       }
-      
+
       // Asegurar que siempre haya un rolId
       if (!selectedRolId) {
         selectedRolId = AppRole.CLIENTE;
       }
-      
+
       // Sincronizar con API usando el rol detectado
       const result = await authSyncService.syncUsuarioConApi(firebaseProfile, selectedRolId);
-      
+
       if (result.success && result.user) {
         const userData: User = {
           id: result.user.id.toString(),
           email: result.user.correo,
           name: `${result.user.nombre || ''} ${result.user.apellido || ''}`.trim() || result.user.correo,
-          role: authSyncService.getRolId(result.user.rolId) === AppRole.ADMIN ? 'admin' : 'cliente',
+          role: authSyncService.getRoleName(result.user.rolId) as UserRole,
           telefono: result.user.telefono ?? undefined,
           fotoPerfil: result.user.fotoPerfil ?? undefined,
           firebaseUid: firebaseProfile.uid,
           emailVerified: firebaseProfile.emailVerified
         };
-        
+
         // Guardar en localStorage
         localStorage.setItem('barbershop_user', JSON.stringify(userData));
-        
+
         setUser(userData);
         setIsAuthenticated(true);
-        
+
         return { success: true };
       } else {
         return { success: false, error: result.error || 'Error con Google Sign-In' };
@@ -453,6 +458,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const verifyPasswordReset = async (token: string): Promise<{ success: boolean; email?: string; error?: string }> => {
+    try {
+      const email = await firebaseAuthService.verifyPasswordResetCode(token);
+      return { success: true, email };
+    } catch (error: any) {
+      console.error('Error en verifyPasswordReset:', error);
+      return { success: false, error: error.message || 'Error verificando el token' };
+    }
+  };
+
+  const confirmPasswordReset = async (token: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await firebaseAuthService.confirmPasswordReset(token, newPassword);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error en confirmPasswordReset:', error);
+      return { success: false, error: error.message || 'Error restableciendo la contraseña' };
+    }
+  };
+
   const resendEmailVerification = async (): Promise<{ success: boolean; error?: string }> => {
     try {
       await firebaseAuthService.sendEmailVerification();
@@ -476,6 +501,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle,
       logout,
       resetPassword,
+      verifyPasswordReset,
+      confirmPasswordReset,
       resendEmailVerification,
       isAdmin,
       isCliente,

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -17,8 +17,6 @@ import {
   CreditCard,
   Receipt,
   Hash,
-  Clock,
-  Star,
   FileText,
   Ban,
   Download,
@@ -33,343 +31,153 @@ import { Label } from "../ui/label";
 import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
+import { ventaService, Venta } from "../../services/ventaService";
+import { servicioService, Servicio } from "../../services/servicioService";
+import { productoService, ApiProducto } from "../../services/productos";
+import { apiService, ApiUser } from "../../services/api";
+import { AppRole } from "../../services/authSyncService";
 
 // Función para formatear moneda colombiana con puntos para separar miles
 const formatCurrency = (amount: number): string => {
   return amount.toLocaleString('es-CO');
 };
 
-const ventasData = [
-  {
-    id: "VNT001",
-    cliente: "Juan Pérez",
-    clienteDocumento: "CC 1012345678",
-    fecha: "01-08-2025",
-    servicios: "Corte, Barba",
-    productos: "Cera, Perfume",
-    subtotal: 92437,
-    iva: 17563,
-    descuento: 0,
-    total: 110000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Efectivo",
-    productosDetalle: [
-      { id: "PROD003", nombre: "Cera para Cabello", cantidad: 1, precio: 25000 },
-      { id: "PROD004", nombre: "Perfume Masculino", cantidad: 1, precio: 120000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 },
-      { id: "SERV002", nombre: "Arreglo de Barba", precio: 20000 }
-    ]
-  },
-  {
-    id: "VNT002",
-    cliente: "María Gómez",
-    clienteDocumento: "CC 1023456789",
-    fecha: "01-08-2025",
-    servicios: "Corte, Cejas",
-    productos: "Minoxidil",
-    subtotal: 71429,
-    iva: 13571,
-    descuento: 0,
-    total: 85000,
-    barbero: "Sofia Martinez",
-    estado: "Completada",
-    metodoPago: "Tarjeta",
-    productosDetalle: [
-      { id: "PROD005", nombre: "Minoxidil", cantidad: 1, precio: 85000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 },
-      { id: "SERV003", nombre: "Arreglo de Cejas", precio: 15000 }
-    ]
-  },
-  {
-    id: "VNT003",
-    cliente: "Carlos Ruiz",
-    clienteDocumento: "CC 1034567890",
-    fecha: "01-08-2025",
-    servicios: "Paquete Premium",
-    productos: "Gafas",
-    subtotal: 100840,
-    iva: 19160,
-    descuento: 0,
-    total: 120000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Transferencia",
-    productosDetalle: [
-      { id: "PROD006", nombre: "Gafas de Sol Ray-Ban", cantidad: 1, precio: 280000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV004", nombre: "Paquete Premium Completo", precio: 80000 }
-    ]
-  },
-  {
-    id: "VNT004",
-    cliente: "Laura Zapata",
-    clienteDocumento: "CC 1045678901",
-    fecha: "31-07-2025",
-    servicios: "Corte, Tinturado",
-    productos: "Ninguno",
-    subtotal: 54622,
-    iva: 10378,
-    descuento: 0,
-    total: 65000,
-    barbero: "Sofia Martinez",
-    estado: "Anulada",
-    metodoPago: "Efectivo",
-    productosDetalle: [],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 },
-      { id: "SERV005", nombre: "Tinturado", precio: 30000 }
-    ]
-  },
-  {
-    id: "VNT005",
-    cliente: "Ana García",
-    clienteDocumento: "CC 1056789012",
-    fecha: "30-07-2025",
-    servicios: "Corte",
-    productos: "Champú",
-    subtotal: 42017,
-    iva: 7983,
-    descuento: 0,
-    total: 50000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Efectivo",
-    productosDetalle: [
-      { id: "PROD001", nombre: "Champú Premium Kerastase", cantidad: 1, precio: 45000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 }
-    ]
-  },
-  {
-    id: "VNT006",
-    cliente: "Pedro López",
-    clienteDocumento: "CC 1067890123",
-    fecha: "29-07-2025",
-    servicios: "Barba",
-    productos: "Aceite",
-    subtotal: 33613,
-    iva: 6387,
-    descuento: 0,
-    total: 40000,
-    barbero: "Sofia Martinez",
-    estado: "Completada",
-    metodoPago: "Tarjeta",
-    productosDetalle: [
-      { id: "PROD008", nombre: "Tónico Capilar", cantidad: 1, precio: 32000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV002", nombre: "Arreglo de Barba", precio: 20000 }
-    ]
-  },
-  {
-    id: "VNT007",
-    cliente: "Sofía Mendoza",
-    clienteDocumento: "CC 1078901234",
-    fecha: "28-07-2025",
-    servicios: "Paquete Completo",
-    productos: "Varios",
-    subtotal: 126050,
-    iva: 23950,
-    descuento: 0,
-    total: 150000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Transferencia",
-    productosDetalle: [
-      { id: "PROD002", nombre: "Acondicionador L'Oréal Professional", cantidad: 1, precio: 38000 },
-      { id: "PROD009", nombre: "Paños Húmedos", cantidad: 2, precio: 15000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV004", nombre: "Paquete Completo", precio: 90000 }
-    ]
-  },
-  {
-    id: "VNT008",
-    cliente: "Roberto Silva",
-    clienteDocumento: "CC 1089012345",
-    fecha: "27-07-2025",
-    servicios: "Corte",
-    productos: "Ninguno",
-    subtotal: 25210,
-    iva: 4790,
-    descuento: 0,
-    total: 30000,
-    barbero: "Sofia Martinez",
-    estado: "Completada",
-    metodoPago: "Efectivo",
-    productosDetalle: [],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 }
-    ]
-  },
-  {
-    id: "VNT009",
-    cliente: "Carmen Díaz",
-    clienteDocumento: "CC 1090123456",
-    fecha: "26-07-2025",
-    servicios: "Cejas, Depilación",
-    productos: "Crema",
-    subtotal: 58824,
-    iva: 11176,
-    descuento: 0,
-    total: 70000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Tarjeta",
-    productosDetalle: [
-      { id: "PROD007", nombre: "Crema Facial Eucerin", cantidad: 1, precio: 65000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV003", nombre: "Arreglo de Cejas", precio: 15000 },
-      { id: "SERV006", nombre: "Depilación", precio: 25000 }
-    ]
-  },
-  {
-    id: "VNT010",
-    cliente: "Diego Morales",
-    clienteDocumento: "CC 1101234567",
-    fecha: "25-07-2025",
-    servicios: "Corte, Barba",
-    productos: "Cadena",
-    subtotal: 88235,
-    iva: 16765,
-    descuento: 0,
-    total: 105000,
-    barbero: "Sofia Martinez",
-    estado: "Pendiente",
-    metodoPago: "Transferencia",
-    productosDetalle: [
-      { id: "PROD010", nombre: "Cadenas de Acero", cantidad: 1, precio: 75000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 },
-      { id: "SERV002", nombre: "Arreglo de Barba", precio: 20000 }
-    ]
-  },
-  {
-    id: "VNT011",
-    cliente: "Elena Vargas",
-    clienteDocumento: "CC 1112345678",
-    fecha: "24-07-2025",
-    servicios: "Tinturado",
-    productos: "Ninguno",
-    subtotal: 67227,
-    iva: 12773,
-    descuento: 0,
-    total: 80000,
-    barbero: "Miguel Rodriguez",
-    estado: "Completada",
-    metodoPago: "Efectivo",
-    productosDetalle: [],
-    serviciosDetalle: [
-      { id: "SERV005", nombre: "Tinturado", precio: 55000 }
-    ]
-  },
-  {
-    id: "VNT012",
-    cliente: "Fernando Castro",
-    clienteDocumento: "CC 1123456789",
-    fecha: "23-07-2025",
-    servicios: "Corte",
-    productos: "Gel",
-    subtotal: 37815,
-    iva: 7185,
-    descuento: 0,
-    total: 45000,
-    barbero: "Sofia Martinez",
-    estado: "Anulada",
-    metodoPago: "Tarjeta",
-    productosDetalle: [
-      { id: "PROD003", nombre: "Cera para Cabello", cantidad: 1, precio: 25000 }
-    ],
-    serviciosDetalle: [
-      { id: "SERV001", nombre: "Corte de Cabello", precio: 35000 }
-    ]
-  }
-];
 
-// Datos de productos disponibles
-const productosDisponibles = [
-  { id: "PROD001", nombre: "Champú Premium Kerastase", precio: 45000 },
-  { id: "PROD002", nombre: "Acondicionador L'Oréal Professional", precio: 38000 },
-  { id: "PROD003", nombre: "Cera para Cabello", precio: 25000 },
-  { id: "PROD004", nombre: "Perfume Masculino", precio: 120000 },
-  { id: "PROD005", nombre: "Minoxidil", precio: 85000 },
-  { id: "PROD006", nombre: "Gafas de Sol Ray-Ban", precio: 280000 },
-  { id: "PROD007", nombre: "Crema Facial Eucerin", precio: 65000 },
-  { id: "PROD008", nombre: "Tónico Capilar", precio: 32000 },
-  { id: "PROD009", nombre: "Paños Húmedos", precio: 15000 },
-  { id: "PROD010", nombre: "Cadenas de Acero", precio: 75000 }
-];
+
 
 export function VentasPage() {
   const { created, edited, deleted, AlertContainer } = useCustomAlert();
   const { confirmEditAction, DoubleConfirmationContainer } = useDoubleConfirmation();
-  const [ventas, setVentas] = useState(ventasData);
+  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [productosAPI, setProductosAPI] = useState<ApiProducto[]>([]);
+  const [clientesAPI, setClientesAPI] = useState<ApiUser[]>([]);
+  const [barberosAPI, setBarberosAPI] = useState<ApiUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [selectedVenta, setSelectedVenta] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  // Valor especial para representar \"todos los barberos\" en el filtro
+  // Valor especial para representar "todos los barberos" en el filtro
   const VALOR_TODOS_BARBEROS = "todos";
-  // Valor especial para representar \"sin barbero\" en el formulario de nueva venta
+  // Valor especial para representar "sin barbero" en el formulario de nueva venta
   const VALOR_SIN_BARBERO = "sin-barbero";
   const [barberoSeleccionado, setBarberoSeleccionado] = useState<string>(VALOR_TODOS_BARBEROS);
 
-  // Función para generar fecha automática
+  // Cargar ventas desde la API al montar el componente
+  useEffect(() => {
+    cargarVentas();
+  }, []);
+
+  const cargarVentas = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Cargar todos los datos necesarios en paralelo
+      const [ventasData, serviciosData, productosData, usuariosData] = await Promise.all([
+        ventaService.getVentas(),
+        servicioService.getServicios(),
+        productoService.getProductos(),
+        apiService.getUsuarios()
+      ]);
+
+      console.log('🔍 Ventas cargadas:', ventasData.length);
+      console.log('🔍 Servicios cargados:', serviciosData?.length || 0);
+      console.log('🔍 Productos cargados:', productosData?.length || 0);
+      console.log('🔍 Usuarios cargados:', usuariosData?.length || 0);
+
+      setVentas(ventasData);
+      setServicios(serviciosData || []);
+      setProductosAPI(productosData || []);
+
+      // Filtrar clientes: Mostrar TODOS los usuarios excepto los administradores
+      // Esto permite que usuarios con otros roles (o sin rol) puedan ser seleccionados como clientes
+      const clientes = usuariosData.filter((u: any) => u.rolId !== 1 && u.rolId !== AppRole.ADMIN);
+      setClientesAPI(clientes);
+      console.log('🔍 Clientes filtrados (todos excepto admin):', clientes.length);
+
+      // Filtrar barberos: Usuarios que NO son Clientes ni Administradores
+      const barberos = usuariosData.filter((u: any) =>
+        u.rolId !== AppRole.CLIENTE &&
+        u.rolId !== AppRole.ADMIN
+      );
+
+      // Si la lista de barberos está vacía, incluimos a los admins para que el sistema sea funcional
+      if (barberos.length === 0) {
+        setBarberosAPI(usuariosData.filter((u: any) => u.rolId === AppRole.ADMIN || u.rolId === 1));
+      } else {
+        setBarberosAPI(barberos);
+      }
+      console.log('🔍 Barberos filtrados:', barberos.length);
+
+      // Verificar servicios disponibles después de cargar
+      setTimeout(() => {
+        console.log('🔍 serviciosDisponibles después de cargar:', serviciosDisponibles);
+      }, 100);
+
+    } catch (err: any) {
+      console.error('Error cargando datos:', err);
+      setError(err.message || 'Error al cargar los datos');
+      toast.error('Error al cargar los datos. Por favor, intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateCurrentDate = () => {
-    return new Date().toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    return new Date().toISOString().split('T')[0] || "";
   };
 
   const inicialNuevaVenta = {
-    numeroVenta: '',
-    cliente: '',
-    clienteDocumento: '',
-    servicios: '',
-    barbero: VALOR_SIN_BARBERO,
-    metodoPago: '',
-    fechaCreacion: generateCurrentDate(),
-    subtotal: 0,
-    descuento: 0,
+    clienteId: null as number | null,
+    clienteDocumento: "",
+    fechaCreacion: "",
+    metodoPago: "",
+    barberoId: null as number | null,
+    barberoNombre: "",
     porcentajeDescuento: 0,
-    productos: [] as Array<{ id: string, nombre: string, cantidad: number, precio: number }>
+    productos: [] as { id: string; nombre: string; cantidad: number; precio: number }[],
   };
 
-  // Extraer servicios únicos de ventas anteriores
-  const serviciosDisponibles = Array.from(new Set(
-    ventasData.flatMap(venta =>
-      venta.servicios.split(',').map(servicio => servicio.trim())
-    )
-  )).filter(servicio => servicio && servicio !== '').sort();
+  // Usar servicios cargados desde la API con fallback
+  const serviciosDisponibles = useMemo(() => {
+    const serviciosDesdeAPI = servicios.map(servicio => servicio.nombre).filter(Boolean);
 
-  // Barberos únicos para el filtro de comisiones
-  const barberosDisponibles = Array.from(
-    new Set(ventas.map((venta) => venta.barbero).filter(Boolean))
-  ).sort();
+    // Si no hay servicios desde la API, usar servicios de fallback
+    if (serviciosDesdeAPI.length === 0) {
+      console.log('🔍 Usando servicios de fallback - no se cargaron servicios desde API');
+      return [
+        "Corte Clásico",
+        "Barba Completa",
+        "Corte + Barba",
+        "Tinte Cabello",
+        "Tratamiento Capilar"
+      ];
+    }
 
-  // Clientes únicos disponibles para asignar a una venta
-  const clientesDisponibles = Array.from(
-    new Map(
-      ventasData.map((venta) => [
-        venta.cliente,
-        { nombre: venta.cliente, documento: (venta as any).clienteDocumento || '' }
-      ])
-    ).values()
-  );
+    console.log('🔍 Usando servicios desde API:', serviciosDesdeAPI);
+    return serviciosDesdeAPI.sort();
+  }, [servicios]);
+
+  // Barberos disponibles para el filtro y la creación
+  const barberosDisponibles = useMemo(() => {
+    return barberosAPI.map(b => `${b.nombre} ${b.apellido || ''}`.trim()).sort();
+  }, [barberosAPI]);
+
+  // Clientes disponibles para asignar a una venta
+  const clientesDisponibles = useMemo(() => {
+    return clientesAPI.map(c => ({
+      nombre: `${c.nombre} ${c.apellido || ''}`.trim(),
+      documento: c.documento || '',
+      id: c.id
+    })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [clientesAPI]);
 
   const [nuevaVenta, setNuevaVenta] = useState(inicialNuevaVenta);
   const [productoSeleccionado, setProductoSeleccionado] = useState('');
@@ -378,10 +186,14 @@ export function VentasPage() {
   const [servicioSeleccionado, setServicioSeleccionado] = useState('');
   const [serviciosAgregados, setServiciosAgregados] = useState<string[]>([]);
 
+  // Calculate next venta number for display
+  const numeroVenta = ventas.length + 1;
+
   const filteredVentas = ventas.filter((venta) => {
     const matchesSearch =
-      venta.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      venta.id.toLowerCase().includes(searchTerm.toLowerCase());
+      (venta.numeroVenta?.toString() || '').includes(searchTerm.toLowerCase()) ||
+      (venta.cliente?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (venta.clienteId?.toString() || '').includes(searchTerm.toLowerCase());
 
     const matchesBarbero =
       barberoSeleccionado === VALOR_TODOS_BARBEROS ||
@@ -444,12 +256,41 @@ export function VentasPage() {
 
 
   const calcularSubtotal = () => {
-    if (!nuevaVenta.productos || !Array.isArray(nuevaVenta.productos)) {
-      return 0;
+    let subtotal = 0;
+
+    // Calcular subtotal de productos
+    if (nuevaVenta.productos && Array.isArray(nuevaVenta.productos)) {
+      subtotal += nuevaVenta.productos.reduce((total, producto) =>
+        total + (producto.precio * producto.cantidad), 0
+      );
     }
-    return nuevaVenta.productos.reduce((total, producto) =>
-      total + (producto.precio * producto.cantidad), 0
-    );
+
+    // Calcular subtotal de servicios
+    serviciosAgregados.forEach(nombreServicio => {
+      const servicio = servicios.find(s => s.nombre === nombreServicio);
+      if (servicio && servicio.precio) {
+        subtotal += servicio.precio;
+        console.log(`🔍 Agregando servicio "${nombreServicio}" con precio ${servicio.precio}`);
+      } else {
+        // Usar precios de fallback si no se encuentra el servicio
+        const preciosFallback: { [key: string]: number } = {
+          "Corte Clásico": 25000,
+          "Barba Completa": 20000,
+          "Corte + Barba": 40000,
+          "Tinte Cabello": 80000,
+          "Tratamiento Capilar": 35000
+        };
+
+        const precioFallback = preciosFallback[nombreServicio];
+        if (precioFallback) {
+          subtotal += precioFallback;
+          console.log(`🔍 Usando precio fallback para "${nombreServicio}": ${precioFallback}`);
+        }
+      }
+    });
+
+    console.log(`🔍 Subtotal calculado: ${subtotal}`);
+    return subtotal;
   };
 
   const calcularDescuento = (subtotal: number) => {
@@ -462,20 +303,25 @@ export function VentasPage() {
     return subtotal - descuento;
   };
 
+  const calcularIva = (subtotal: number) => {
+    return subtotal * 0.19; // 19% IVA
+  };
+
   const agregarProducto = () => {
     if (!productoSeleccionado || cantidadProducto <= 0) return;
 
-    const producto = productosDisponibles.find(p => p.id === productoSeleccionado);
+    // Buscar en productos cargados de la API
+    const producto = productosAPI.find(p => p.id.toString() === productoSeleccionado);
     if (!producto) return;
 
     const productosActuales = nuevaVenta.productos || [];
-    const existeProducto = productosActuales.find(p => p.id === producto.id);
+    const existeProducto = productosActuales.find(p => p.id === producto.id.toString());
 
     if (existeProducto) {
       setNuevaVenta({
         ...nuevaVenta,
         productos: productosActuales.map(p =>
-          p.id === producto.id
+          p.id === producto.id.toString()
             ? { ...p, cantidad: p.cantidad + cantidadProducto }
             : p
         )
@@ -484,10 +330,10 @@ export function VentasPage() {
       setNuevaVenta({
         ...nuevaVenta,
         productos: [...productosActuales, {
-          id: producto.id,
+          id: producto.id.toString(),
           nombre: producto.nombre,
           cantidad: cantidadProducto,
-          precio: producto.precio
+          precio: producto.precio || producto.precioBase
         }]
       });
     }
@@ -507,38 +353,48 @@ export function VentasPage() {
   const agregarServicio = () => {
     if (!servicioSeleccionado) return;
 
+    const servicio = servicios.find(s => s.nombre === servicioSeleccionado);
+    if (!servicio) return;
+
     if (!serviciosAgregados.includes(servicioSeleccionado)) {
-      const nuevosServicios = [...serviciosAgregados, servicioSeleccionado];
-      setServiciosAgregados(nuevosServicios);
-      setNuevaVenta({
-        ...nuevaVenta,
-        servicios: nuevosServicios.join(', ')
-      });
+      setServiciosAgregados([...serviciosAgregados, servicioSeleccionado]);
     }
 
     setServicioSeleccionado('');
   };
 
   const eliminarServicio = (servicio: string) => {
-    const nuevosServicios = serviciosAgregados.filter(s => s !== servicio);
-    setServiciosAgregados(nuevosServicios);
-    setNuevaVenta({
-      ...nuevaVenta,
-      servicios: nuevosServicios.join(', ')
-    });
+    setServiciosAgregados(serviciosAgregados.filter(s => s !== servicio));
   };
 
   // Función para abrir el diálogo de detalles
-  const handleViewDetails = (venta: any) => {
-    setSelectedVenta(venta);
-    setIsDetailDialogOpen(true);
+  const handleViewDetails = async (venta: Venta) => {
+    try {
+      setLoadingDetails(true);
+      setIsDetailDialogOpen(true);
+      setSelectedVenta(venta); // Mostrar datos básicos mientras carga
+
+      // Cargar detalles completos de la venta
+      const ventaConDetalles = await ventaService.getVentaById(venta.id);
+      if (ventaConDetalles) {
+        setSelectedVenta(ventaConDetalles);
+      } else {
+        toast.error('No se pudieron cargar los detalles de la venta');
+      }
+    } catch (error: any) {
+      console.error('Error cargando detalles de venta:', error);
+      toast.error('Error al cargar los detalles de la venta');
+      // Si falla, mantener los datos básicos que tenemos
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
-  const handleCreateVenta = () => {
+  const handleCreateVenta = async () => {
     const productosActuales = nuevaVenta.productos || [];
     const tieneServicios = serviciosAgregados.length > 0;
 
-    if (!nuevaVenta.cliente || !nuevaVenta.metodoPago) {
+    if (nuevaVenta.clienteId === null || !nuevaVenta.metodoPago) {
       toast.error("Por favor completa el cliente y el método de pago");
       return;
     }
@@ -548,61 +404,85 @@ export function VentasPage() {
       return;
     }
 
-    const numeroVenta = `VNT${String(ventas.length + 1).padStart(3, '0')}`;
-    const subtotal = calcularSubtotal();
-    const iva = calcularIva(subtotal);
-    const descuento = calcularDescuento(subtotal);
-    const total = calcularTotal();
-    const productosTexto = productosActuales.length > 0
-      ? productosActuales.map(p => `${p.nombre} (x${p.cantidad})`).join(', ')
-      : 'Ninguno';
+    try {
+      // Use the already calculated numeroVenta from component level
+      const subtotal = calcularSubtotal();
+      const iva = calcularIva(subtotal);
+      const descuento = calcularDescuento(subtotal);
+      const total = calcularTotal();
+      const productosTexto = productosActuales.length > 0
+        ? productosActuales.map(p => `${p.nombre} (x${p.cantidad})`).join(', ')
+        : 'Ninguno';
 
-    const serviciosTexto = tieneServicios
-      ? serviciosAgregados.join(', ')
-      : 'Ninguno';
+      const serviciosTexto = tieneServicios
+        ? serviciosAgregados.join(', ')
+        : 'Ninguno';
 
-    const barberoVenta =
-      !nuevaVenta.barbero || nuevaVenta.barbero === VALOR_SIN_BARBERO
-        ? ''
-        : nuevaVenta.barbero;
+      const ventaData = {
+        numeroVenta,
+        clienteId: nuevaVenta.clienteId,
+        clienteDocumento: nuevaVenta.clienteDocumento || '',
+        fecha: nuevaVenta.fechaCreacion,
+        servicios: serviciosTexto,
+        productos: productosTexto,
+        subtotal: subtotal,
+        iva: iva,
+        descuento: descuento,
+        total: total,
+        barberoId: nuevaVenta.barberoId ?? undefined,
+        barberoNombre: nuevaVenta.barberoNombre || 'Sin asignar',
+        estado: 'Completada',
+        metodoPago: nuevaVenta.metodoPago,
+        productosDetalle: productosActuales,
+        serviciosDetalle: tieneServicios
+          ? serviciosAgregados.map((nombreServicio) => {
+            const servicio = servicios.find(s => s.nombre === nombreServicio);
+            const precio = servicio?.precio || (() => {
+              const preciosFallback: { [key: string]: number } = {
+                "Corte Clásico": 25000,
+                "Barba Completa": 20000,
+                "Corte + Barba": 40000,
+                "Tinte Cabello": 80000,
+                "Tratamiento Capilar": 35000
+              };
+              return preciosFallback[nombreServicio] || 0;
+            })();
 
-    const venta = {
-      id: numeroVenta,
-      cliente: nuevaVenta.cliente,
-      clienteDocumento: nuevaVenta.clienteDocumento || '',
-      documento: nuevaVenta.clienteDocumento || '',
-      fecha: nuevaVenta.fechaCreacion,
-      servicios: serviciosTexto,
-      productos: productosTexto,
-      subtotal: subtotal,
-      iva: iva,
-      descuento: descuento,
-      total: total,
-      barbero: barberoVenta || 'Administrador',
-      estado: 'Completada',
-      metodoPago: nuevaVenta.metodoPago,
-      productosDetalle: productosActuales,
-      serviciosDetalle: tieneServicios
-        ? serviciosAgregados.map((nombre, index) => ({
-          id: `SERVPERS-${index + 1}`,
-          nombre,
-          precio: 0, // No hay tarifario definido; el total de servicios se gestiona aparte
-        }))
-        : []
-    };
+            return {
+              id: servicio ? `SERV-${servicio.id}` : `SERVPERS-${Date.now()}`,
+              nombre: nombreServicio,
+              precio: precio
+            };
+          })
+          : []
+      };
 
-    setVentas([venta, ...ventas]);
-    setNuevaVenta({
-      ...inicialNuevaVenta,
-      fechaCreacion: generateCurrentDate(),
-    });
-    setServiciosAgregados([]);
-    setIsDialogOpen(false);
+      console.log('🔍 VentasPage - ventaData before service call:', ventaData);
+      console.log('🔍 productosActuales:', productosActuales);
+      console.log('🔍 tieneServicios:', tieneServicios);
+      console.log('🔍 serviciosAgregados:', serviciosAgregados);
 
-    created("Venta creada ✔️", `La venta ${numeroVenta} ha sido registrada exitosamente por ${formatCurrency(total)} para el cliente ${nuevaVenta.cliente}.`);
+      const nuevaVentaCreada = await ventaService.createVenta(ventaData);
+
+      // Actualizar el estado local con la nueva venta
+      setVentas([nuevaVentaCreada, ...ventas]);
+
+      // Resetear formulario
+      setNuevaVenta({
+        ...inicialNuevaVenta,
+        fechaCreacion: generateCurrentDate(),
+      });
+      setServiciosAgregados([]);
+      setIsDialogOpen(false);
+
+      created("Venta creada ✔️", `La venta #${numeroVenta} ha sido registrada exitosamente por ${formatCurrency(total)}.`);
+    } catch (error: any) {
+      console.error('Error creando venta:', error);
+      toast.error('Error al crear la venta. Por favor, intenta nuevamente.');
+    }
   };
 
-  const handleAnularVenta = (ventaId: string) => {
+  const handleAnularVenta = (ventaId: number) => {
     setVentas(ventas.map(venta =>
       venta.id === ventaId
         ? { ...venta, estado: "Anulada" }
@@ -611,7 +491,7 @@ export function VentasPage() {
     deleted("Venta anulada ✔️", `La venta ${ventaId} ha sido anulada exitosamente. El estado se ha actualizado en el sistema.`);
   };
 
-  const handleToggleEstado = (venta: any) => {
+  const handleToggleEstado = async (venta: Venta) => {
     // Solo permitir cambios entre "Completada" y "Anulada"
     // Si la venta está anulada, no se puede cambiar a completada
     if (venta.estado === 'Anulada') {
@@ -637,17 +517,27 @@ export function VentasPage() {
     const accion = 'anular';
 
     confirmEditAction(
-      `${venta.id} - ${venta.cliente}`,
-      () => {
-        setVentas(prev => prev.map(v =>
-          v.id === venta.id
-            ? { ...v, estado: nuevoEstado }
-            : v
-        ));
+      `${venta.numeroVenta} - ${venta.cliente}`,
+      async () => {
+        try {
+          await ventaService.updateVentaStatus(venta.id, nuevoEstado);
+
+          // Actualizar estado local
+          setVentas(prev => prev.map(v =>
+            v.id === venta.id
+              ? { ...v, estado: nuevoEstado }
+              : v
+          ));
+
+          edited("Venta anulada ✔️", `La venta ${venta.numeroVenta} ha sido anulada exitosamente.`);
+        } catch (error: any) {
+          console.error('Error anulando venta:', error);
+          toast.error('Error al anular la venta. Por favor, intenta nuevamente.');
+        }
       },
       {
         confirmTitle: `Confirmar ${accion.charAt(0).toUpperCase() + accion.slice(1)} Venta`,
-        confirmMessage: `¿Estás seguro de que deseas ${accion} la venta "${venta.id}" del cliente "${venta.cliente}"?`,
+        confirmMessage: `¿Estás seguro de que deseas ${accion} la venta "${venta.numeroVenta}" del cliente "${venta.cliente}"?`,
         successTitle: `¡Venta ${nuevoEstado.toLowerCase()}a exitosamente!`,
         successMessage: `La venta ha sido ${nuevoEstado.toLowerCase()}ada correctamente en el sistema.`,
         requireInput: false
@@ -1014,568 +904,627 @@ export function VentasPage() {
       </header>
 
       <main className="flex-1 overflow-auto p-8 bg-black-primary">
-        {/* Stats Cards */}
-        <div style={{ display: 'none' }} className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="elegante-card text-center">
-            <DollarSign className="w-8 h-8 text-orange-primary mx-auto mb-2" />
-            <h4 className="text-2xl font-bold text-white-primary mb-1">${formatCurrency(totalVentas)}</h4>
-            <p className="text-gray-lightest text-sm">Total Ventas</p>
+        {/* Estado de carga */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-primary mx-auto mb-4"></div>
+              <p className="text-gray-lightest">Cargando ventas...</p>
+            </div>
           </div>
-          <div className="elegante-card text-center">
-            <ShoppingCart className="w-8 h-8 text-green-400 mx-auto mb-2" />
-            <h4 className="text-2xl font-bold text-white-primary mb-1">{ventasCompletadas}</h4>
-            <p className="text-gray-lightest text-sm">Completadas</p>
+        )}
+
+        {/* Estado de error */}
+        {error && !loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="text-red-400 mb-4">
+                <Ban className="w-12 h-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-white-primary mb-2">Error al cargar las ventas</h3>
+              <p className="text-sm text-gray-lightest mb-4">{error}</p>
+              <button
+                onClick={cargarVentas}
+                className="elegante-button-primary"
+              >
+                Reintentar
+              </button>
+            </div>
           </div>
-          <div className="elegante-card text-center">
-            <Calendar className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-            <h4 className="text-2xl font-bold text-white-primary mb-1">{ventasHoy}</h4>
-            <p className="text-gray-lightest text-sm">Ventas Hoy</p>
-          </div>
-          <div className="elegante-card text-center">
-            <Package className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-            <h4 className="text-2xl font-bold text-white-primary mb-1">
-              ${formatCurrency(Math.round(totalVentas / ventas.length))}
-            </h4>
-            <p className="text-gray-lightest text-sm">Promedio</p>
-          </div>
-        </div>
+        )}
 
-        {/* Sección Principal */}
-        <div className="elegante-card">
-          {/* Barra de Controles */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-6 border-b border-gray-dark">
-            {/* Lado izquierdo: botón + búsqueda + filtro de barbero */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Botón Nueva Venta */}
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <button
-                    className="elegante-button-primary gap-2 flex items-center"
-                    onClick={() => {
-                      setNuevaVenta({
-                        ...inicialNuevaVenta,
-                        fechaCreacion: generateCurrentDate()
-                      });
-                      setServiciosAgregados([]);
-                    }}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Nueva Venta
-                  </button>
-                </DialogTrigger>
-                <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-white-primary flex items-center gap-2">
-                      <Receipt className="w-5 h-5 text-orange-primary" />
-                      Registrar Nueva Venta
-                    </DialogTitle>
-                    <DialogDescription className="text-gray-lightest">
-                      Completa la información de la transacción
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-6 pt-4">
-                    {/* Información Principal */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Hash className="w-4 h-4 text-orange-primary" />
-                          Número de Venta
-                        </Label>
-                        <Input
-                          value={`VNT${String(ventas.length + 1).padStart(3, '0')}`}
-                          disabled
-                          className="elegante-input bg-gray-medium"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-orange-primary" />
-                          Fecha de Creación
-                        </Label>
-                        <Input
-                          value={nuevaVenta.fechaCreacion}
-                          disabled
-                          readOnly
-                          className="elegante-input bg-gray-medium"
-                        />
-                      </div>
-                    </div>
+        {/* Contenido principal cuando no hay error ni carga */}
+        {!loading && !error && (
+          <>
+            {/* Stats Cards */}
+            <div style={{ display: 'none' }} className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="elegante-card text-center">
+                <DollarSign className="w-8 h-8 text-orange-primary mx-auto mb-2" />
+                <h4 className="text-2xl font-bold text-white-primary mb-1">${formatCurrency(totalVentas)}</h4>
+                <p className="text-gray-lightest text-sm">Total Ventas</p>
+              </div>
+              <div className="elegante-card text-center">
+                <ShoppingCart className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <h4 className="text-2xl font-bold text-white-primary mb-1">{ventasCompletadas}</h4>
+                <p className="text-gray-lightest text-sm">Completadas</p>
+              </div>
+              <div className="elegante-card text-center">
+                <Calendar className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                <h4 className="text-2xl font-bold text-white-primary mb-1">{ventasHoy}</h4>
+                <p className="text-gray-lightest text-sm">Ventas Hoy</p>
+              </div>
+              <div className="elegante-card text-center">
+                <Package className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                <h4 className="text-2xl font-bold text-white-primary mb-1">
+                  ${formatCurrency(Math.round(totalVentas / ventas.length))}
+                </h4>
+                <p className="text-gray-lightest text-sm">Promedio</p>
+              </div>
+            </div>
 
-                    {/* Cliente y Método de Pago */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <User className="w-4 h-4 text-orange-primary" />
-                          Cliente *
-                        </Label>
-                        <Select
-                          value={nuevaVenta.cliente}
-                          onValueChange={(value) => {
-                            const cliente = clientesDisponibles.find((c) => c.nombre === value);
-                            setNuevaVenta({
-                              ...nuevaVenta,
-                              cliente: value,
-                              clienteDocumento: cliente?.documento || ''
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="elegante-input">
-                            <SelectValue placeholder="Selecciona el cliente" />
-                          </SelectTrigger>
-                          <SelectContent className="elegante-card">
-                            {clientesDisponibles.map((cliente) => (
-                              <SelectItem key={cliente.nombre} value={cliente.nombre}>
-                                {cliente.nombre}{cliente.documento ? ` — ${cliente.documento}` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-orange-primary" />
-                          Método de Pago *
-                        </Label>
-                        <Select value={nuevaVenta.metodoPago} onValueChange={(value) => setNuevaVenta({ ...nuevaVenta, metodoPago: value })}>
-                          <SelectTrigger className="elegante-input">
-                            <SelectValue placeholder="Selecciona el método de pago" />
-                          </SelectTrigger>
-                          <SelectContent className="elegante-card">
-                            <SelectItem value="Efectivo">Efectivo</SelectItem>
-                            <SelectItem value="Tarjeta">Tarjeta</SelectItem>
-                            <SelectItem value="Transferencia">Transferencia</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Descuento */}
-                    <div className="space-y-2">
-                      <Label className="text-white-primary flex items-center gap-2">
-                        <Calculator className="w-4 h-4 text-orange-primary" />
-                        Porcentaje Descuento (%)
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={nuevaVenta.porcentajeDescuento}
-                        onChange={(e) => setNuevaVenta({ ...nuevaVenta, porcentajeDescuento: parseFloat(e.target.value) || 0 })}
-                        className="elegante-input"
-                      />
-                    </div>
-
-                    {/* Agregar Productos */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-white-primary">Agregar Productos</h3>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-white-primary flex items-center gap-2">
-                            <ShoppingBag className="w-4 h-4 text-orange-primary" />
-                            Producto *
-                          </Label>
-                          <select
-                            value={productoSeleccionado}
-                            onChange={(e) => setProductoSeleccionado(e.target.value)}
-                            className="elegante-input w-full"
-                          >
-                            <option value="">Seleccionar producto...</option>
-                            {productosDisponibles.map(producto => (
-                              <option key={producto.id} value={producto.id}>
-                                {producto.nombre} - ${formatCurrency(producto.precio)}
-                              </option>
-                            ))}
-                          </select>
+            {/* Sección Principal */}
+            <div className="elegante-card">
+              {/* Barra de Controles */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-6 border-b border-gray-dark">
+                {/* Lado izquierdo: botón + búsqueda + filtro de barbero */}
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Botón Nueva Venta */}
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <button
+                        className="elegante-button-primary gap-2 flex items-center"
+                        onClick={() => {
+                          setNuevaVenta({
+                            ...inicialNuevaVenta,
+                            fechaCreacion: generateCurrentDate()
+                          });
+                          setServiciosAgregados([]);
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Nueva Venta
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-gray-darkest border-gray-dark max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="text-white-primary flex items-center gap-2">
+                          <Receipt className="w-5 h-5 text-orange-primary" />
+                          Registrar Nueva Venta
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-lightest">
+                          Completa la información de la transacción
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-6 pt-4">
+                        {/* Información Principal */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <Hash className="w-4 h-4 text-orange-primary" />
+                              Número de Venta
+                            </Label>
+                            <Input
+                              value={numeroVenta.toString().padStart(3, "0")}
+                              disabled
+                              className="elegante-input bg-gray-medium"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-orange-primary" />
+                              Fecha de Creación
+                            </Label>
+                            <Input
+                              value={nuevaVenta.fechaCreacion}
+                              disabled
+                              readOnly
+                              className="elegante-input bg-gray-medium"
+                            />
+                          </div>
                         </div>
+
+                        {/* Cliente y Método de Pago */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <User className="w-4 h-4 text-orange-primary" />
+                              Cliente *
+                            </Label>
+                            <Select
+                              value={nuevaVenta.clienteId?.toString() || ""}
+                              onValueChange={(value) => {
+                                const clienteId = Number(value);
+                                const cliente = clientesDisponibles.find((c) => c.id === clienteId);
+                                setNuevaVenta({
+                                  ...nuevaVenta,
+                                  clienteId: clienteId,
+                                  clienteDocumento: cliente?.documento || ''
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="elegante-input">
+                                <SelectValue placeholder="Selecciona el cliente" />
+                              </SelectTrigger>
+                              <SelectContent className="elegante-card">
+                                {clientesDisponibles.map((cliente) => (
+                                  <SelectItem key={cliente.id} value={cliente.id.toString()}>
+                                    {cliente.nombre}{cliente.documento ? ` — ${cliente.documento}` : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-white-primary flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-orange-primary" />
+                              Método de Pago *
+                            </Label>
+                            <Select value={nuevaVenta.metodoPago} onValueChange={(value) => setNuevaVenta({ ...nuevaVenta, metodoPago: value })}>
+                              <SelectTrigger className="elegante-input">
+                                <SelectValue placeholder="Selecciona el método de pago" />
+                              </SelectTrigger>
+                              <SelectContent className="elegante-card">
+                                <SelectItem value="Efectivo">Efectivo</SelectItem>
+                                <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                                <SelectItem value="Transferencia">Transferencia</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Descuento */}
                         <div className="space-y-2">
                           <Label className="text-white-primary flex items-center gap-2">
-                            <Hash className="w-4 h-4 text-orange-primary" />
-                            Cantidad
+                            <Calculator className="w-4 h-4 text-orange-primary" />
+                            Porcentaje Descuento (%)
                           </Label>
                           <Input
                             type="number"
-                            value={cantidadProducto}
-                            onChange={(e) => setCantidadProducto(parseInt(e.target.value) || 1)}
+                            min="0"
+                            max="100"
+                            value={nuevaVenta.porcentajeDescuento}
+                            onChange={(e) => setNuevaVenta({ ...nuevaVenta, porcentajeDescuento: parseFloat(e.target.value) || 0 })}
                             className="elegante-input"
-                            min="1"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-white-primary">ㅤ</Label>
-                          <button
-                            onClick={agregarProducto}
-                            disabled={!productoSeleccionado || cantidadProducto <= 0}
-                            className="elegante-button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Agregar producto
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Lista de Productos Agregados */}
-                      {nuevaVenta.productos && nuevaVenta.productos.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-md font-medium text-white-primary">Productos Agregados:</h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {nuevaVenta.productos.map((producto, index) => (
-                              <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
-                                <div className="flex-1">
-                                  <span className="text-white-primary font-medium">{producto.nombre}</span>
-                                  <div className="text-sm text-gray-lightest">
-                                    Cantidad: {producto.cantidad} | Precio: ${formatCurrency(producto.precio)} |
-                                    Subtotal: ${formatCurrency(producto.precio * producto.cantidad)}
+                        {/* Agregar Productos */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold text-white-primary">Agregar Productos</h3>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-white-primary flex items-center gap-2">
+                                <ShoppingBag className="w-4 h-4 text-orange-primary" />
+                                Producto *
+                              </Label>
+                              <select
+                                value={productoSeleccionado}
+                                onChange={(e) => setProductoSeleccionado(e.target.value)}
+                                className="elegante-input w-full"
+                              >
+                                <option value="">Seleccionar producto...</option>
+                                {productosAPI.map(producto => (
+                                  <option key={producto.id} value={producto.id.toString()}>
+                                    {producto.nombre} - ${formatCurrency(producto.precio || producto.precioBase)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-white-primary flex items-center gap-2">
+                                <Hash className="w-4 h-4 text-orange-primary" />
+                                Cantidad
+                              </Label>
+                              <Input
+                                type="number"
+                                value={cantidadProducto}
+                                onChange={(e) => setCantidadProducto(parseInt(e.target.value) || 1)}
+                                className="elegante-input"
+                                min="1"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-white-primary">ㅤ</Label>
+                              <button
+                                onClick={agregarProducto}
+                                disabled={!productoSeleccionado || cantidadProducto <= 0}
+                                className="elegante-button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Agregar producto
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Lista de Productos Agregados */}
+                          {nuevaVenta.productos && nuevaVenta.productos.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-md font-medium text-white-primary">Productos Agregados:</h4>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {nuevaVenta.productos.map((producto, index) => (
+                                  <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
+                                    <div className="flex-1">
+                                      <span className="text-white-primary font-medium">{producto.nombre}</span>
+                                      <div className="text-sm text-gray-lightest">
+                                        Cantidad: {producto.cantidad} | Precio: ${formatCurrency(producto.precio)} |
+                                        Subtotal: ${formatCurrency(producto.precio * producto.cantidad)}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => eliminarProducto(producto.id)}
+                                      className="ml-3 p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
+                                      title="Eliminar producto"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
                                   </div>
-                                </div>
-                                <button
-                                  onClick={() => eliminarProducto(producto.id)}
-                                  className="ml-3 p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
-                                  title="Eliminar producto"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Agregar Servicios */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold text-white-primary">Agregar Servicios</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Barbero (opcional) */}
+                            <div className="space-y-2">
+                              <Label className="text-white-primary flex items-center gap-2">
+                                <User className="w-4 h-4 text-orange-primary" />
+                                Barbero (opcional)
+                              </Label>
+                              <Select
+                                value={nuevaVenta.barberoId?.toString() || VALOR_SIN_BARBERO}
+                                onValueChange={(value) => {
+                                  if (value === VALOR_SIN_BARBERO) {
+                                    setNuevaVenta({ ...nuevaVenta, barberoId: null, barberoNombre: "Sin asignar" });
+                                  } else {
+                                    const id = parseInt(value);
+                                    const barbero = barberosAPI.find(b => b.id === id);
+                                    setNuevaVenta({
+                                      ...nuevaVenta,
+                                      barberoId: id,
+                                      barberoNombre: barbero ? `${barbero.nombre} ${barbero.apellido || ''}`.trim() : ""
+                                    });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="elegante-input bg-gray-darker border-gray-dark">
+                                  <SelectValue placeholder="Sin barbero asignado" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-gray-darkest border border-gray-dark text-white-primary">
+                                  <SelectItem value={VALOR_SIN_BARBERO}>Sin barbero</SelectItem>
+                                  {barberosAPI.map((barbero) => (
+                                    <SelectItem key={barbero.id} value={barbero.id.toString()}>
+                                      {barbero.nombre} {barbero.apellido}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Servicio */}
+                            <div className="space-y-2">
+                              <Label className="text-white-primary flex items-center gap-2">
+                                <Scissors className="w-4 h-4 text-orange-primary" />
+                                Servicios
+                                {servicios.length === 0 && (
+                                  <span className="text-xs text-yellow-400">(Usando datos locales)</span>
+                                )}
+                              </Label>
+                              <select
+                                value={servicioSeleccionado}
+                                onChange={(e) => setServicioSeleccionado(e.target.value)}
+                                className="elegante-input w-full"
+                                disabled={servicios.length === 0 && serviciosDisponibles.length === 0}
+                              >
+                                <option value="">
+                                  {servicios.length === 0 && serviciosDisponibles.length === 0
+                                    ? "No hay servicios disponibles"
+                                    : "Seleccionar servicio..."
+                                  }
+                                </option>
+                                {serviciosDisponibles.map((servicio, index) => (
+                                  <option key={index} value={servicio}>{servicio}</option>
+                                ))}
+                              </select>
+                              {servicios.length === 0 && (
+                                <p className="text-xs text-yellow-400">
+                                  No se pudieron cargar los servicios desde la API. Usando datos locales.
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Botón agregar servicio */}
+                            <div className="space-y-2">
+                              <Label className="text-white-primary">ㅤ</Label>
+                              <button
+                                onClick={agregarServicio}
+                                disabled={!servicioSeleccionado}
+                                className="elegante-button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Agregar Servicio
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Agregar Servicios */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-white-primary">Agregar Servicios</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Barbero (opcional) */}
-                        <div className="space-y-2">
-                          <Label className="text-white-primary flex items-center gap-2">
-                            <User className="w-4 h-4 text-orange-primary" />
-                            Barbero (opcional)
-                          </Label>
-                          <Select
-                            value={nuevaVenta.barbero}
-                            onValueChange={(value) =>
-                              setNuevaVenta({ ...nuevaVenta, barbero: value })
-                            }
-                          >
-                            <SelectTrigger className="elegante-input bg-gray-darker border-gray-dark">
-                              <SelectValue placeholder="Sin barbero asignado" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-gray-darkest border border-gray-dark text-white-primary">
-                              <SelectItem value={VALOR_SIN_BARBERO}>Sin barbero</SelectItem>
-                              {barberosDisponibles.map((barbero) => (
-                                <SelectItem key={barbero} value={barbero}>
-                                  {barbero}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Servicio */}
-                        <div className="space-y-2">
-                          <Label className="text-white-primary flex items-center gap-2">
-                            <Scissors className="w-4 h-4 text-orange-primary" />
-                            Servicios
-                          </Label>
-                          <select
-                            value={servicioSeleccionado}
-                            onChange={(e) => setServicioSeleccionado(e.target.value)}
-                            className="elegante-input w-full"
-                          >
-                            <option value="">Seleccionar servicio...</option>
-                            {serviciosDisponibles.map((servicio, index) => (
-                              <option key={index} value={servicio}>{servicio}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Botón agregar servicio */}
-                        <div className="space-y-2">
-                          <Label className="text-white-primary">ㅤ</Label>
-                          <button
-                            onClick={agregarServicio}
-                            disabled={!servicioSeleccionado}
-                            className="elegante-button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Agregar Servicio
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Lista de Servicios Agregados */}
-                      {serviciosAgregados.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-md font-medium text-white-primary">Servicios Agregados:</h4>
-                          <div className="space-y-2 max-h-32 overflow-y-auto">
-                            {serviciosAgregados.map((servicio, index) => (
-                              <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
-                                <div className="flex-1">
-                                  <span className="text-white-primary font-medium">{servicio}</span>
-                                </div>
-                                <button
-                                  onClick={() => eliminarServicio(servicio)}
-                                  className="ml-3 p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
-                                  title="Eliminar servicio"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
+                          {/* Lista de Servicios Agregados */}
+                          {serviciosAgregados.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="text-md font-medium text-white-primary">Servicios Agregados:</h4>
+                              <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {serviciosAgregados.map((servicio, index) => (
+                                  <div key={index} className="flex items-center justify-between bg-gray-darker p-3 rounded-lg">
+                                    <div className="flex-1">
+                                      <span className="text-white-primary font-medium">{servicio}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => eliminarServicio(servicio)}
+                                      className="ml-3 p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
+                                      title="Eliminar servicio"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Resumen de Totales */}
-                    {((nuevaVenta.productos && nuevaVenta.productos.length > 0) || serviciosAgregados.length > 0) && (
-                      <div className="bg-gray-darker p-4 rounded-lg space-y-2">
-                        <div className="flex justify-between text-gray-lightest">
-                          <span>Subtotal:</span>
-                          <span>${formatCurrency(calcularSubtotal())}</span>
-                        </div>
-                        {nuevaVenta.porcentajeDescuento > 0 && (
-                          <div className="flex justify-between text-gray-lightest">
-                            <span>Descuento ({nuevaVenta.porcentajeDescuento}%):</span>
-                            <span>-${formatCurrency(calcularDescuento(calcularSubtotal()))}</span>
+                        {/* Resumen de Totales */}
+                        {((nuevaVenta.productos && nuevaVenta.productos.length > 0) || serviciosAgregados.length > 0) && (
+                          <div className="bg-gray-darker p-4 rounded-lg space-y-2">
+                            <div className="flex justify-between text-gray-lightest">
+                              <span>Subtotal:</span>
+                              <span>${formatCurrency(calcularSubtotal())}</span>
+                            </div>
+                            {nuevaVenta.porcentajeDescuento > 0 && (
+                              <div className="flex justify-between text-gray-lightest">
+                                <span>Descuento ({nuevaVenta.porcentajeDescuento}%):</span>
+                                <span>-${formatCurrency(calcularDescuento(calcularSubtotal()))}</span>
+                              </div>
+                            )}
+                            <hr className="border-gray-medium" />
+                            <div className="flex justify-between text-white-primary font-bold text-lg">
+                              <span>Total:</span>
+                              <span className="text-orange-primary">${formatCurrency(calcularTotal())}</span>
+                            </div>
                           </div>
                         )}
-                        <hr className="border-gray-medium" />
-                        <div className="flex justify-between text-white-primary font-bold text-lg">
-                          <span>Total:</span>
-                          <span className="text-orange-primary">${formatCurrency(calcularTotal())}</span>
+
+                        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
+                          <button
+                            onClick={() => setIsDialogOpen(false)}
+                            className="elegante-button-secondary"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleCreateVenta}
+                            className="elegante-button-primary"
+                          >
+                            Registrar Venta
+                          </button>
                         </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <div className="flex items-center gap-4">
+                    {/* Búsqueda */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter pointer-events-none z-10" />
+                      <Input
+                        placeholder="Buscar por cliente o ID..."
+                        value={searchTerm}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        className="elegante-input pl-11 w-80"
+                      />
+                    </div>
+
+                    {/* Filtro de barbero */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-gray-lightest text-sm flex items-center gap-1">
+                        <User className="w-4 h-4 text-orange-primary" />
+                        Barbero
+                      </Label>
+                      <Select
+                        value={barberoSeleccionado}
+                        onValueChange={(value) => {
+                          setBarberoSeleccionado(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-52 elegante-input bg-gray-darker border-gray-dark">
+                          <SelectValue placeholder="Todos los barberos" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-darkest border border-gray-dark text-white-primary">
+                          <SelectItem value={VALOR_TODOS_BARBEROS}>Todos</SelectItem>
+                          {barberosDisponibles.map((barbero) => (
+                            <SelectItem key={barbero} value={barbero}>
+                              {barbero}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Lado derecho: resumen de comisiones + contador */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    {barberoSeleccionado !== VALOR_TODOS_BARBEROS && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                        <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
+                          Total servicios:{" "}
+                          <span className="text-orange-primary font-semibold">
+                            ${formatCurrency(totalServiciosFiltrados)}
+                          </span>
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
+                          60% Barbero:{" "}
+                          <span className="text-green-400 font-semibold">
+                            ${formatCurrency(totalBarbero)}
+                          </span>
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
+                          40% Barbería:{" "}
+                          <span className="text-blue-300 font-semibold">
+                            ${formatCurrency(totalBarberia)}
+                          </span>
+                        </span>
                       </div>
                     )}
-
-                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-dark">
-                      <button
-                        onClick={() => setIsDialogOpen(false)}
-                        className="elegante-button-secondary"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={handleCreateVenta}
-                        className="elegante-button-primary"
-                      >
-                        Registrar Venta
-                      </button>
+                    <div className="text-xs sm:text-sm text-gray-lightest sm:ml-2">
+                      Mostrando {displayedVentas.length} de {filteredVentas.length} ventas
                     </div>
                   </div>
-                </DialogContent>
-              </Dialog>
-              <div className="flex items-center gap-4">
-                {/* Búsqueda */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter pointer-events-none z-10" />
-                  <Input
-                    placeholder="Buscar por cliente o ID..."
-                    value={searchTerm}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    className="elegante-input pl-11 w-80"
-                  />
                 </div>
+              </div>
 
-                {/* Filtro de barbero */}
+              {/* Tabla de Ventas */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-dark">
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Número de Venta</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Cliente</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Fecha</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Total</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Método</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
+                      <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Barbero</th>
+                      <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedVentas.map((venta) => (
+                      <tr key={venta.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">
+                            {venta.numeroVenta}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div>
+                            <span className="text-gray-lighter">{venta.cliente}</span>
+                            {venta.clienteDocumento && (
+                              <div className="text-xs text-gray-lightest">{venta.clienteDocumento}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">{venta.fecha}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">${formatCurrency(venta.total)}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lighter">
+                            {venta.metodoPago}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(venta.estado)}`}>
+                            {venta.estado}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-gray-lightest">{venta.barbero}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleViewDetails(venta)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Ver detalles"
+                            >
+                              <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                            </button>
+                            {venta.estado === 'Completada' && (
+                              <button
+                                onClick={() => handleToggleEstado(venta)}
+                                className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                                title="Anular venta"
+                              >
+                                <Ban className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                              </button>
+                            )}
+                            {venta.estado === 'Anulada' && (
+                              <button
+                                onClick={() => handleToggleEstado(venta)}
+                                className="p-2 hover:bg-gray-darker rounded-lg transition-colors group opacity-50 cursor-not-allowed"
+                                title="No se puede reactivar una venta anulada"
+                              >
+                                <Ban className="w-4 h-4 text-gray-lightest" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => generateVentaPDF(venta)}
+                              className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                              title="Generar PDF"
+                            >
+                              <Download className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación Funcional */}
+              <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-dark">
+                <div className="text-sm text-gray-lightest">
+                  Página {currentPage} de {totalPages}
+                </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-gray-lightest text-sm flex items-center gap-1">
-                    <User className="w-4 h-4 text-orange-primary" />
-                    Barbero
-                  </Label>
-                  <Select
-                    value={barberoSeleccionado}
-                    onValueChange={(value) => {
-                      setBarberoSeleccionado(value);
-                      setCurrentPage(1);
-                    }}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <SelectTrigger className="w-52 elegante-input bg-gray-darker border-gray-dark">
-                      <SelectValue placeholder="Todos los barberos" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-darkest border border-gray-dark text-white-primary">
-                      <SelectItem value={VALOR_TODOS_BARBEROS}>Todos</SelectItem>
-                      {barberosDisponibles.map((barbero) => (
-                        <SelectItem key={barbero} value={barbero}>
-                          {barbero}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <ChevronLeft className="w-4 h-4 text-gray-lightest" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4 text-gray-lightest" />
+                  </button>
                 </div>
               </div>
 
-              {/* Lado derecho: resumen de comisiones + contador */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                {barberoSeleccionado !== VALOR_TODOS_BARBEROS && (
-                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                    <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
-                      Total servicios:{" "}
-                      <span className="text-orange-primary font-semibold">
-                        ${formatCurrency(totalServiciosFiltrados)}
-                      </span>
-                    </span>
-                    <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
-                      60% Barbero:{" "}
-                      <span className="text-green-400 font-semibold">
-                        ${formatCurrency(totalBarbero)}
-                      </span>
-                    </span>
-                    <span className="px-3 py-1 rounded-full bg-gray-darker border border-gray-dark text-gray-lightest">
-                      40% Barbería:{" "}
-                      <span className="text-blue-300 font-semibold">
-                        ${formatCurrency(totalBarberia)}
-                      </span>
-                    </span>
+              {/* Sin resultados */}
+              {filteredVentas.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-gray-lightest mb-4">
+                    <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">No se encontraron ventas</h3>
+                    <p className="text-sm">
+                      {searchTerm
+                        ? `No hay ventas que coincidan con "${searchTerm}"`
+                        : "No hay ventas registradas en el sistema"
+                      }
+                    </p>
                   </div>
-                )}
-                <div className="text-xs sm:text-sm text-gray-lightest sm:ml-2">
-                  Mostrando {displayedVentas.length} de {filteredVentas.length} ventas
+                  {searchTerm && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }}
+                      className="elegante-button-secondary mt-4"
+                    >
+                      Limpiar búsqueda
+                    </button>
+                  )}
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabla de Ventas */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Documento</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Cliente</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Fecha</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Total</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Método</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Barbero</th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedVentas.map((venta) => (
-                  <tr key={venta.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">
-                        {venta.documento || venta.clienteDocumento || venta.id}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div>
-                        <span className="text-gray-lighter">{venta.cliente}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{venta.fecha}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">${formatCurrency(venta.total)}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">
-                        {venta.metodoPago}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getEstadoColor(venta.estado)}`}>
-                        {venta.estado}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lightest">{venta.barbero}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedVenta(venta);
-                            setIsDetailDialogOpen(true);
-                          }}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        {venta.estado === 'Completada' && (
-                          <button
-                            onClick={() => handleToggleEstado(venta)}
-                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                            title="Anular venta"
-                          >
-                            <Ban className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          </button>
-                        )}
-                        {venta.estado === 'Anulada' && (
-                          <button
-                            onClick={() => handleToggleEstado(venta)}
-                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group opacity-50 cursor-not-allowed"
-                            title="No se puede reactivar una venta anulada"
-                          >
-                            <Ban className="w-4 h-4 text-gray-lightest" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => generateVentaPDF(venta)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Generar PDF"
-                        >
-                          <Download className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Paginación Funcional */}
-          <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-dark">
-            <div className="text-sm text-gray-lightest">
-              Página {currentPage} de {totalPages}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4 text-gray-lightest" />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-gray-dark hover:bg-gray-darker disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4 text-gray-lightest" />
-              </button>
-            </div>
-          </div>
-
-          {/* Sin resultados */}
-          {filteredVentas.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-gray-lightest mb-4">
-                <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">No se encontraron ventas</h3>
-                <p className="text-sm">
-                  {searchTerm
-                    ? `No hay ventas que coincidan con "${searchTerm}"`
-                    : "No hay ventas registradas en el sistema"
-                  }
-                </p>
-              </div>
-              {searchTerm && (
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setCurrentPage(1);
-                  }}
-                  className="elegante-button-secondary mt-4"
-                >
-                  Limpiar búsqueda
-                </button>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Diálogo de Detalles de Venta */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
@@ -1583,13 +1532,24 @@ export function VentasPage() {
             <DialogHeader>
               <DialogTitle className="text-white-primary flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-orange-primary" />
-                Detalles de Venta {selectedVenta?.id}
+                Detalles de Venta {selectedVenta?.numeroVenta}
               </DialogTitle>
               <DialogDescription className="text-gray-lightest">
                 Información completa de la transacción
               </DialogDescription>
             </DialogHeader>
-            {selectedVenta && (
+
+            {/* Indicador de carga */}
+            {loadingDetails && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-primary mx-auto mb-3"></div>
+                  <p className="text-gray-lightest text-sm">Cargando detalles...</p>
+                </div>
+              </div>
+            )}
+
+            {selectedVenta && !loadingDetails && (
               <div className="space-y-6 pt-4">
                 {/* Información Principal de la Venta */}
                 <div className="grid grid-cols-2 gap-4">
@@ -1599,7 +1559,7 @@ export function VentasPage() {
                       Número de Venta
                     </Label>
                     <Input
-                      value={selectedVenta.id}
+                      value={selectedVenta.numeroVenta}
                       disabled
                       className="elegante-input bg-gray-medium"
                     />

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+const API_BASE_URL = '/api';
 
 export interface ApiUser {
   id: number;
@@ -105,8 +105,6 @@ class ApiService {
   private mapToApiFormat(data: any): any {
     if (!data) return data;
 
-    // Lista de campos que sabemos que la API espera en el modelo de Usuario
-    // Según errores de validación y estructura de la tabla
     const mapped: any = {};
 
     if (data.id !== undefined) mapped.Id = data.id;
@@ -123,130 +121,79 @@ class ApiService {
     if (data.fechaNacimiento !== undefined) mapped.FechaNacimiento = data.fechaNacimiento;
     if (data.fotoPerfil !== undefined) mapped.FotoPerfil = data.fotoPerfil;
     if (data.estado !== undefined) mapped.Estado = !!data.estado;
-    
+
     // Campos para Servicios
     if (data.descripcion !== undefined) mapped.Descripcion = data.descripcion;
     if (data.duracion !== undefined) mapped.Duracion = Number(data.duracion);
     if (data.precio !== undefined) mapped.Precio = Number(data.precio);
-    if (data.estado !== undefined) mapped.Activo = !!data.estado; // API usa Activo pero frontend usa estado
-    
-    // Campos para Paquetes
-    if (data.nombre !== undefined) mapped.Nombre = data.nombre;
-    if (data.servicios !== undefined) mapped.Servicios = data.servicios;
-    if (data.descuento !== undefined) mapped.Descuento = Number(data.descuento);
-    if (data.precioOriginal !== undefined) mapped.PrecioOriginal = Number(data.precioOriginal);
-    if (data.clientesAtendidos !== undefined) mapped.ClientesAtendidos = Number(data.clientesAtendidos);
-    if (data.categoria !== undefined) mapped.Categoria = data.categoria;
-    if (data.activo !== undefined) mapped.Activo = !!data.activo;
-    
-    // Campos para DetallePaquetes
-    if (data.paqueteId !== undefined) mapped.PaqueteId = Number(data.paqueteId);
-    if (data.nombreServicio !== undefined) mapped.NombreServicio = data.nombreServicio;
-    if (data.precioServicio !== undefined) mapped.PrecioServicio = Number(data.precioServicio);
-    if (data.cantidad !== undefined) mapped.Cantidad = Number(data.cantidad);
-    if (data.subtotal !== undefined) mapped.Subtotal = Number(data.subtotal);
+    if (data.estado !== undefined) mapped.Activo = !!data.estado;
 
     return mapped;
   }
 
-  // Normalizar datos que vienen de la API para asegurar tipos correctos
+  // Normalizar datos
   private normalizeServicioData(data: any): Servicio {
-    console.log('🔍 Raw API data:', data);
-    console.log('🔍 estado value:', data.estado, 'type:', typeof data.estado);
-    console.log('🔍 Estado value:', data.Estado, 'type:', typeof data.Estado);
-    
-    const normalized = {
-      id: Number(data.id) || 0,
-      nombre: String(data.nombre || ''),
-      descripcion: String(data.descripcion || ''),
-      duracion: Number(data.duracion) || 0,
-      precio: Number(data.precio) || 0,
+    return {
+      id: Number(data.id || data.Id) || 0,
+      nombre: String(data.nombre || data.Nombre || ''),
+      descripcion: String(data.descripcion || data.Descripcion || ''),
+      duracion: Number(data.duracion || data.Duracion) || 0,
+      precio: Number(data.precio || data.Precio) || 0,
       estado: Boolean(
-        data.estado === true || 
-        data.estado === 'true' || 
-        data.estado === 1 || 
+        data.estado === true ||
+        data.estado === 'true' ||
+        data.estado === 1 ||
         data.estado === '1' ||
-        data.Estado === true || 
-        data.Estado === 'true' || 
+        data.Estado === true ||
+        data.Estado === 'true' ||
         data.Estado === 1 ||
         data.Estado === '1' ||
-        // Si es null, undefined o false, se mantiene false
-        data.estado !== null && data.estado !== undefined && data.estado !== false && data.estado !== 'false' && data.estado !== 0 && data.estado !== '0'
+        (data.estado !== null && data.estado !== undefined && data.estado !== false && data.estado !== 'false' && data.estado !== 0 && data.estado !== '0')
       )
     };
-    
-    console.log('✅ Normalized estado:', normalized.estado);
-    return normalized;
   }
 
   private normalizePaqueteData(data: any): Paquete {
-    console.log('🔍 Raw Paquete API data:', data);
-    
-    const normalized = {
-      id: Number(data.id) || 0,
-      nombre: String(data.nombre || ''),
-      descripcion: String(data.descripcion || ''),
-      servicios: Array.isArray(data.servicios) ? data.servicios : [],
-      duracion: Number(data.duracion) || 0,
-      precio: Number(data.precio) || 0,
-      descuento: Number(data.descuento) || 0,
-      precioOriginal: Number(data.precioOriginal) || 0,
-      clientesAtendidos: Number(data.clientesAtendidos) || 0,
-      categoria: String(data.categoria || ''),
+    let serviciosStrings: string[] = [];
+    if (data.detallePaquetes && Array.isArray(data.detallePaquetes)) {
+      serviciosStrings = data.detallePaquetes.map((dp: any) => dp.servicio?.nombre || dp.nombreServicio || 'Servicio');
+    } else if (Array.isArray(data.servicios)) {
+      serviciosStrings = data.servicios;
+    }
+
+    return {
+      id: Number(data.id || data.Id) || 0,
+      nombre: String(data.nombre || data.Nombre || ''),
+      descripcion: String(data.descripcion || data.Descripcion || ''),
+      servicios: serviciosStrings,
+      duracion: Number(data.duracionMinutos || data.duracion || 0),
+      precio: Number(data.precio || data.Precio) || 0,
+      descuento: Number(data.descuento || 0),
+      precioOriginal: Number(data.precioOriginal) || Number(data.precio || data.Precio) || 0,
+      clientesAtendidos: Number(data.clientesAtendidos || 0),
+      categoria: String(data.categoria || 'General'),
       activo: Boolean(
-        data.activo === true || 
-        data.activo === 'true' || 
-        data.activo === 1 || 
-        data.activo === '1' ||
-        data.Activo === true || 
-        data.Activo === 'true' || 
-        data.Activo === 1 ||
-        data.Activo === '1' ||
-        data.activo !== null && data.activo !== undefined && data.activo !== false && data.activo !== 'false' && data.activo !== 0 && data.activo !== '0'
+        data.activo === true || data.activo === 'true' || data.activo === 1 || data.Activo === true || data.estado === true
       )
     };
-    
-    console.log('✅ Normalized Paquete:', normalized);
-    return normalized;
   }
 
   private normalizeDetallePaqueteData(data: any): DetallePaquete {
-    console.log('🔍 Raw DetallePaquete API data:', data);
-    
-    const normalized = {
-      id: Number(data.id) || 0,
-      paqueteId: Number(data.paqueteId) || 0,
-      nombreServicio: String(data.nombreServicio || ''),
-      precioServicio: Number(data.precioServicio) || 0,
-      cantidad: Number(data.cantidad) || 1,
-      subtotal: Number(data.subtotal) || 0
+    return {
+      id: Number(data.id || data.Id) || 0,
+      paqueteId: Number(data.paqueteId || data.PaqueteId) || 0,
+      nombreServicio: String(data.servicio?.nombre || data.nombreServicio || 'Servicio'),
+      precioServicio: Number(data.servicio?.precio || data.precioServicio || 0),
+      cantidad: Number(data.cantidad || data.Cantidad) || 1,
+      subtotal: Number(data.subtotal || data.Subtotal) || (Number(data.servicio?.precio || 0) * (Number(data.cantidad) || 1))
     };
-    
-    console.log('✅ Normalized DetallePaquete:', normalized);
-    return normalized;
   }
 
   async getUsuarios(): Promise<ApiUser[]> {
     try {
-      console.log('Fetching usuarios from:', `${API_BASE_URL}/usuarios`);
       const response = await this.request('/usuarios');
       const text = await response.text();
-      const data = text ? JSON.parse(text) : [];
-
-      console.log('API Raw Data Type:', Array.isArray(data) ? 'Array' : typeof data);
-      console.log('API Data Length:', data.length);
-
-      // Si la API devuelve una lista de roles con usuarios anidados, aplanarla
-      // Verificamos si el primer elemento tiene una propiedad de usuarios
-      if (Array.isArray(data) && data.length > 0 && ('usuarios' in data[0] || 'Usuarios' in data[0])) {
-        console.log('Sincronización: Aplanando estructura de roles...');
-        const flatUsers = data.flatMap((item: any) => (item.usuarios || item.Usuarios || []))
-          .filter((u: any) => u !== null && typeof u === 'object' && 'id' in u);
-        console.log('Sincronización: Usuarios aplanados:', flatUsers.length);
-        return flatUsers;
-      }
-
-      return data;
+      return text ? JSON.parse(text) : [];
     } catch (error) {
       console.error('Error fetching usuarios:', error);
       throw error;
@@ -257,14 +204,7 @@ class ApiService {
     try {
       const response = await this.request(`/usuarios/${id}`);
       const text = await response.text();
-      if (!text) return null;
-
-      const data = JSON.parse(text);
-
-      // Manejar respuesta si viene envuelta en un array o tiene estructura anidada
-      if (Array.isArray(data)) return data[0] || null;
-
-      return data;
+      return text ? JSON.parse(text) : null;
     } catch (error) {
       console.error('Error fetching usuario by ID:', error);
       return null;
@@ -274,24 +214,14 @@ class ApiService {
   async createUsuario(userData: Partial<ApiUser>): Promise<ApiUser> {
     try {
       const apiBody = this.mapToApiFormat(userData);
-      console.log('🔵 Creando usuario - Datos originales:', userData);
-      console.log('🔵 Creando usuario - Datos mapeados (enviados):', apiBody);
-
       const response = await this.request('/usuarios', {
         method: 'POST',
         body: JSON.stringify(apiBody),
       });
-
-      // Si la respuesta está vacía, retornar un objeto basado en lo enviado
       const text = await response.text();
-      if (!text) return { ...userData, id: 0 } as ApiUser;
-
-      const result = JSON.parse(text);
-      console.log('✅ Usuario creado exitosamente:', result);
-      return result;
-    } catch (error: any) {
-      console.error('❌ Error creating usuario:', error);
-      console.error('❌ Datos que causaron el error:', userData);
+      return text ? JSON.parse(text) : { ...userData, id: 0 } as ApiUser;
+    } catch (error) {
+      console.error('Error creating usuario:', error);
       throw error;
     }
   }
@@ -300,49 +230,26 @@ class ApiService {
     try {
       const apiBody = this.mapToApiFormat(userData);
       apiBody.Id = id;
-
       const response = await this.request(`/usuarios/${id}`, {
         method: 'PUT',
         body: JSON.stringify(apiBody),
       });
-
-      // Manejar respuestas vacías (204 No Content o similar)
       const text = await response.text();
-      if (!text) return { ...userData, id } as ApiUser;
-
-      return JSON.parse(text);
+      return text ? JSON.parse(text) : { ...userData, id } as ApiUser;
     } catch (error) {
       console.error('Error updating usuario:', error);
       throw error;
     }
   }
 
-  // Método especializado para actualizar solo el estado del usuario
-  async updateUsuarioStatus(id: number, estado: boolean, userData?: Partial<ApiUser>): Promise<void> {
+  async updateUsuarioStatus(id: number, estado: boolean): Promise<void> {
     try {
-      let currentUser: Partial<ApiUser> | null | undefined = userData;
-
-      // Si no se proporcionan datos del usuario, intentar obtenerlos de la API
-      if (!currentUser) {
-        currentUser = await this.getUsuarioById(id);
-        if (!currentUser) {
-          throw new Error('Usuario no encontrado');
-        }
-      }
-
-      // Enviar todos los campos requeridos con el estado actualizado
-      const apiBody = this.mapToApiFormat({
-        ...currentUser,
-        estado: estado
+      console.log(`🔄 [POST] Actualizando estado del usuario ${id} a ${estado}`);
+      await this.request(`/usuarios/${id}/estado`, {
+        method: 'POST',
+        body: JSON.stringify({ estado: estado }),
       });
-      apiBody.Id = id;
-
-      await this.request(`/usuarios/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(apiBody),
-      });
-
-      console.log(`✅ Estado del usuario ${id} actualizado a ${estado}`);
+      console.log(`✅ Estado del usuario ${id} actualizado`);
     } catch (error) {
       console.error('Error updating usuario status:', error);
       throw error;
@@ -379,10 +286,10 @@ class ApiService {
       // Este método ahora solo debe usarse para sincronización con Firebase
       // La autenticación principal debe manejarse a través de Firebase Auth
       console.warn('⚠️ authenticateUser está deprecado. Usa Firebase Auth para autenticación.');
-      
+
       const usuarios = await this.getUsuarios();
       const user = usuarios.find(u => u.correo === correo);
-      
+
       if (!user) {
         console.log('Usuario no encontrado:', correo);
         return null;
@@ -630,7 +537,7 @@ class ApiService {
       console.log(`🗑️ Eliminando todas las asignaciones del rol ${rolId}...`);
       const rolesModulos = await this.getRolesModulos();
       const modulosDelRol = rolesModulos.filter((rm: any) => rm.rolId === rolId);
-      
+
       for (const rm of modulosDelRol) {
         if (rm.id) {
           await this.deleteRolModulo(rm.id);
@@ -723,15 +630,21 @@ class ApiService {
     }
   }
 
-  async updateServicioStatus(id: number, estado: boolean) {
-  return fetch(`${API_BASE_URL}/servicios/${id}/estado`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ estado }) // 👈 ESTA es la clave
-  });
-}
+  async updateServicioStatus(id: number, estado: boolean): Promise<void> {
+    try {
+      console.log(`🔄 Actualizando estado del servicio ${id} a ${estado}`);
+
+      await this.request(`/Servicios/${id}/estado`, {
+        method: 'POST',
+        body: JSON.stringify({ estado: estado }),
+      });
+
+      console.log(`✅ Estado del servicio ${id} actualizado a ${estado}`);
+    } catch (error: any) {
+      console.error(`❌ Error actualizando estado del servicio ${id}:`, error);
+      throw error;
+    }
+  }
 
   // ==================== MÉTODOS PARA PAQUETES ====================
   async getPaquetes(): Promise<Paquete[]> {
@@ -817,7 +730,7 @@ class ApiService {
     try {
       console.log(`📤 Actualizando estado del paquete ${id} a ${activo}...`);
       await this.request(`/Paquetes/${id}/estado`, {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({ estado: activo }), // 🔥 CAMBIAR A estado para coincidir con backend
       });
       console.log(`✅ Estado del paquete ${id} actualizado`);
@@ -910,7 +823,7 @@ class ApiService {
     try {
       console.log(`🗑️ Eliminando todos los detalles del paquete ${paqueteId}...`);
       const detalles = await this.getDetallePaquetesByPaqueteId(paqueteId);
-      
+
       for (const detalle of detalles) {
         if (detalle.id) {
           await this.deleteDetallePaquete(detalle.id);

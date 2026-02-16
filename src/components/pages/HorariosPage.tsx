@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Clock,
   Calendar,
@@ -26,7 +26,6 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +37,8 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { useCustomAlert } from "../ui/custom-alert";
+import { barberosService, Barbero } from "../../services/barberosService";
+import { horariosService, HorarioBarbero } from "../../services/horariosService";
 
 const diasSemana = [
   "Lunes",
@@ -51,69 +52,42 @@ const diasSemana = [
 
 // Tipo para un bloque de horario (día + hora inicio + hora fin)
 interface BloqueHorario {
+  id?: number;
   dia: string;
   horaInicio: string;
   horaFin: string;
+  estado?: boolean;
 }
 
 // Tipo para un horario completo (un solo registro con múltiples bloques)
 interface HorarioSemanal {
   id: number;
+  barberoId: number;
   barbero: string;
-  activo: boolean;
+  activo: boolean; // Estado derivado
   bloques: BloqueHorario[];
+  notas?: string;
 }
-
-// Datos iniciales con la nueva estructura
-const horariosData: HorarioSemanal[] = [
-  {
-    id: 1,
-    barbero: "Carlos Mendez",
-    activo: true,
-    bloques: [
-      { dia: "Lunes", horaInicio: "08:00", horaFin: "12:00" },
-      { dia: "Lunes", horaInicio: "14:00", horaFin: "19:00" },
-      { dia: "Miércoles", horaInicio: "09:00", horaFin: "18:00" },
-      { dia: "Viernes", horaInicio: "08:00", horaFin: "17:00" },
-      { dia: "Sábado", horaInicio: "09:00", horaFin: "14:00" },
-    ],
-  },
-  {
-    id: 2,
-    barbero: "Miguel Rodriguez",
-    activo: true,
-    bloques: [
-      { dia: "Martes", horaInicio: "09:00", horaFin: "13:00" },
-      { dia: "Martes", horaInicio: "15:00", horaFin: "20:00" },
-      { dia: "Jueves", horaInicio: "10:00", horaFin: "19:00" },
-      { dia: "Sábado", horaInicio: "10:00", horaFin: "16:00" },
-    ],
-  },
-  {
-    id: 3,
-    barbero: "Ana Lopez",
-    activo: true,
-    bloques: [
-      { dia: "Lunes", horaInicio: "10:00", horaFin: "18:00" },
-      { dia: "Miércoles", horaInicio: "10:00", horaFin: "18:00" },
-      { dia: "Viernes", horaInicio: "10:00", horaFin: "18:00" },
-    ],
-  },
-];
-
-const barberos = ["Carlos Mendez", "Miguel Rodriguez", "Ana Lopez", "Sistema"];
 
 export function HorariosPage() {
   const { success, error, AlertContainer } = useCustomAlert();
-  const [horarios, setHorarios] = useState<HorarioSemanal[]>(horariosData);
+  const [horarios, setHorarios] = useState<HorarioSemanal[]>([]);
+  const [barberos, setBarberos] = useState<Barbero[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  
+  // Selection states
   const [editingHorario, setEditingHorario] = useState<HorarioSemanal | null>(null);
   const [horarioToDelete, setHorarioToDelete] = useState<HorarioSemanal | null>(null);
   const [selectedHorario, setSelectedHorario] = useState<HorarioSemanal | null>(null);
+  
+  // Filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBarbero, setFilterBarbero] = useState("all");
   const [showInactivos, setShowInactivos] = useState(true);
@@ -122,11 +96,11 @@ export function HorariosPage() {
 
   // Estado para el formulario de nuevo horario
   const [nuevoHorario, setNuevoHorario] = useState<{
-    barbero: string;
+    barberoId: string;
     activo: boolean;
     bloques: BloqueHorario[];
   }>({
-    barbero: "",
+    barberoId: "",
     activo: true,
     bloques: [],
   });
@@ -138,9 +112,62 @@ export function HorariosPage() {
     horaFin: "",
   });
 
+  // Cargar datos al inicio
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [barberosData, horariosData] = await Promise.all([
+        barberosService.getBarberos(),
+        horariosService.getHorarios()
+      ]);
+      
+      setBarberos(barberosData);
+
+      // Agrupar horarios por barberoId
+      const horariosPorBarbero: Record<number, HorarioBarbero[]> = {};
+      horariosData.forEach(h => {
+        if (!horariosPorBarbero[h.barberoId]) {
+            horariosPorBarbero[h.barberoId] = [];
+        }
+        horariosPorBarbero[h.barberoId].push(h);
+      });
+
+      // Mapear a la estructura de la vista
+      const horariosMapeados: HorarioSemanal[] = barberosData
+        .filter(b => b.id !== undefined && horariosPorBarbero[b.id] && horariosPorBarbero[b.id].length > 0)
+        .map(b => {
+             const bloquesBarbero = horariosPorBarbero[b.id!] || [];
+             return {
+                id: b.id!,
+                barberoId: b.id!,
+                barbero: `${b.nombre} ${b.apellido}`,
+                activo: b.estado, 
+                bloques: bloquesBarbero.map(h => ({
+                    id: h.id,
+                    dia: h.dia,
+                    horaInicio: h.horaInicio,
+                    horaFin: h.horaFin,
+                    estado: h.estado ?? true
+                }))
+             };
+        });
+
+      setHorarios(horariosMapeados);
+    } catch (err) {
+      console.error("Error cargando horarios:", err);
+      error("Error de conexión", "No se pudieron cargar los horarios de los barberos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredHorarios = horarios.filter((horario) => {
     const matchesSearch = horario.barbero.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBarbero = filterBarbero === "all" || horario.barbero === filterBarbero;
+    const matchesBarbero = filterBarbero === "all" || horario.barberoId.toString() === filterBarbero;
     const matchesActivo = showInactivos || horario.activo;
     return matchesSearch && matchesBarbero && matchesActivo;
   });
@@ -166,8 +193,8 @@ export function HorariosPage() {
     }
 
     setNuevoHorario({
-      ...nuevoHorario,
-      bloques: [...nuevoHorario.bloques, { ...nuevoBloque }],
+        ...nuevoHorario,
+        bloques: [...nuevoHorario.bloques, { ...nuevoBloque, estado: true }],
     });
     setNuevoBloque({ dia: "", horaInicio: "", horaFin: "" });
   };
@@ -183,7 +210,7 @@ export function HorariosPage() {
   // Resetear formulario
   const resetFormulario = () => {
     setNuevoHorario({
-      barbero: "",
+      barberoId: "",
       activo: true,
       bloques: [],
     });
@@ -191,7 +218,7 @@ export function HorariosPage() {
   };
 
   const handleCreateHorario = () => {
-    if (!nuevoHorario.barbero) {
+    if (!nuevoHorario.barberoId) {
       error("Barbero requerido", "Por favor selecciona un barbero.");
       return;
     }
@@ -199,30 +226,46 @@ export function HorariosPage() {
       error("Sin bloques", "Debes agregar al menos un bloque de horario (día + horas).");
       return;
     }
+    
+    if (horarios.some(h => h.barberoId.toString() === nuevoHorario.barberoId)) {
+      error("Duplicado", "Este barbero ya tiene horarios asignados. Edítalos en su lugar.");
+      return;
+    }
+
     setIsCreateDialogOpen(true);
   };
 
-  const confirmCreateHorario = () => {
-    const horario: HorarioSemanal = {
-      id: Date.now(),
-      ...nuevoHorario,
-    };
-    setHorarios([...horarios, horario]);
-    resetFormulario();
-    setIsDialogOpen(false);
-    setIsCreateDialogOpen(false);
+  const confirmCreateHorario = async () => {
+    try {
+        const barberoIdNum = parseInt(nuevoHorario.barberoId);
+        const promises = nuevoHorario.bloques.map(bloque => {
+            const horarioData: HorarioBarbero = {
+                barberoId: barberoIdNum,
+                dia: bloque.dia,
+                horaInicio: bloque.horaInicio,
+                horaFin: bloque.horaFin,
+                estado: true
+            };
+            return horariosService.createHorario(horarioData);
+        });
 
-    const diasUnicos = [...new Set(horario.bloques.map((b) => b.dia))];
-    success(
-      "¡Horario creado exitosamente!",
-      `Se ha registrado 1 horario para ${horario.barbero} con ${horario.bloques.length} bloques (${diasUnicos.join(", ")}).`
-    );
+        await Promise.all(promises);
+
+        resetFormulario();
+        setIsDialogOpen(false);
+        setIsCreateDialogOpen(false);
+        await loadData();
+        success("¡Horario creado!", "Se han registrado los horarios correctamente.");
+    } catch (err) {
+        console.error(err);
+        error("Error", "No se pudieron crear los horarios.");
+    }
   };
 
   const handleEditHorario = (horario: HorarioSemanal) => {
     setEditingHorario(horario);
     setNuevoHorario({
-      barbero: horario.barbero,
+      barberoId: horario.barberoId.toString(),
       activo: horario.activo,
       bloques: [...horario.bloques],
     });
@@ -230,7 +273,7 @@ export function HorariosPage() {
   };
 
   const handleUpdateHorario = () => {
-    if (!nuevoHorario.barbero) {
+    if (!nuevoHorario.barberoId) {
       error("Barbero requerido", "Por favor selecciona un barbero.");
       return;
     }
@@ -241,21 +284,60 @@ export function HorariosPage() {
     setIsEditDialogOpen(true);
   };
 
-  const confirmEditHorario = () => {
-    if (editingHorario) {
-      setHorarios(
-        horarios.map((h) =>
-          h.id === editingHorario.id ? { ...editingHorario, ...nuevoHorario } : h
-        )
-      );
-      setEditingHorario(null);
-      resetFormulario();
-      setIsDialogOpen(false);
-      setIsEditDialogOpen(false);
-      success(
-        "¡Horario actualizado exitosamente!",
-        `Los cambios en el horario de ${nuevoHorario.barbero} han sido guardados.`
-      );
+  const confirmEditHorario = async () => {
+    if (!editingHorario) return;
+
+    try {
+        const barberoIdNum = parseInt(nuevoHorario.barberoId);
+        
+        // Bloques actuales en BD (traídos en loadData y guardados en editingHorario)
+        const bloquesActuales = editingHorario.bloques;
+        
+        // Bloques en el formulario
+        const bloquesNuevos = nuevoHorario.bloques;
+
+        // 1. Eliminar los que ya no están
+        // Un bloque se elimina si tiene ID y ese ID no está en la lista nueva
+        const idsNuevos = new Set(bloquesNuevos.map(b => b.id).filter(id => id !== undefined));
+        const bloquesAEliminar = bloquesActuales.filter(b => b.id !== undefined && !idsNuevos.has(b.id));
+        
+        // 2. Crear los nuevos (no tienen ID)
+        const bloquesACrear = bloquesNuevos.filter(b => b.id === undefined);
+
+        // 3. Actualizar los existentes (tienen ID)
+        const bloquesAActualizar = bloquesNuevos.filter(b => b.id !== undefined);
+
+        const deletePromises = bloquesAEliminar.map(b => horariosService.deleteHorario(b.id!));
+        
+        const createPromises = bloquesACrear.map(b => horariosService.createHorario({
+            barberoId: barberoIdNum,
+            dia: b.dia,
+            horaInicio: b.horaInicio,
+            horaFin: b.horaFin,
+            estado: true
+        }));
+
+        const updatePromises = bloquesAActualizar.map(b => horariosService.updateHorario(b.id!, {
+            id: b.id,
+            barberoId: barberoIdNum,
+            dia: b.dia,
+            horaInicio: b.horaInicio,
+            horaFin: b.horaFin,
+            estado: true
+        }));
+
+        await Promise.all([...deletePromises, ...createPromises, ...updatePromises]);
+
+        setEditingHorario(null);
+        resetFormulario();
+        setIsDialogOpen(false);
+        setIsEditDialogOpen(false);
+        await loadData();
+
+        success("¡Horario actualizado!", "Los cambios han sido guardados exitosamente.");
+    } catch(err) {
+        console.error(err);
+        error("Error", "Ocurrió un error al actualizar los horarios.");
     }
   };
 
@@ -264,26 +346,50 @@ export function HorariosPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (horarioToDelete) {
-      setHorarios(horarios.filter((h) => h.id !== horarioToDelete.id));
-      setIsDeleteDialogOpen(false);
-      setHorarioToDelete(null);
-      success(
-        "¡Horario eliminado exitosamente!",
-        `El horario de ${horarioToDelete.barbero} ha sido eliminado del sistema.`
-      );
+        try {
+            const promises = horarioToDelete.bloques.map(b => 
+                b.id ? horariosService.deleteHorario(b.id) : Promise.resolve()
+            );
+            await Promise.all(promises);
+
+            setIsDeleteDialogOpen(false);
+            setHorarioToDelete(null);
+            await loadData();
+            success("¡Horario eliminado!", `El horario de ${horarioToDelete.barbero} ha sido eliminado.`);
+        } catch (err) {
+            console.error(err);
+            error("Error", "No se pudo eliminar el horario.");
+        }
     }
   };
 
-  const toggleEstadoHorario = (horario: HorarioSemanal) => {
-    setHorarios(
-      horarios.map((h) => (h.id === horario.id ? { ...h, activo: !h.activo } : h))
-    );
-    success(
-      `¡Estado actualizado!`,
-      `El horario de ${horario.barbero} ahora está ${!horario.activo ? "activo" : "inactivo"}`
-    );
+  const toggleEstadoHorario = async (horario: HorarioSemanal) => {
+    // Si queremos "desactivar" un horario completo, podríamos iterar y poner estado=false a sus bloques
+    // O si solo es visual. De momento no hay endpoint "toggleAll".
+    // Lo dejaremos visual o update.
+    // Implementación: update all blocks status
+    try {
+        const nuevoEstado = !horario.activo;
+        const promises = horario.bloques.map(b => {
+             if (!b.id) return Promise.resolve();
+             return horariosService.updateHorario(b.id, {
+                 id: b.id,
+                 barberoId: horario.barberoId,
+                 dia: b.dia,
+                 horaInicio: b.horaInicio,
+                 horaFin: b.horaFin,
+                 estado: nuevoEstado
+             });
+        });
+        await Promise.all(promises);
+        await loadData();
+        success("Estado actualizado", `El horario de ${horario.barbero} ahora está ${nuevoEstado ? 'activo' : 'inactivo'}`);
+    } catch (err) {
+        console.error(err);
+        error("Error", "No se pudo cambiar el estado.");
+    }
   };
 
   const handleViewDetail = (horario: HorarioSemanal) => {
@@ -319,10 +425,6 @@ export function HorariosPage() {
       return a.horaInicio.localeCompare(b.horaInicio);
     });
   };
-
-  const totalHorarios = horarios.length;
-  const horariosActivos = horarios.filter((h) => h.activo).length;
-  const totalBloques = horarios.reduce((acc, h) => acc + h.bloques.length, 0);
 
   return (
     <>
@@ -364,7 +466,7 @@ export function HorariosPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-lighter pointer-events-none z-10" />
                 <Input
-                  placeholder="Buscar barbero o notas..."
+                  placeholder="Buscar barbero..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="elegante-input pl-11 w-80"
@@ -378,8 +480,8 @@ export function HorariosPage() {
               >
                 <option value="all">Todos los barberos</option>
                 {barberos.map((barbero) => (
-                  <option key={barbero} value={barbero}>
-                    {barbero}
+                  <option key={barbero.id} value={barbero.id}>
+                    {barbero.nombre} {barbero.apellido}
                   </option>
                 ))}
               </select>
@@ -394,6 +496,9 @@ export function HorariosPage() {
 
           {/* Tabla */}
           <div className="overflow-x-auto">
+            {loading ? (
+                <div className="text-center py-8 text-gray-lightest">Cargando horarios de barberos...</div>
+            ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-dark">
@@ -489,15 +594,16 @@ export function HorariosPage() {
                 ))}
               </tbody>
             </table>
+            )}
 
-            {displayedHorarios.length === 0 && (
+            {!loading && displayedHorarios.length === 0 && (
               <div className="text-center py-8">
                 <Clock className="w-16 h-16 text-gray-medium mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-white-primary mb-2">
                   No se encontraron horarios
                 </h3>
                 <p className="text-gray-lightest">
-                  Intenta con otros términos de búsqueda o filtros
+                  No hay horarios asignados o intenta con otros filtros.
                 </p>
               </div>
             )}
@@ -554,16 +660,17 @@ export function HorariosPage() {
                 <div className="space-y-1.5">
                   <Label className="text-gray-lightest text-sm">Barbero *</Label>
                   <select
-                    value={nuevoHorario.barbero}
+                    value={nuevoHorario.barberoId}
                     onChange={(e) =>
-                      setNuevoHorario({ ...nuevoHorario, barbero: e.target.value })
+                      setNuevoHorario({ ...nuevoHorario, barberoId: e.target.value })
                     }
                     className="elegante-input p-2.5 w-full"
+                    disabled={!!editingHorario}
                   >
                     <option value="">Seleccionar barbero</option>
                     {barberos.map((barbero) => (
-                      <option key={barbero} value={barbero}>
-                        {barbero}
+                      <option key={barbero.id} value={barbero.id}>
+                        {barbero.nombre} {barbero.apellido}
                       </option>
                     ))}
                   </select>
@@ -695,7 +802,7 @@ export function HorariosPage() {
             <button
               onClick={editingHorario ? handleUpdateHorario : handleCreateHorario}
               className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              disabled={!nuevoHorario.barbero || nuevoHorario.bloques.length === 0}
+              disabled={!nuevoHorario.barberoId || nuevoHorario.bloques.length === 0}
             >
               <Clock className="w-4 h-4" />
               {editingHorario ? "Actualizar" : "Crear"} Horario
@@ -715,7 +822,9 @@ export function HorariosPage() {
             <AlertDialogDescription className="text-gray-lightest">
               Se creará <span className="font-semibold text-orange-primary">1 registro</span> de
               horario para{" "}
-              <span className="font-semibold text-white-primary">{nuevoHorario.barbero}</span> con{" "}
+              <span className="font-semibold text-white-primary">
+                {barberos.find(b => b.id.toString() === nuevoHorario.barberoId)?.nombre || 'Barbero'}
+              </span> con{" "}
               <span className="font-semibold text-orange-primary">
                 {nuevoHorario.bloques.length} bloque{nuevoHorario.bloques.length !== 1 ? "s" : ""}
               </span>{" "}
@@ -745,7 +854,9 @@ export function HorariosPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-lightest">
               Se actualizará el horario de{" "}
-              <span className="font-semibold text-white-primary">{nuevoHorario.barbero}</span>.
+              <span className="font-semibold text-white-primary">
+                 {barberos.find(b => b.id.toString() === nuevoHorario.barberoId)?.nombre || 'Barbero'}
+              </span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

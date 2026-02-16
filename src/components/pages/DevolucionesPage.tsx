@@ -1,42 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "../ui/input";
+import { X } from "lucide-react";
 import {
   Plus,
   Search,
   Eye,
   ChevronLeft,
   ChevronRight,
-  Calendar,
   RotateCcw,
   FileText,
   Download,
-  AlertTriangle,
-  TrendingDown,
   User,
-  Package,
-  MessageSquare,
   Filter,
   Check,
-  X,
-  CreditCard,
   History,
   AlertCircle,
-  ToggleLeft,
   ToggleRight,
-  CalendarDays,
   Wallet,
   Ban,
   Receipt,
   ShoppingBag,
   DollarSign,
-  Hash
+  Hash,
+  TrendingDown
 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Label } from "../ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 import { toast } from "sonner";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
+import { devolucionService } from "../../services/devolucionService";
+import { ventaService } from "../../services/ventaService";
+import { useAuth } from "../AuthContext"; // Added
 
 // Función para formatear moneda colombiana
 const formatCurrency = (amount: number): string => {
@@ -68,10 +64,13 @@ interface Devolucion {
   fecha: string;
   hora: string;
   monto: number;
-  estado: 'Activo' | 'Anulado';
+  estado: 'Activo' | 'Anulado' | 'Pendiente' | 'Procesado';
   responsable: string;
   numeroVenta: string;
   saldoAFavor: number;
+  apiId?: number;
+  ventaId?: number;
+  productoId?: number;
 }
 
 // Interface para manejar saldos de clientes
@@ -81,127 +80,15 @@ interface SaldoCliente {
   saldoTotal: number;
 }
 
-// Datos de ejemplo actualizados - Solo productos
-const devolucionesData: Devolucion[] = [
-  {
-    id: "DEV001",
-    cliente: "Juan Pérez",
-    clienteId: "CLI001",
-    clienteDocumento: "CC 3012345678",
-    producto: "Champú Premium",
-    cantidad: 2,
-    precioUnitario: 17500,
-    motivoCategoria: "producto_defectuoso",
-    motivoDetalle: "Producto Defectuoso",
-    observaciones: "Envase roto, producto derramado",
-    fecha: "23-08-2025",
-    hora: "14:30",
-    monto: 35000,
-    estado: "Activo",
-    responsable: "Miguel Rodriguez",
-    numeroVenta: "VEN001",
-    saldoAFavor: 35000
-  },
-  {
-    id: "DEV002",
-    cliente: "María González",
-    clienteId: "CLI002",
-    clienteDocumento: "CC 3023456789",
-    producto: "Aceite de Barba Premium",
-    cantidad: 1,
-    precioUnitario: 25000,
-    motivoCategoria: "no_conforme",
-    motivoDetalle: "No Conforme con Expectativas",
-    observaciones: "No le gustó la fragancia",
-    fecha: "22-08-2025",
-    hora: "16:45",
-    monto: 25000,
-    estado: "Activo",
-    responsable: "Sofia Martinez",
-    numeroVenta: "VEN002",
-    saldoAFavor: 25000
-  },
-  {
-    id: "DEV003",
-    cliente: "Carlos Ruiz",
-    clienteId: "CLI003",
-    clienteDocumento: "CC 3034567890",
-    producto: "Cera para Cabello",
-    cantidad: 1,
-    precioUnitario: 28000,
-    motivoCategoria: "reaccion_alergica",
-    motivoDetalle: "Reacción Alérgica",
-    observaciones: "Cliente presentó irritación en la piel",
-    fecha: "21-08-2025",
-    hora: "11:20",
-    monto: 28000,
-    estado: "Anulado",
-    responsable: "Ana López",
-    numeroVenta: "VEN003",
-    saldoAFavor: 0
-  },
-  {
-    id: "DEV004",
-    cliente: "Laura Zapata",
-    clienteId: "CLI004",
-    clienteDocumento: "CC 3045678901",
-    producto: "Kit de Cuidado Completo",
-    cantidad: 1,
-    precioUnitario: 45000,
-    motivoCategoria: "error_compra",
-    motivoDetalle: "Error en la Compra",
-    observaciones: "Cliente compró producto equivocado",
-    fecha: "20-08-2025",
-    hora: "09:15",
-    monto: 45000,
-    estado: "Activo",
-    responsable: "Miguel Rodriguez",
-    numeroVenta: "VEN004",
-    saldoAFavor: 45000
-  },
-  {
-    id: "DEV005",
-    cliente: "Pedro López",
-    clienteId: "CLI005",
-    clienteDocumento: "CC 3056789012",
-    producto: "Loción Aftershave",
-    cantidad: 3,
-    precioUnitario: 18000,
-    motivoCategoria: "producto_vencido",
-    motivoDetalle: "Producto Vencido",
-    observaciones: "Fecha de vencimiento cercana",
-    fecha: "19-08-2025",
-    hora: "13:30",
-    monto: 54000,
-    estado: "Anulado",
-    responsable: "Sofia Martinez",
-    numeroVenta: "VEN005",
-    saldoAFavor: 0
-  },
-  {
-    id: "DEV006",
-    cliente: "Juan Pérez",
-    clienteId: "CLI001",
-    clienteDocumento: "CC 3012345678",
-    producto: "Gel Fijador",
-    cantidad: 1,
-    precioUnitario: 22000,
-    motivoCategoria: "no_conforme",
-    motivoDetalle: "No Conforme con Expectativas",
-    observaciones: "Textura diferente a la esperada",
-    fecha: "15-08-2025",
-    hora: "10:20",
-    monto: 22000,
-    estado: "Activo",
-    responsable: "Ana López",
-    numeroVenta: "VEN006",
-    saldoAFavor: 22000
-  }
-];
+// DevolucionesPage component
+
 
 export function DevolucionesPage() {
+  const { user } = useAuth();
   const { confirmCreateAction, confirmEditAction, DoubleConfirmationContainer } = useDoubleConfirmation();
-  const [devoluciones, setDevoluciones] = useState<Devolucion[]>(devolucionesData);
+  const [devoluciones, setDevoluciones] = useState<Devolucion[]>([]);
+  const [ventasDisponibles, setVentasDisponibles] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isHistorialDialogOpen, setIsHistorialDialogOpen] = useState(false);
@@ -212,6 +99,76 @@ export function DevolucionesPage() {
   const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [isPdfPopoverOpen, setIsPdfPopoverOpen] = useState(false);
 
+  // Cargar datos al iniciar
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [devs, sales] = await Promise.all([
+        devolucionService.getDevoluciones(),
+        ventaService.getVentas()
+      ]);
+
+      // Formatear devoluciones de la API al formato de la interfaz local si es necesario
+      // Pero por ahora miremos si coinciden lo suficiente
+      const formattedDevs: Devolucion[] = devs.map(d => {
+        const monto = Number(d.monto) || 0;
+        const cantidad = Number(d.cantidad) || 1;
+        const estadoRaw = d.estado || 'Activo';
+
+        return {
+          id: String(d.id),
+          cliente: d.clienteNombre || 'Cliente',
+          clienteId: String(d.clienteId || ''),
+          producto: d.productoNombre || 'Producto',
+          cantidad: cantidad,
+          precioUnitario: monto / (cantidad || 1),
+          motivoCategoria: d.motivo,
+          motivoDetalle: getMotivoLabel(d.motivo),
+          observaciones: d.observaciones,
+          fecha: d.fecha ? new Date(d.fecha).toLocaleDateString('es-CO') : '',
+          hora: d.fecha ? new Date(d.fecha).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '',
+          monto: monto,
+          estado: estadoRaw as any,
+          responsable: d.responsableNombre || 'Responsable',
+          numeroVenta: String(d.ventaId),
+          saldoAFavor: d.saldoAFavor || 0,
+          apiId: d.id,
+          ventaId: d.ventaId,
+          productoId: d.productoId
+        };
+      });
+
+      setDevoluciones(formattedDevs);
+
+      // Formatear ventas para el selector
+      const formattedSales = sales.map(s => ({
+        id: s.id,
+        numeroVenta: String(s.numeroVenta || s.id),
+        cliente: s.cliente,
+        clienteId: s.clienteId,
+        fecha: s.fecha ? new Date(s.fecha).toLocaleDateString('es-CO') : '',
+        total: s.total,
+        productos: s.productosDetalle.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          precio: p.precio,
+          cantidad: p.cantidad
+        }))
+      }));
+
+      setVentasDisponibles(formattedSales);
+    } catch (error) {
+      toast.error("Error al cargar datos");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Estados para rango de fechas en reporte Excel
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -220,7 +177,10 @@ export function DevolucionesPage() {
   // Estado para nueva devolución
   const [nuevaDevolucion, setNuevaDevolucion] = useState({
     numeroVenta: '',
+    ventaId: 0,
+    clienteId: null as number | null,
     cliente: '',
+    productoId: 0,
     producto: '',
     cantidad: 1,
     precioUnitario: 0,
@@ -229,36 +189,6 @@ export function DevolucionesPage() {
     monto: 0
   });
 
-
-
-  // Datos simulados de ventas para el selector - Solo productos
-  const ventasDisponibles = [
-    {
-      id: 'VEN001', cliente: 'Juan Pérez', fecha: '23-08-2025', total: 85000, productos: [
-        { nombre: 'Champú Premium', precio: 17500, cantidad: 3 },
-        { nombre: 'Cera para Cabello', precio: 25000, cantidad: 1 },
-        { nombre: 'Aceite de Barba', precio: 15000, cantidad: 2 }
-      ]
-    },
-    {
-      id: 'VEN002', cliente: 'María González', fecha: '22-08-2025', total: 45000, productos: [
-        { nombre: 'Aceite de Barba Premium', precio: 25000, cantidad: 1 },
-        { nombre: 'Loción Aftershave', precio: 20000, cantidad: 1 }
-      ]
-    },
-    {
-      id: 'VEN003', cliente: 'Carlos Ruiz', fecha: '21-08-2025', total: 53000, productos: [
-        { nombre: 'Cera para Cabello', precio: 28000, cantidad: 1 },
-        { nombre: 'Kit de Cuidado', precio: 25000, cantidad: 1 }
-      ]
-    },
-    {
-      id: 'VEN004', cliente: 'Laura Zapata', fecha: '20-08-2025', total: 45000, productos: [
-        { nombre: 'Kit de Cuidado Completo', precio: 45000, cantidad: 1 }
-      ]
-    },
-  ];
-
   const [ventaSeleccionada, setVentaSeleccionada] = useState<any>(null);
   const [productoDevolucion, setProductoDevolucion] = useState('');
 
@@ -266,7 +196,7 @@ export function DevolucionesPage() {
   const filteredDevoluciones = devoluciones.filter(devolucion => {
     const matchesSearch = devolucion.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
       devolucion.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      devolucion.clienteId.toLowerCase().includes(searchTerm.toLowerCase());
+      (devolucion.clienteId?.toString() || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesEstado = filtroEstado === "Todos" || devolucion.estado === filtroEstado;
     return matchesSearch && matchesEstado;
   });
@@ -277,8 +207,13 @@ export function DevolucionesPage() {
 
   // Funciones auxiliares
   const getEstadoColor = (estado: string) => {
-    // Todos los estados ahora usan el mismo estilo gris uniforme
-    return "bg-gray-medium text-gray-lighter";
+    switch (estado) {
+      case 'Activo': return "bg-green-500/20 text-green-400 border border-green-500/30";
+      case 'Anulado': return "bg-red-500/20 text-red-400 border border-red-500/30";
+      case 'Pendiente': return "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
+      case 'Procesado': return "bg-blue-500/20 text-blue-400 border border-blue-500/30";
+      default: return "bg-gray-medium text-gray-lighter";
+    }
   };
 
   const getMotivoLabel = (motivoCategoria: string) => {
@@ -310,15 +245,45 @@ export function DevolucionesPage() {
     }).filter(s => s.saldoTotal > 0);
   };
 
-  const handleVentaChange = (numeroVenta: string) => {
-    setNuevaDevolucion(prev => ({ ...prev, numeroVenta }));
-    const venta = ventasDisponibles.find(v => v.id === numeroVenta);
+  const handleVentaChange = async (ventaIdStr: string) => {
+    const ventaId = Number(ventaIdStr);
+    let venta = ventasDisponibles.find(v => v.id === ventaId);
+
     if (venta) {
+      // Si la venta no tiene productos o servicios cargados, intentar obtener los detalles completos
+      if (!venta.productos || venta.productos.length === 0) {
+        try {
+          const ventaCompleta = await ventaService.getVentaById(ventaId);
+          if (ventaCompleta) {
+            const productosActualizados = ventaCompleta.productosDetalle.map(p => ({
+              id: p.id,
+              nombre: p.nombre,
+              precio: p.precio,
+              cantidad: p.cantidad
+            }));
+
+            // Actualizar el objeto localmente
+            venta = { ...venta, productos: productosActualizados };
+
+            // Actualizar en el estado global de la página para no repetir la carga
+            setVentasDisponibles(prev => prev.map(v =>
+              v.id === ventaId ? { ...v, productos: productosActualizados } : v
+            ));
+          }
+        } catch (error) {
+          console.error("Error al cargar detalles completos de la venta:", error);
+        }
+      }
+
       setVentaSeleccionada(venta);
       setNuevaDevolucion(prev => ({
         ...prev,
-        cliente: venta.cliente,
+        numeroVenta: venta!.numeroVenta,
+        ventaId: venta!.id,
+        clienteId: venta!.clienteId,
+        cliente: venta!.cliente,
         producto: '',
+        productoId: 0,
         cantidad: 1,
         precioUnitario: 0,
         monto: 0
@@ -329,8 +294,12 @@ export function DevolucionesPage() {
       setProductoDevolucion('');
       setNuevaDevolucion(prev => ({
         ...prev,
+        numeroVenta: '',
+        ventaId: 0,
+        clienteId: null,
         cliente: '',
         producto: '',
+        productoId: 0,
         cantidad: 1,
         precioUnitario: 0,
         monto: 0
@@ -344,6 +313,7 @@ export function DevolucionesPage() {
       setNuevaDevolucion(prev => ({
         ...prev,
         producto: '',
+        productoId: 0,
         precioUnitario: 0,
         monto: 0
       }));
@@ -355,6 +325,7 @@ export function DevolucionesPage() {
       setNuevaDevolucion(prev => ({
         ...prev,
         producto: nombreProducto,
+        productoId: Number(producto.id),
         precioUnitario: producto.precio,
         monto: producto.precio * prev.cantidad
       }));
@@ -362,6 +333,7 @@ export function DevolucionesPage() {
       setNuevaDevolucion(prev => ({
         ...prev,
         producto: nombreProducto,
+        productoId: 0,
         precioUnitario: 0,
         monto: 0
       }));
@@ -377,60 +349,71 @@ export function DevolucionesPage() {
   };
 
   const handleCreateDevolucion = () => {
-    if (!nuevaDevolucion.numeroVenta || !nuevaDevolucion.producto || !nuevaDevolucion.motivoCategoria) {
-      toast.error("Por favor completa todos los campos obligatorios");
+    // ---------------------------------------------------------
+    // VALIDACIÓN FUERTE (SOLUCIÓN PROFESIONAL)
+    // ---------------------------------------------------------
+    if (!nuevaDevolucion.ventaId || Number(nuevaDevolucion.ventaId) <= 0) {
+      toast.error("Venta inválida: El ID de la venta debe ser mayor a 0");
       return;
     }
 
-    // Validar cantidad disponible
-    if (ventaSeleccionada) {
-      const producto = ventaSeleccionada.productos.find((p: any) => p.nombre === nuevaDevolucion.producto);
-      if (producto && nuevaDevolucion.cantidad > producto.cantidad) {
-        toast.error(`Solo se pueden devolver máximo ${producto.cantidad} unidades de este producto`);
-        return;
-      }
+    if (!nuevaDevolucion.clienteId || Number(nuevaDevolucion.clienteId) <= 0) {
+      toast.error("Cliente inválido: El ID del cliente debe ser mayor a 0");
+      return;
     }
+
+    if (!nuevaDevolucion.productoId || Number(nuevaDevolucion.productoId) <= 0) {
+      toast.error("Producto inválido: El ID del producto debe ser mayor a 0");
+      return;
+    }
+
+    if (!nuevaDevolucion.motivoCategoria) {
+      toast.error("Por favor selecciona un motivo");
+      return;
+    }
+    // ---------------------------------------------------------
 
     // Cerrar el modal temporalmente para evitar conflictos de z-index
     setIsDialogOpen(false);
 
     confirmCreateAction(
       `${nuevaDevolucion.producto} - ${nuevaDevolucion.cliente}`,
-      () => {
-        const motivoDetalle = getMotivoLabel(nuevaDevolucion.motivoCategoria);
+      async () => {
+        try {
+          const currentUserId = user?.id ? parseInt(user.id) : 1;
 
-        // Buscar cliente existente para obtener su ID
-        const clienteExistente = devoluciones.find(d => d.cliente === nuevaDevolucion.cliente);
-        const clienteId = clienteExistente ? clienteExistente.clienteId : `CLI${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+          const payload = {
+            ventaId: Number(nuevaDevolucion.ventaId),
+            productoId: Number(nuevaDevolucion.productoId),
+            clienteId: Number(nuevaDevolucion.clienteId),
+            cantidad: Number(nuevaDevolucion.cantidad),
+            motivoCategoria: nuevaDevolucion.motivoCategoria,
+            motivoDetalle: getMotivoLabel(nuevaDevolucion.motivoCategoria),
+            montoDevuelto: Number(nuevaDevolucion.monto),
+            saldoAFavor: Number(nuevaDevolucion.monto),
+            usuarioId: isNaN(currentUserId) ? 1 : currentUserId,
+            observaciones: nuevaDevolucion.observaciones || ''
+          };
 
-        const nuevaDev: Devolucion = {
-          id: `DEV${String(devoluciones.length + 1).padStart(3, '0')}`,
-          cliente: nuevaDevolucion.cliente,
-          clienteId: clienteId,
-          producto: nuevaDevolucion.producto,
-          cantidad: nuevaDevolucion.cantidad,
-          precioUnitario: nuevaDevolucion.precioUnitario,
-          motivoCategoria: nuevaDevolucion.motivoCategoria,
-          motivoDetalle: motivoDetalle,
-          observaciones: nuevaDevolucion.observaciones,
-          fecha: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          hora: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-          monto: nuevaDevolucion.monto,
-          estado: "Activo",
-          responsable: "Usuario Actual",
-          numeroVenta: nuevaDevolucion.numeroVenta,
-          saldoAFavor: nuevaDevolucion.monto
-        };
+          console.log("🚀 Payload real antes del service:", payload);
 
-        setDevoluciones([nuevaDev, ...devoluciones]);
+          // Verificar si hay algún valor sospechoso
+          const hasInvalidIds = [payload.ventaId, payload.productoId, payload.clienteId, payload.usuarioId].some(id => isNaN(id) || id <= 0);
+          if (hasInvalidIds) {
+            console.error("❌ Se detectaron IDs inválidos en el payload:", payload);
+            toast.error("Error crítico: Se detectaron IDs inválidos (0 o NaN)");
+            return;
+          }
 
-        // Calcular el nuevo saldo total del cliente
-        const saldoTotalCliente = getSaldoTotalCliente(clienteId) + nuevaDevolucion.monto;
+          await devolucionService.createDevolucion(payload);
 
-        // Mostrar mensaje de éxito con información del saldo
-        toast.success(`Devolución registrada exitosamente. Saldo a favor del cliente: ${formatCurrency(saldoTotalCliente)}`);
-
-        resetFormularios();
+          toast.success(`Devolución registrada exitosamente.`);
+          loadData(); // Recargar todos los datos desde la API
+          resetFormularios();
+        } catch (error) {
+          toast.error("Error al registrar la devolución");
+          console.error(error);
+        }
       },
       {
         confirmTitle: 'Confirmar Registro de Devolución',
@@ -445,7 +428,10 @@ export function DevolucionesPage() {
   const resetFormularios = () => {
     setNuevaDevolucion({
       numeroVenta: '',
+      ventaId: 0,
+      clienteId: null,
       cliente: '',
+      productoId: 0,
       producto: '',
       cantidad: 1,
       precioUnitario: 0,
@@ -459,34 +445,38 @@ export function DevolucionesPage() {
   };
 
   const handleToggleEstado = (devolucion: Devolucion) => {
+    // Aseguramos que tenemos un ID válido antes de proceder
+    const idParaActualizar = devolucion.apiId || Number(devolucion.id);
+
+    if (!idParaActualizar || isNaN(idParaActualizar)) {
+      toast.error("No se pudo identificar el ID de la devolución para actualizar");
+      console.error("❌ Error: ID de devolución inválido:", { apiId: devolucion.apiId, id: devolucion.id });
+      return;
+    }
+
     const nuevoEstado = devolucion.estado === 'Activo' ? 'Anulado' : 'Activo';
     const accion = nuevoEstado === 'Activo' ? 'reactivar' : 'anular';
 
     confirmEditAction(
       `${devolucion.producto} - ${devolucion.cliente}`,
-      () => {
-        setDevoluciones(prev => prev.map(d =>
-          d.id === devolucion.id
-            ? {
-              ...d,
-              estado: nuevoEstado,
-              saldoAFavor: nuevoEstado === 'Activo' ? d.monto : 0
-            }
-            : d
-        ));
+      async () => {
+        try {
+          console.log(`🚀 Intentando ${accion} devolución con ID: ${idParaActualizar}, Nuevo estado: ${nuevoEstado}`);
 
-        // Mostrar el saldo actualizado del cliente
-        const saldoActualizado = nuevoEstado === 'Activo'
-          ? getSaldoTotalCliente(devolucion.clienteId) + devolucion.monto
-          : getSaldoTotalCliente(devolucion.clienteId) - devolucion.monto;
+          await devolucionService.updateDevolucionStatus(idParaActualizar, nuevoEstado);
 
-        toast.info(`Saldo a favor actualizado para ${devolucion.cliente}: ${formatCurrency(Math.max(0, saldoActualizado))}`);
+          toast.success(`Devolución ${nuevoEstado.toLowerCase()}ada exitosamente`);
+          loadData();
+        } catch (error: any) {
+          console.error(`❌ Error al ${accion} devolución:`, error);
+          toast.error(error.message || `Error al actualizar el estado`);
+        }
       },
       {
         confirmTitle: `Confirmar ${accion.charAt(0).toUpperCase() + accion.slice(1)} Devolución`,
-        confirmMessage: `¿Estás seguro de que deseas ${accion} la devolución "${devolucion.producto}" del cliente "${devolucion.cliente}"?`,
-        successTitle: `¡Devolución ${nuevoEstado.toLowerCase()}a exitosamente!`,
-        successMessage: `La devolución ha sido ${nuevoEstado.toLowerCase()}ada correctamente en el sistema.`,
+        confirmMessage: `¿Estás seguro de que deseas ${accion} la devolución del producto "${devolucion.producto}" para el cliente "${devolucion.cliente}"?`,
+        successTitle: `¡Devolución ${nuevoEstado.toLowerCase()}ada exitosamente!`,
+        successMessage: `El estado ha sido actualizado a ${nuevoEstado} y el stock ha sido ajustado según corresponda.`,
         requireInput: false
       }
     );
@@ -495,7 +485,7 @@ export function DevolucionesPage() {
 
 
   // Función para generar reporte Excel real por rango de fechas
-  const generateExcelReport = async (periodo: 'custom', startDate?: string, endDate?: string) => {
+  const generateExcelReport = async (_periodo: 'custom', startDate?: string, endDate?: string) => {
     try {
       // Validar que las fechas estén presentes
       if (!startDate || !endDate) {
@@ -555,71 +545,86 @@ export function DevolucionesPage() {
       }));
 
       // Agregar resumen al final
-      excelData.push({});
+      excelData.push({
+        'ID Devolución': '',
+        'Cliente': '',
+        'Producto': '',
+        'Cantidad': 0,
+        'Precio Unitario': '',
+        'Monto Total': '',
+        'Motivo': '',
+        'Estado': 'Activo',
+        'Fecha': '',
+        'Hora': '',
+        'Responsable': '',
+        'No. Venta': '',
+        'Saldo a Favor': '',
+        'Observaciones': ''
+      } as any);
       excelData.push({
         'ID Devolución': 'RESUMEN',
         'Cliente': '',
         'Producto': '',
-        'Cantidad': '',
+        'Cantidad': 0,
         'Precio Unitario': '',
         'Monto Total': '',
         'Motivo': '',
-        'Estado': '',
+        'Estado': 'Activo',
         'Fecha': '',
         'Hora': '',
         'Responsable': '',
         'No. Venta': '',
         'Saldo a Favor': '',
         'Observaciones': ''
-      });
+      } as any);
       excelData.push({
         'ID Devolución': 'Total Registros:',
         'Cliente': totalRegistros.toString(),
         'Producto': '',
-        'Cantidad': '',
+        'Cantidad': 0,
         'Precio Unitario': '',
         'Monto Total': '',
         'Motivo': '',
-        'Estado': '',
+        'Estado': 'Activo',
         'Fecha': '',
         'Hora': '',
         'Responsable': '',
         'No. Venta': '',
         'Saldo a Favor': '',
         'Observaciones': ''
-      });
+      } as any);
       excelData.push({
         'ID Devolución': 'Total Monto:',
         'Cliente': `${formatCurrency(totalMonto)}`,
         'Producto': '',
-        'Cantidad': '',
+        'Cantidad': 0,
         'Precio Unitario': '',
         'Monto Total': '',
         'Motivo': '',
-        'Estado': '',
+        'Estado': 'Activo',
         'Fecha': '',
         'Hora': '',
         'Responsable': '',
         'No. Venta': '',
         'Saldo a Favor': '',
         'Observaciones': ''
-      });
+      } as any);
       excelData.push({
         'ID Devolución': 'Total Saldos:',
         'Cliente': `${formatCurrency(totalSaldos)}`,
         'Producto': '',
-        'Cantidad': '',
+        'Cantidad': 0,
         'Precio Unitario': '',
         'Monto Total': '',
         'Motivo': '',
-        'Estado': '',
+        'Estado': 'Activo',
         'Fecha': '',
         'Hora': '',
         'Responsable': '',
         'No. Venta': '',
         'Saldo a Favor': '',
         'Observaciones': ''
-      });
+      } as any);
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
@@ -975,7 +980,7 @@ export function DevolucionesPage() {
                   <div className="space-y-2">
                     <Label className="text-white-primary">Estado</Label>
                     <div className="grid gap-2">
-                      {['Todos', 'Activo', 'Anulado'].map((estado) => (
+                      {['Todos', 'Activo', 'Anulado', 'Pendiente', 'Procesado'].map((estado) => (
                         <button
                           key={estado}
                           onClick={() => setFiltroEstado(estado)}
@@ -1025,12 +1030,18 @@ export function DevolucionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayedDevoluciones.length > 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-lighter">
+                      Cargando devoluciones...
+                    </td>
+                  </tr>
+                ) : displayedDevoluciones.length > 0 ? (
                   displayedDevoluciones.map((devolucion) => (
                     <tr key={devolucion.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
                       <td className="py-4 px-4">
                         <span className="text-white-primary font-medium">
-                          {devolucion.documento || devolucion.clienteDocumento || devolucion.id}
+                          {devolucion.id}
                         </span>
                       </td>
                       <td className="py-4 px-4">
@@ -1254,7 +1265,7 @@ export function DevolucionesPage() {
                   </span>
                 </div>
                 <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-                  {getHistorialCliente(selectedDevolucion.clienteId).slice(0, 5).map((dev, index) => (
+                  {getHistorialCliente(selectedDevolucion.clienteId).slice(0, 5).map((dev) => (
                     <div key={dev.id} className="flex items-center justify-between p-2 bg-gray-darker rounded-lg">
                       <div className="flex items-center gap-3">
                         <span className="text-gray-lightest text-sm">{dev.id}</span>
@@ -1293,14 +1304,14 @@ export function DevolucionesPage() {
                   Número de Venta *
                 </Label>
                 <select
-                  value={nuevaDevolucion.numeroVenta}
+                  value={nuevaDevolucion.ventaId || ""}
                   onChange={(e) => handleVentaChange(e.target.value)}
                   className="elegante-input w-full"
                 >
                   <option value="">Seleccionar venta...</option>
                   {ventasDisponibles.map((venta) => (
                     <option key={venta.id} value={venta.id}>
-                      {venta.id} - {venta.cliente} - ${formatCurrency(venta.total)} ({venta.fecha})
+                      {venta.numeroVenta} - {venta.cliente} - ${formatCurrency(venta.total)} ({venta.fecha})
                     </option>
                   ))}
                 </select>

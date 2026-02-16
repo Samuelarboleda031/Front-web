@@ -20,7 +20,7 @@ export interface CategoriaUpdateRequest {
 }
 
 class CategoriaService {
-  private readonly API_BASE_URL = 'http://edwisbarber.somee.com/api';
+  private readonly API_BASE_URL = '/api';
 
   private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const isGet = !options.method || options.method === 'GET';
@@ -135,21 +135,9 @@ class CategoriaService {
 
   async updateCategoriaStatus(id: number, estado: boolean): Promise<void> {
     try {
-      // Primero obtener la categoría actual para conservar los demás datos
-      const categoriaActual = await this.getCategoriaById(id);
-      if (!categoriaActual) {
-        throw new Error('Categoría no encontrada');
-      }
-
-      const mapped = {
-        Id: id,
-        Nombre: categoriaActual.nombre,
-        Estado: estado
-      };
-      console.log(`📤 Actualizando estado de categoría ${id} a ${estado}:`, mapped);
-      await this.request(`/categorias/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(mapped),
+      await this.request(`/categorias/${id}/estado`, {
+        method: 'POST',
+        body: JSON.stringify({ estado: estado }),
       });
       console.log(`✅ Estado de categoría ${id} actualizado a ${estado}`);
     } catch (error: any) {

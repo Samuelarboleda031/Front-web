@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,6 +14,7 @@ interface PasswordResetPageProps {
 }
 
 export function PasswordResetPage({ token, email, onComplete, onBack }: PasswordResetPageProps) {
+  const { verifyPasswordReset, confirmPasswordReset } = useAuth();
   const [step, setStep] = useState<'verify' | 'reset' | 'success'>('verify');
   const [passwords, setPasswords] = useState({
     newPassword: '',
@@ -24,29 +26,42 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
   const [error, setError] = useState('');
   const [tokenValid, setTokenValid] = useState(true);
   const [timeLeft, setTimeLeft] = useState(24 * 60 * 60); // 24 horas en segundos
+  const [verifiedEmail, setVerifiedEmail] = useState(email || '');
 
-  // Simular validación del token al cargar
+  // Capturar oobCode directamente de la URL (Solución Real solicitada)
+  const [urlParams] = useState(() => new URLSearchParams(window.location.search));
+  const oobCodeFromUrl = urlParams.get('oobCode');
+  const finalToken = token || oobCodeFromUrl;
+
+  // Validación real del token al cargar
   useEffect(() => {
     const validateToken = async () => {
-      if (!token) {
+      // Usamos finalToken que puede venir por props o por URL
+      if (!finalToken) {
         setTokenValid(false);
+        setStep('reset');
         return;
       }
 
-      // Simular validación del token
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Para tokens de simulación, siempre son válidos
-      if (token.startsWith('sim_')) {
-        setTokenValid(true);
-        setStep('reset');
-      } else {
+      try {
+        const result = await verifyPasswordReset(finalToken);
+        if (result.success && result.email) {
+          setTokenValid(true);
+          setVerifiedEmail(result.email);
+          setStep('reset');
+        } else {
+          setTokenValid(false);
+          setStep('reset');
+        }
+      } catch (error) {
+        console.error("Error validando token:", error);
         setTokenValid(false);
+        setStep('reset');
       }
     };
 
     validateToken();
-  }, [token]);
+  }, [finalToken, verifyPasswordReset]);
 
   // Contador regresivo para la expiración del token
   useEffect(() => {
@@ -73,19 +88,17 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
   };
 
   const validatePassword = (password: string) => {
-    const validations = {
+    return {
       minLength: password.length >= 6,
       hasNumber: /[0-9]/.test(password),
       hasUpperCase: /[A-Z]/.test(password),
       hasLowerCase: /[a-z]/.test(password)
     };
-    
-    return validations;
   };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (passwords.newPassword !== passwords.confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -97,16 +110,23 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
       return;
     }
 
+    if (!finalToken) {
+      setError('Token de recuperación no válido o expirado');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      // Simular proceso de actualización de contraseña
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setStep('success');
-    } catch (err) {
-      setError('Error al actualizar la contraseña. Intenta de nuevo.');
+      const result = await confirmPasswordReset(finalToken, passwords.newPassword);
+      if (result.success) {
+        setStep('success');
+      } else {
+        setError(result.error || 'Error al actualizar la contraseña');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar la contraseña. Intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -162,12 +182,6 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
               >
                 Solicitar nuevo enlace
               </Button>
-              <Button
-                onClick={() => window.close()}
-                className="elegante-button-secondary w-full"
-              >
-                Cerrar ventana
-              </Button>
             </div>
           </div>
         </div>
@@ -196,12 +210,6 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
                 className="elegante-button-primary w-full"
               >
                 Ir a iniciar sesión
-              </Button>
-              <Button
-                onClick={() => window.close()}
-                className="elegante-button-secondary w-full"
-              >
-                Cerrar ventana
               </Button>
             </div>
           </div>
@@ -239,15 +247,11 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-lightest">Cuenta:</span>
-              <span className="text-white-primary font-mono">{email || 'admin@elitebarbershop.com'}</span>
+              <span className="text-white-primary font-mono">{verifiedEmail}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-lightest">Fecha:</span>
               <span className="text-white-primary">{new Date().toLocaleString('es-ES')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-lightest">IP:</span>
-              <span className="text-white-primary">192.168.1.100 (Simulado)</span>
             </div>
           </div>
         </div>
@@ -290,7 +294,7 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              
+
               {/* Validaciones de contraseña */}
               {passwords.newPassword && (
                 <div className="mt-3 p-3 bg-gray-darker rounded-lg border border-gray-dark">
@@ -368,22 +372,6 @@ export function PasswordResetPage({ token, email, onComplete, onBack }: Password
               <ArrowLeft className="w-4 h-4" />
               Volver al inicio de sesión
             </button>
-          </div>
-        </div>
-
-        {/* Información de seguridad */}
-        <div className="mt-6 p-4 bg-orange-primary/5 border border-orange-primary/20 rounded-lg">
-          <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-orange-primary flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-white-primary mb-2">Información de Seguridad</h4>
-              <ul className="text-sm text-gray-lightest space-y-1">
-                <li>• Este enlace expira automáticamente para tu seguridad</li>
-                <li>• Solo puede ser usado una vez</li>
-                <li>• Tu nueva contraseña se aplicará inmediatamente</li>
-                <li>• Cierra esta ventana después de completar el proceso</li>
-              </ul>
-            </div>
           </div>
         </div>
       </div>

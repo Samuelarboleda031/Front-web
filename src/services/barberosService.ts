@@ -1,290 +1,184 @@
-/**
- * Servicio para gestión de Barberos
- * API: http://edwisbarber.somee.com/api/Barberos
- */
+const API_BASE_URL = '/api';
 
 export interface Barbero {
   id: number;
-  usuarioId?: number;
   nombre: string;
   apellido: string;
+  tipoDocumento: string;
   documento: string;
   correo: string;
   telefono: string;
+  direccion: string;
+  barrio: string;
+  fechaNacimiento: string;
+  rol: string;
+  status: 'active' | 'inactive';
+  fotoPerfil: string;
   especialidad?: string;
-  fotoPerfil?: string;
-  estado: boolean;
-  agendamientos?: any[];
-  entregasInsumos?: any[];
-  horarios?: any[];
-  venta?: any[];
-  usuario?: {
-    id: number;
-    nombre: string;
-    correo: string;
-    rol?: string;
-  };
-  // Campos compatibles con el componente actual
-  nombres?: string; // Para compatibilidad, mapeado desde nombre
-  apellidos?: string; // Para compatibilidad, mapeado desde apellido
-  tipoDocumento?: string; // Para compatibilidad
-  celular?: string; // Para compatibilidad, mapeado desde telefono
-  direccion?: string;
-  barrio?: string;
-  fechaNacimiento?: string;
-  password?: string;
-  rol?: string;
-  status?: 'active' | 'inactive'; // Para compatibilidad, mapeado desde estado
-  imagenUrl?: string; // Para compatibilidad, mapeado desde fotoPerfil
-  fechaCreacion?: string;
+  // campos adicionales para compatibilidad
+  nombres?: string;
+  apellidos?: string;
+  celular?: string;
+  imagenUrl?: string;
   avatar?: string;
 }
 
 export interface CreateBarberoData {
-  usuarioId?: number;
   nombre: string;
   apellido: string;
+  tipoDocumento: string;
   documento: string;
   correo: string;
   telefono: string;
+  direccion: string;
+  barrio: string;
+  fechaNacimiento: string;
+  rol: string;
+  status: string;
+  fotoPerfil: string;
   especialidad?: string;
-  fotoPerfil?: string;
-  estado?: boolean;
-  // Campos compatibles con el componente actual
-  nombres?: string; // Para compatibilidad, se mapeará a nombre
-  apellidos?: string; // Para compatibilidad, se mapeará a apellido
-  tipoDocumento?: string;
-  celular?: string; // Para compatibilidad, se mapeará a telefono
-  direccion?: string;
-  barrio?: string;
-  fechaNacimiento?: string;
-  password?: string;
-  rol?: string;
-  status?: 'active' | 'inactive'; // Para compatibilidad, se mapeará a estado
-  imagenUrl?: string; // Para compatibilidad, se mapeará a fotoPerfil
 }
 
-export interface UpdateBarberoData {
+export interface UpdateBarberoData extends CreateBarberoData {
   id: number;
-  usuarioId?: number;
-  nombre?: string;
-  apellido?: string;
-  documento?: string;
-  correo?: string;
-  telefono?: string;
-  especialidad?: string;
-  fotoPerfil?: string;
-  estado?: boolean;
-  // Campos compatibles con el componente actual
-  nombres?: string; // Para compatibilidad, se mapeará a nombre
-  apellidos?: string; // Para compatibilidad, se mapeará a apellido
-  tipoDocumento?: string;
-  celular?: string; // Para compatibilidad, se mapeará a telefono
-  direccion?: string;
-  barrio?: string;
-  fechaNacimiento?: string;
-  password?: string;
-  rol?: string;
-  status?: 'active' | 'inactive'; // Para compatibilidad, se mapeará a estado
-  imagenUrl?: string; // Para compatibilidad, se mapeará a fotoPerfil
 }
 
-const API_BASE_URL = 'http://edwisbarber.somee.com/api';
+// Interface que refleja la respuesta de la API
+interface BarberoApi {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  tipoDocumento: string;
+  documento: string;
+  correo: string;
+  telefono: string;
+  direccion: string;
+  barrio: string;
+  fechaNacimiento?: string;
+  rol: string;
+  estado: boolean;
+  imagenUrl: string;
+  especialidad: string;
+}
 
 class BarberosService {
   private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
-    console.log(`🔄 Barberos API [${options.method || 'GET'}]: ${url}`);
-    if (options.body) {
-      console.log(`📤 Request Body:`, options.body);
-    }
-    
-    const response = await fetch(url, {
+
+    const config: RequestInit = {
+      ...options,
       headers: {
+        ...options.headers,
         'Content-Type': 'application/json',
       },
-      ...options,
-    });
+    };
 
-    if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status}`;
-      try {
+    try {
+      console.log(`Barberos API [${config.method || 'GET'}]: ${url}`);
+      const response = await fetch(url, config);
+
+      if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Respuesta de error del servidor:', errorText);
-        errorMessage += ` - ${errorText}`;
-      } catch (e) {
-        console.error('❌ No se pudo leer el error del servidor');
+        throw new Error(`Error ${response.status}: ${errorText}`);
       }
-      throw new Error(errorMessage);
-    }
-
-    return response;
-  }
-
-  // Obtener todos los barberos
-  async getBarberos(): Promise<Barbero[]> {
-    try {
-      console.log('📋 Obteniendo barberos...');
-      const response = await this.request('/Barberos');
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : [];
-      
-      console.log('✅ Barberos obtenidos:', data);
-      return data;
+      return response;
     } catch (error) {
-      console.error('❌ Error obteniendo barberos:', error);
+      console.error('API Error:', error);
       throw error;
     }
   }
 
-  // Obtener un barbero por ID
-  async getBarberoById(id: number): Promise<Barbero | null> {
-    try {
-      console.log(`🔍 Obteniendo barbero ${id}...`);
-      const response = await this.request(`/Barberos/${id}`);
-      const text = await response.text();
-      
-      if (!text) return null;
-      
-      const data = JSON.parse(text);
-      console.log(`✅ Barbero ${id} obtenido:`, data);
-      return data;
-    } catch (error) {
-      console.error(`❌ Error obteniendo barbero ${id}:`, error);
-      return null;
-    }
+  mapApiToComponent(api: BarberoApi): Barbero {
+    return {
+      id: api.id,
+      nombre: api.nombres,
+      nombres: api.nombres,
+      apellido: api.apellidos,
+      apellidos: api.apellidos,
+      tipoDocumento: api.tipoDocumento,
+      documento: api.documento,
+      correo: api.correo,
+      telefono: api.telefono,
+      celular: api.telefono,
+      direccion: api.direccion,
+      barrio: api.barrio,
+      fechaNacimiento: (api.fechaNacimiento?.split('T')[0]) ?? '',
+      rol: api.rol,
+      status: api.estado ? 'active' : 'inactive',
+      fotoPerfil: api.imagenUrl,
+      imagenUrl: api.imagenUrl,
+      especialidad: api.especialidad
+    };
   }
 
-  // Crear un nuevo barbero
-  async createBarbero(barberoData: CreateBarberoData): Promise<Barbero> {
-    try {
-      console.log('➕ Creando nuevo barbero:', barberoData);
-      
-      const response = await this.request('/Barberos', {
-        method: 'POST',
-        body: JSON.stringify(barberoData),
-      });
-
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : barberoData;
-      
-      console.log('✅ Barbero creado exitosamente:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Error creando barbero:', error);
-      throw error;
-    }
+  mapComponentToApi(local: CreateBarberoData | UpdateBarberoData): any {
+    return {
+      ...('id' in local ? { Id: local.id } : {}),
+      Nombres: local.nombre,
+      Apellidos: local.apellido,
+      TipoDocumento: local.tipoDocumento,
+      Documento: local.documento,
+      Correo: local.correo,
+      Telefono: local.telefono,
+      Direccion: local.direccion,
+      Barrio: local.barrio,
+      FechaNacimiento: local.fechaNacimiento ? new Date(local.fechaNacimiento).toISOString() : null,
+      Rol: local.rol,
+      Estado: local.status === 'active',
+      ImagenUrl: local.fotoPerfil,
+      Especialidad: local.especialidad
+    };
   }
 
-  // Actualizar un barbero existente
-  async updateBarbero(id: number, updateData: UpdateBarberoData): Promise<Barbero> {
-    try {
-      console.log(`🔄 Actualizando barbero ${id}:`, updateData);
-      console.log(`🔄 Estado en updateData:`, updateData.estado);
-      console.log(`🔄 Status en updateData:`, updateData.status);
-      
-      const response = await this.request(`/Barberos/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
-      });
-
-      const text = await response.text();
-      console.log(`🔄 Respuesta cruda de API para barbero ${id}:`, text);
-      
-      const data = text ? JSON.parse(text) : { ...updateData, id };
-      console.log(`✅ Barbero ${id} actualizado (parseado):`, data);
-      console.log(`✅ Estado en respuesta:`, data.estado);
-      console.log(`✅ Status en respuesta:`, data.status);
-      
-      return data;
-    } catch (error) {
-      console.error(`❌ Error actualizando barbero ${id}:`, error);
-      throw error;
-    }
+  async getBarberos(): Promise<BarberoApi[]> {
+    const response = await this.request('/Barberos');
+    const data = await response.json();
+    return data;
   }
 
-  // Eliminar un barbero
+  async createBarbero(data: any): Promise<BarberoApi> {
+    // Mapear datos a PascalCase para la API
+    const mappedData = {
+      UsuarioId: data.usuarioId,
+      Nombre: data.nombre,
+      Apellido: data.apellido,
+      Documento: data.documento,
+      Correo: data.correo,
+      Telefono: data.telefono,
+      Especialidad: data.especialidad || 'General',
+      Estado: data.estado !== undefined ? data.estado : true,
+      FotoPerfil: data.fotoPerfil ?? ''
+    };
+
+    console.log('🔵 Creando barbero - Datos originales:', data);
+    console.log('🔵 Creando barbero - Datos mapeados (enviados):', mappedData);
+
+    const response = await this.request('/Barberos', {
+      method: 'POST',
+      body: JSON.stringify(mappedData)
+    });
+    return await response.json();
+  }
+
+  async updateBarbero(id: number, data: any): Promise<BarberoApi> {
+    const response = await this.request(`/Barberos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  }
+
   async deleteBarbero(id: number): Promise<void> {
-    try {
-      console.log(`🗑️ Eliminando barbero ${id}...`);
-      
-      await this.request(`/Barberos/${id}`, {
-        method: 'DELETE',
-      });
-      
-      console.log(`✅ Barbero ${id} eliminado exitosamente`);
-    } catch (error) {
-      console.error(`❌ Error eliminando barbero ${id}:`, error);
-      throw error;
-    }
+    await this.request(`/Barberos/${id}`, {
+      method: 'DELETE'
+    });
   }
 
-  // Mapear datos de la API al formato del componente
-  mapApiToComponent(apiData: any): Barbero {
-    return {
-      // Nuevos campos de la API
-      id: apiData.id || 0,
-      usuarioId: apiData.usuarioId,
-      nombre: apiData.nombre || '',
-      apellido: apiData.apellido || '',
-      documento: apiData.documento || '',
-      correo: apiData.correo || '',
-      telefono: apiData.telefono || '',
-      especialidad: apiData.especialidad || '',
-      fotoPerfil: apiData.fotoPerfil || '',
-      estado: apiData.estado !== undefined ? apiData.estado : true,
-      agendamientos: apiData.agendamientos || [],
-      entregasInsumos: apiData.entregasInsumos || [],
-      horarios: apiData.horarios || [],
-      venta: apiData.venta || [],
-      usuario: apiData.usuario || undefined,
-      
-      // Campos de compatibilidad con el componente actual
-      nombres: apiData.nombre || apiData.nombres || '',
-      apellidos: apiData.apellido || apiData.apellidos || '',
-      tipoDocumento: apiData.tipoDocumento || 'Cédula',
-      celular: apiData.telefono || apiData.celular || '',
-      direccion: apiData.direccion || '',
-      barrio: apiData.barrio || '',
-      fechaNacimiento: apiData.fechaNacimiento || '',
-      password: apiData.password || '',
-      rol: apiData.rol || 'Barbero',
-      status: apiData.estado === true || apiData.status === 'active' ? 'active' : 'inactive',
-      imagenUrl: apiData.fotoPerfil || apiData.imagenUrl || '',
-      fechaCreacion: apiData.fechaCreacion || new Date().toLocaleDateString('es-ES'),
-      avatar: `${(apiData.nombre || apiData.nombres || '').split(' ')[0]?.[0] || ''}${(apiData.apellido || apiData.apellidos || '').split(' ')[0]?.[0] || ''}`.toUpperCase()
-    };
-  }
-
-  // Mapear datos del componente al formato de la API
-  mapComponentToApi(componentData: Partial<Barbero>): any {
-    return {
-      // Nuevos campos para la API
-      id: componentData.id,
-      usuarioId: componentData.usuarioId,
-      nombre: componentData.nombre || componentData.nombres,
-      apellido: componentData.apellido || componentData.apellidos,
-      documento: componentData.documento,
-      correo: componentData.correo,
-      telefono: componentData.telefono || componentData.celular,
-      especialidad: componentData.especialidad,
-      fotoPerfil: componentData.fotoPerfil || componentData.imagenUrl,
-      estado: componentData.estado !== undefined ? componentData.estado : (componentData.status === 'active' ? true : false),
-      agendamientos: componentData.agendamientos,
-      entregasInsumos: componentData.entregasInsumos,
-      horarios: componentData.horarios,
-      venta: componentData.venta,
-      usuario: componentData.usuario,
-      
-      // Campos de compatibilidad (se mantienen por si la API los espera)
-      tipoDocumento: componentData.tipoDocumento,
-      direccion: componentData.direccion,
-      barrio: componentData.barrio,
-      fechaNacimiento: componentData.fechaNacimiento,
-      password: componentData.password,
-      rol: componentData.rol
-    };
+  async updateBarberoStatus(id: number, estado: boolean): Promise<void> {
+    await this.request(`/Barberos/${id}/estado`, {
+      method: 'POST', // Changed from PUT to POST as per recent history
+      body: JSON.stringify({ estado })
+    });
   }
 }
 

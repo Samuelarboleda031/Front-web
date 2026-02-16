@@ -1,4 +1,9 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
+import { agendamientoService } from "../../services/agendamientoService";
+import { barberosService } from "../../services/barberosService";
+import { servicioService } from "../../services/servicioService";
+import { clientesService } from "../../services/clientesService";
+import { apiService } from "../../services/api";
 import { Input } from "../ui/input";
 import { Calendar, Clock, User, Edit, Trash2, Search, ChevronLeft, ChevronRight, Eye, MoreHorizontal } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -11,108 +16,14 @@ import { useCustomAlert } from "../ui/custom-alert";
 const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const horasDelDia = Array.from({ length: 15 }, (_, i) => i + 7); // 7:00 AM a 9:00 PM
 
-const citasData = [
-  {
-    id: 1,
-    cliente: "Carlos Mendez",
-    telefono: "+1234567890",
-    servicio: "Corte + Barba",
-    barbero: "Miguel Rodriguez",
-    fecha: "2024-01-15",
-    hora: "09:00",
-    duracion: 60,
-    precio: 45000,
-    estado: "confirmada",
-    notas: "Cliente regular, prefiere corte degradado"
-  },
-  {
-    id: 2,
-    cliente: "Ana García",
-    telefono: "+1234567891",
-    servicio: "Corte Dama",
-    barbero: "Sofia Martinez",
-    fecha: "2024-01-15",
-    hora: "10:30",
-    duracion: 45,
-    precio: 35000,
-    estado: "en-curso",
-    notas: ""
-  },
-  {
-    id: 3,
-    cliente: "José Torres",
-    telefono: "+1234567892",
-    servicio: "Afeitado Clásico",
-    barbero: "Miguel Rodriguez",
-    fecha: "2024-01-15",
-    hora: "11:00",
-    duracion: 30,
-    precio: 25000,
-    estado: "pendiente",
-    notas: "Primera vez, explicar proceso"
-  },
-  {
-    id: 4,
-    cliente: "María López",
-    telefono: "+1234567893",
-    servicio: "Tratamiento Capilar",
-    barbero: "Sofia Martinez",
-    fecha: "2024-01-15",
-    hora: "12:00",
-    duracion: 90,
-    precio: 65000,
-    estado: "confirmada",
-    notas: "Cabello graso, usar productos específicos"
-  },
-  {
-    id: 5,
-    cliente: "Pedro Sanchez",
-    telefono: "+1234567894",
-    servicio: "Corte Caballero",
-    barbero: "Miguel Rodriguez",
-    fecha: "2024-01-15",
-    hora: "09:30",
-    duracion: 30,
-    precio: 25000,
-    estado: "pendiente",
-    notas: ""
-  }
-];
-
-const servicios = [
-  { nombre: "Corte Caballero", precio: 25000 },
-  { nombre: "Corte Dama", precio: 35000 },
-  { nombre: "Corte + Barba", precio: 45000 },
-  { nombre: "Afeitado Clásico", precio: 25000 },
-  { nombre: "Tratamiento Capilar", precio: 65000 },
-  { nombre: "Peinado Evento", precio: 40000 },
-  { nombre: "Tintura", precio: 80000 },
-  { nombre: "Mechas", precio: 95000 }
-];
-
-const barberos = [
-  "Miguel Rodriguez", "Sofia Martinez", "Carlos Ruiz", "Ana Herrera"
-];
-
-const clientes = [
-  { nombre: "Carlos Mendez", telefono: "+1234567890" },
-  { nombre: "Ana García", telefono: "+1234567891" },
-  { nombre: "José Torres", telefono: "+1234567892" },
-  { nombre: "María López", telefono: "+1234567893" },
-  { nombre: "Pedro Sanchez", telefono: "+1234567894" },
-  { nombre: "Laura Martínez", telefono: "+1234567895" },
-  { nombre: "Diego Hernández", telefono: "+1234567896" },
-  { nombre: "Carmen Rodríguez", telefono: "+1234567897" },
-  { nombre: "Roberto Díaz", telefono: "+1234567898" },
-  { nombre: "Patricia Gómez", telefono: "+1234567899" }
-];
+// Los datos se cargan dinámicamente desde la API
 
 const estados = [
-  { value: "pendiente", label: "Pendiente", color: "bg-orange-primary" },
-  { value: "confirmada", label: "Confirmada", color: "bg-orange-primary text-black-primary" },
-  { value: "en-curso", label: "En Curso", color: "bg-green-600" },
-  { value: "completada", label: "Completada", color: "bg-blue-600" },
-  { value: "cancelada", label: "Cancelada", color: "bg-red-600" }
+  { value: "Pendiente", label: "Pendiente", color: "bg-orange-primary" },
+  { value: "Confirmada", label: "Confirmada", color: "bg-orange-primary text-black-primary" },
+  { value: "En Proceso", label: "En Proceso", color: "bg-green-600" },
+  { value: "Completada", label: "Completada", color: "bg-blue-600" },
+  { value: "Cancelada", label: "Cancelada", color: "bg-red-600" }
 ];
 
 // Función para formatear precios
@@ -123,8 +34,46 @@ const formatearPrecio = (precio: number): string => {
 
 export function AgendamientoPage() {
   const { success, error, AlertContainer } = useCustomAlert();
-  const [citas, setCitas] = useState(citasData);
+  const [citas, setCitas] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Listas para los selects
+  const [serviciosList, setServiciosList] = useState<any[]>([]);
+  const [paquetesList, setPaquetesList] = useState<any[]>([]);
+  const [barberosList, setBarberosList] = useState<any[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
+
   const [currentWeek, setCurrentWeek] = useState(0);
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [citasData, barberosData, serviciosData, clientesData, paquetesData] = await Promise.all([
+        agendamientoService.getAgendamientos(),
+        barberosService.getBarberos(),
+        servicioService.getServicios(),
+        clientesService.getClientes(),
+        apiService.getPaquetes()
+      ]);
+
+      setCitas(citasData);
+      setBarberosList(barberosData);
+      setServiciosList(serviciosData);
+      setClientesList(clientesData);
+      setPaquetesList(paquetesData);
+    } catch (err) {
+      console.error("Error al cargar datos:", err);
+      // Fallback a los datos estáticos si hay error (opcional, pero mejor mostrar error)
+      error("Error de conexión", "No se pudieron cargar los datos desde el servidor.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Estados para el modal de gestión de franja horaria
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
@@ -136,15 +85,19 @@ export function AgendamientoPage() {
 
   // Estados para formulario de nueva cita
   const [nuevaCita, setNuevaCita] = useState({
+    clienteId: 0,
     cliente: '',
     telefono: '',
+    servicioId: null as number | null,
+    paqueteId: null as number | null,
     servicio: '',
+    barberoId: 0,
     barbero: '',
     fecha: '',
     hora: '',
     duracion: 60,
     precio: 0,
-    estado: 'pendiente',
+    estado: 'Pendiente',
     notas: ''
   });
 
@@ -187,15 +140,16 @@ export function AgendamientoPage() {
     return citasDelDia.filter(cita => {
       const horaSplit = cita.hora.split(':');
       const horaInicio = parseInt(horaSplit[0] || '0');
-      const minutosInicio = parseInt(horaSplit[1] || '0');
+      // minutosInicio no se usa actualmente para el cálculo de bloques de hora plana
+
 
       const horaFin = horaInicio + Math.ceil(cita.duracion / 60);
       return horaInicio <= hora && hora < horaFin;
     }).filter(cita => {
       // Aplicar filtros de búsqueda
-      const matchesSearch = cita.cliente.toLowerCase().includes(slotSearchTerm.toLowerCase()) ||
+      const matchesSearch = cita.clienteNombre.toLowerCase().includes(slotSearchTerm.toLowerCase()) ||
         cita.telefono.includes(slotSearchTerm) ||
-        cita.servicio.toLowerCase().includes(slotSearchTerm.toLowerCase());
+        cita.servicioNombre.toLowerCase().includes(slotSearchTerm.toLowerCase());
       const matchesEstado = slotFilterEstado === "all" || cita.estado === slotFilterEstado;
       return matchesSearch && matchesEstado;
     });
@@ -203,11 +157,11 @@ export function AgendamientoPage() {
 
   const getCitaColor = (estado: string) => {
     switch (estado) {
-      case 'confirmada': return '#d8b081';
-      case 'en-curso': return '#22C55E';
-      case 'completada': return '#3B82F6';
-      case 'cancelada': return '#EF4444';
-      case 'pendiente': return '#d8b081';
+      case 'Confirmada': return '#d8b081';
+      case 'En Proceso': return '#22C55E';
+      case 'Completada': return '#3B82F6';
+      case 'Cancelada': return '#EF4444';
+      case 'Pendiente': return '#d8b081';
       default: return '#d8b081';
     }
   };
@@ -231,15 +185,19 @@ export function AgendamientoPage() {
     // Preparar formulario para nueva cita
     const horaString = hora.toString().padStart(2, '0') + ':00';
     setNuevaCita({
+      clienteId: 0,
       cliente: '',
       telefono: '',
+      servicioId: null,
+      paqueteId: null,
       servicio: '',
+      barberoId: 0,
       barbero: '',
       fecha: dayInfo?.fechaCompleta || '',
       hora: horaString,
       duracion: 60,
       precio: 0,
-      estado: 'pendiente',
+      estado: 'Pendiente',
       notas: ''
     });
 
@@ -249,93 +207,178 @@ export function AgendamientoPage() {
     setIsSlotModalOpen(true);
   };
 
-  // Manejar selección de servicio
-  const handleServicioChange = (nombreServicio: string) => {
-    const servicio = servicios.find(s => s.nombre === nombreServicio);
-    setNuevaCita({
-      ...nuevaCita,
-      servicio: nombreServicio,
-      precio: servicio ? servicio.precio : 0
-    });
+  // Manejar selección de servicio o paquete
+  const handleItemChange = (value: string) => {
+    if (value.startsWith('p-')) {
+      // Es un paquete
+      const id = parseInt(value.replace('p-', ''));
+      const paquete = paquetesList.find(p => p.id === id);
+      setNuevaCita({
+        ...nuevaCita,
+        paqueteId: id,
+        servicioId: null,
+        servicio: paquete ? paquete.nombre : '',
+        precio: paquete ? paquete.precio : 0,
+        duracion: paquete ? paquete.duracion : 60
+      });
+    } else {
+      // Es un servicio
+      const id = parseInt(value);
+      const servicio = serviciosList.find(s => s.id === id);
+      setNuevaCita({
+        ...nuevaCita,
+        servicioId: id,
+        paqueteId: null,
+        servicio: servicio ? servicio.nombre : '',
+        precio: servicio ? servicio.precio : 0,
+        duracion: servicio ? (servicio.duracion || 60) : 60
+      });
+    }
   };
 
   // Crear nueva cita
-  const handleCreateCita = () => {
-    if (!nuevaCita.cliente || !nuevaCita.telefono || !nuevaCita.servicio || !nuevaCita.barbero) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios.");
+  const handleCreateCita = async () => {
+    if (!nuevaCita.clienteId || (!nuevaCita.servicioId && !nuevaCita.paqueteId) || !nuevaCita.barberoId) {
+      error("Campos obligatorios faltantes", "Por favor selecciona un cliente, un servicio/paquete y un barbero.");
       return;
     }
 
-    const cita = {
-      id: Date.now(),
-      ...nuevaCita,
-      precio: parseFloat(nuevaCita.precio.toString())
-    };
+    try {
+      const created = await agendamientoService.createAgendamiento({
+        clienteId: nuevaCita.clienteId,
+        barberoId: nuevaCita.barberoId,
+        servicioId: nuevaCita.servicioId,
+        paqueteId: nuevaCita.paqueteId,
+        fecha: nuevaCita.fecha,
+        hora: nuevaCita.hora,
+        duracion: nuevaCita.duracion,
+        precio: nuevaCita.precio,
+        estado: nuevaCita.estado,
+        notas: nuevaCita.notas
+      });
 
-    setCitas([...citas, cita]);
-    setNuevaCita({
-      cliente: '',
-      telefono: '',
-      servicio: '',
-      barbero: '',
-      fecha: selectedSlot?.fecha || '',
-      hora: selectedSlot?.hora.toString().padStart(2, '0') + ':00' || '',
-      duracion: 60,
-      precio: 0,
-      estado: 'pendiente',
-      notas: ''
-    });
+      setCitas([...citas, created]);
+      setNuevaCita({
+        clienteId: 0,
+        cliente: '',
+        telefono: '',
+        servicioId: null,
+        paqueteId: null,
+        servicio: '',
+        barberoId: 0,
+        barbero: '',
+        fecha: selectedSlot?.fecha || '',
+        hora: selectedSlot?.hora.toString().padStart(2, '0') + ':00' || '',
+        duracion: 60,
+        precio: 0,
+        estado: 'Pendiente',
+        notas: ''
+      });
 
-    success("¡Cita creada exitosamente!", `La cita para ${cita.cliente} ha sido registrada.`);
-    setActiveTab('lista');
+      success("¡Cita creada exitosamente!", `La cita ha sido registrada.`);
+      setActiveTab('lista');
+    } catch (err) {
+      error("Error al crear cita", "No se pudo conectar con el servidor.");
+    }
   };
 
   // Editar cita
   const handleEditCita = (cita: any) => {
     setSelectedCita(cita);
-    setNuevaCita(cita);
+    setNuevaCita({
+      clienteId: cita.clienteId,
+      cliente: cita.clienteNombre,
+      telefono: cita.clienteTelefono || '',
+      servicioId: cita.servicioId,
+      paqueteId: cita.paqueteId,
+      servicio: cita.servicioNombre || cita.paqueteNombre || '',
+      barberoId: cita.barberoId,
+      barbero: cita.barberoNombre,
+      fecha: cita.fecha,
+      hora: cita.hora,
+      duracion: cita.duracion,
+      precio: cita.precio,
+      estado: cita.estado,
+      notas: cita.notas
+    });
     setActiveTab('crear');
   };
 
   // Actualizar cita
-  const handleUpdateCita = () => {
-    if (!nuevaCita.cliente || !nuevaCita.telefono || !nuevaCita.servicio || !nuevaCita.barbero) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios.");
+  const handleUpdateCita = async () => {
+    if (!nuevaCita.clienteId || (!nuevaCita.servicioId && !nuevaCita.paqueteId) || !nuevaCita.barberoId) {
+      error("Campos obligatorios faltantes", "Por favor selecciona un cliente, servicio/paquete y un barbero.");
       return;
     }
 
-    setCitas(citas.map(cita =>
-      cita.id === selectedCita.id
-        ? { ...cita, ...nuevaCita, precio: parseFloat(nuevaCita.precio.toString()) }
-        : cita
-    ));
+    try {
+      await agendamientoService.updateAgendamiento(selectedCita.id, {
+        clienteId: nuevaCita.clienteId,
+        barberoId: nuevaCita.barberoId,
+        servicioId: nuevaCita.servicioId,
+        paqueteId: nuevaCita.paqueteId,
+        fecha: nuevaCita.fecha,
+        hora: nuevaCita.hora,
+        duracion: nuevaCita.duracion,
+        precio: nuevaCita.precio,
+        estado: nuevaCita.estado,
+        notas: nuevaCita.notas
+      });
 
-    success("¡Cita actualizada exitosamente!", `Los cambios han sido guardados correctamente.`);
-    setSelectedCita(null);
-    setActiveTab('lista');
+      // Refrescamos todos los datos para asegurar que los nombres y detalles sean correctos
+      await fetchData();
+
+      success("¡Cita actualizada exitosamente!", `Los cambios han sido guardados correctamente.`);
+      setSelectedCita(null);
+      setActiveTab('lista');
+    } catch (err) {
+      console.error("Error al actualizar:", err);
+      error("Error al actualizar", "No se pudieron guardar los cambios en el servidor.");
+    }
   };
 
   // Eliminar cita
   const handleDeleteCita = (cita: any) => {
+    console.log("Iniciando eliminación de cita:", cita);
     setCitaToDelete(cita);
+    setIsSlotModalOpen(false); // Cerramos el modal de la franja para evitar conflictos de capas
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteCita = () => {
+  const confirmDeleteCita = async () => {
+    console.log("LLAMANDO A confirmDeleteCita - Cita ID:", citaToDelete?.id);
     if (citaToDelete) {
-      setCitas(citas.filter(cita => cita.id !== citaToDelete.id));
-      setIsDeleteDialogOpen(false);
-      setCitaToDelete(null);
-      success("¡Cita eliminada exitosamente!", `La cita ha sido eliminada del sistema.`);
+      try {
+        console.log("Ejecutando agendamientoService.deleteAgendamiento físico...");
+        await agendamientoService.deleteAgendamiento(citaToDelete.id);
+        console.log("Eliminación física exitosa en el servidor");
+
+        // Refrescamos todos los datos desde el servidor para asegurar sincronización total
+        await fetchData();
+
+        setIsDeleteDialogOpen(false);
+        setCitaToDelete(null);
+        success("¡Cita eliminada!", `La cita ha sido eliminada permanentemente del sistema.`);
+      } catch (err: any) {
+        console.error("ERROR CRÍTICO AL ELIMINAR:", err);
+        error("Error al eliminar", err.message || "No se pudo realizar la operación.");
+      }
+    } else {
+      console.warn("No hay cita seleccionada para eliminar (citaToDelete es null)");
     }
   };
 
   // Cambiar estado de cita
-  const handleChangeEstado = (citaId: number, nuevoEstado: string) => {
-    setCitas(citas.map(cita =>
-      cita.id === citaId ? { ...cita, estado: nuevoEstado } : cita
-    ));
-    success("Estado actualizado", "El estado de la cita ha sido modificado.");
+  const handleChangeEstado = async (citaId: number, nuevoEstado: string) => {
+    try {
+      await agendamientoService.updateAgendamientoStatus(citaId, nuevoEstado);
+      setCitas(citas.map(cita =>
+        cita.id === citaId ? { ...cita, estado: nuevoEstado } : cita
+      ));
+      success("Estado actualizado", "El estado de la cita ha sido modificado.");
+    } catch (err) {
+      error("Error al actualizar estado", "No se pudieron guardar los cambios.");
+    }
   };
 
   // Ver detalle de cita
@@ -346,12 +389,18 @@ export function AgendamientoPage() {
 
   // Stats para el dashboard
   const totalCitas = citas.length;
-  const citasActivas = citas.filter(c => c.estado !== 'cancelada').length;
+  const citasActivas = citas.filter(c => c.estado !== 'Cancelada').length;
   const citasHoy = citas.filter(c => c.fecha === new Date().toISOString().split('T')[0]).length;
 
   return (
     <>
       <main className="flex-1 overflow-auto p-8 bg-black-primary">
+        {isLoading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-orange-primary text-xl animate-pulse">Cargando datos...</div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div style={{ display: 'none' }} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="elegante-card text-center">
@@ -467,7 +516,7 @@ export function AgendamientoPage() {
                                   border: `1px solid ${getCitaColor(cita.estado)}`
                                 }}
                               >
-                                {cita.cliente}
+                                {cita.clienteNombre}
                               </div>
                             ))}
                             {citasEnSlot.length > 2 && (
@@ -505,8 +554,8 @@ export function AgendamientoPage() {
             <button
               onClick={() => setActiveTab('lista')}
               className={`px-6 py-3 border-b-2 transition-colors ${activeTab === 'lista'
-                  ? 'border-orange-primary text-orange-primary'
-                  : 'border-transparent text-gray-lightest hover:text-white-primary'
+                ? 'border-orange-primary text-orange-primary'
+                : 'border-transparent text-gray-lightest hover:text-white-primary'
                 }`}
             >
               Lista de Citas
@@ -524,14 +573,14 @@ export function AgendamientoPage() {
                     hora: selectedSlot?.hora.toString().padStart(2, '0') + ':00' || '',
                     duracion: 60,
                     precio: 0,
-                    estado: 'pendiente',
+                    estado: 'Pendiente',
                     notas: ''
                   });
                 }
               }}
               className={`px-6 py-3 border-b-2 transition-colors ${activeTab === 'crear'
-                  ? 'border-orange-primary text-orange-primary'
-                  : 'border-transparent text-gray-lightest hover:text-white-primary'
+                ? 'border-orange-primary text-orange-primary'
+                : 'border-transparent text-gray-lightest hover:text-white-primary'
                 }`}
             >
               {selectedCita ? 'Editar Cita' : 'Nueva Cita'}
@@ -586,7 +635,7 @@ export function AgendamientoPage() {
                           className="w-4 h-4 rounded-full"
                           style={{ backgroundColor: getCitaColor(cita.estado) }}
                         />
-                        <h4 className="font-semibold text-white-primary">{cita.cliente}</h4>
+                        <h4 className="font-semibold text-white-primary">{cita.clienteNombre}</h4>
                         <div className={`elegante-tag ${getEstadoInfo(cita.estado).color} text-white text-xs`}>
                           {getEstadoInfo(cita.estado).label}
                         </div>
@@ -594,21 +643,31 @@ export function AgendamientoPage() {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleViewDetail(cita)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetail(cita);
+                          }}
                           className="p-2 rounded bg-blue-600/20 hover:bg-blue-600/30 transition-colors"
                           title="Ver detalle"
                         >
                           <Eye className="w-4 h-4 text-blue-400" />
                         </button>
                         <button
-                          onClick={() => handleEditCita(cita)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCita(cita);
+                          }}
                           className="p-2 rounded bg-orange-primary/20 hover:bg-orange-primary/30 transition-colors"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4 text-orange-primary" />
                         </button>
                         <button
-                          onClick={() => handleDeleteCita(cita)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("Click en icono Eliminar (Trash2)");
+                            handleDeleteCita(cita);
+                          }}
                           className="p-2 rounded bg-red-600/20 hover:bg-red-600/30 transition-colors"
                           title="Eliminar"
                         >
@@ -633,10 +692,10 @@ export function AgendamientoPage() {
 
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-lightest">
                       <div>
-                        <span className="text-gray-light">Servicio:</span> {cita.servicio}
+                        <span className="text-gray-light">Servicio:</span> {cita.servicioNombre}
                       </div>
                       <div>
-                        <span className="text-gray-light">Barbero:</span> {cita.barbero}
+                        <span className="text-gray-light">Barbero:</span> {cita.barberoNombre}
                       </div>
                       <div>
                         <span className="text-gray-light">Hora:</span> {cita.hora} ({cita.duracion}min)
@@ -662,7 +721,7 @@ export function AgendamientoPage() {
                       onClick={() => setActiveTab('crear')}
                       className="elegante-button-primary mt-4"
                     >
-                      
+
                       Crear Cita
                     </button>
                   </div>
@@ -680,13 +739,15 @@ export function AgendamientoPage() {
                   <div className="space-y-3">
                     <div>
                       <Label className="text-white-primary mb-2">Cliente</Label>
-                      <Select 
-                        value={nuevaCita.cliente} 
+                      <Select
+                        value={nuevaCita.clienteId.toString()}
                         onValueChange={(value) => {
-                          const clienteSeleccionado = clientes.find(c => c.nombre === value);
-                          setNuevaCita({ 
-                            ...nuevaCita, 
-                            cliente: value,
+                          const id = parseInt(value);
+                          const clienteSeleccionado = clientesList.find(c => c.id === id);
+                          setNuevaCita({
+                            ...nuevaCita,
+                            clienteId: id,
+                            cliente: clienteSeleccionado ? `${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido}` : '',
                             telefono: clienteSeleccionado ? clienteSeleccionado.telefono : ''
                           });
                         }}
@@ -695,9 +756,9 @@ export function AgendamientoPage() {
                           <SelectValue placeholder="Seleccionar cliente" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-darkest border-gray-dark">
-                          {clientes.map((cliente) => (
-                            <SelectItem key={cliente.nombre} value={cliente.nombre} className="text-white-primary">
-                              {cliente.nombre}
+                          {clientesList.map((cliente) => (
+                            <SelectItem key={cliente.id} value={cliente.id.toString()} className="text-white-primary">
+                              {cliente.nombre} {cliente.apellido}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -721,29 +782,55 @@ export function AgendamientoPage() {
                   <div className="space-y-3">
                     <div>
                       <Label className="text-white-primary mb-2">Servicio</Label>
-                      <Select value={nuevaCita.servicio} onValueChange={handleServicioChange}>
+                      <Select
+                        value={nuevaCita.paqueteId ? `p-${nuevaCita.paqueteId}` : (nuevaCita.servicioId?.toString() || "")}
+                        onValueChange={handleItemChange}
+                      >
                         <SelectTrigger className="elegante-input">
-                          <SelectValue placeholder="Seleccionar servicio" />
+                          <SelectValue placeholder="Seleccionar servicio o paquete" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-darkest border-gray-dark">
-                          {servicios.map((servicio) => (
-                            <SelectItem key={servicio.nombre} value={servicio.nombre} className="text-white-primary">
+                        <SelectContent className="bg-gray-darkest border-gray-dark max-h-80 overflow-y-auto">
+                          <div className="px-2 py-1.5 text-xs font-semibold text-orange-primary/70 uppercase tracking-wider">Servicios</div>
+                          {serviciosList.map((servicio) => (
+                            <SelectItem key={servicio.id} value={servicio.id.toString()} className="text-white-primary">
                               {servicio.nombre} - {formatearPrecio(servicio.precio)}
                             </SelectItem>
                           ))}
+
+                          {paquetesList.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 mt-2 text-xs font-semibold text-orange-primary/70 uppercase tracking-wider">Paquetes Especiales</div>
+                              {paquetesList.map((paquete) => (
+                                <SelectItem key={`p-${paquete.id}`} value={`p-${paquete.id}`} className="text-white-primary">
+                                  🎁 {paquete.nombre} - {formatearPrecio(paquete.precio)}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label className="text-white-primary mb-2">Barbero</Label>
-                      <Select value={nuevaCita.barbero} onValueChange={(value) => setNuevaCita({ ...nuevaCita, barbero: value })}>
+                      <Select
+                        value={nuevaCita.barberoId.toString()}
+                        onValueChange={(value) => {
+                          const id = parseInt(value);
+                          const barbero = barberosList.find(b => b.id === id);
+                          setNuevaCita({
+                            ...nuevaCita,
+                            barberoId: id,
+                            barbero: barbero ? `${barbero.nombres || barbero.nombre} ${barbero.apellidos || barbero.apellido || ''}` : ''
+                          });
+                        }}
+                      >
                         <SelectTrigger className="elegante-input">
                           <SelectValue placeholder="Seleccionar barbero" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-darkest border-gray-dark">
-                          {barberos.map((barbero) => (
-                            <SelectItem key={barbero} value={barbero} className="text-white-primary">
-                              {barbero}
+                          {barberosList.map((barbero) => (
+                            <SelectItem key={barbero.id} value={barbero.id.toString()} className="text-white-primary">
+                              {barbero.nombres || barbero.nombre} {barbero.apellidos || barbero.apellido || ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -859,7 +946,7 @@ export function AgendamientoPage() {
             <div className="space-y-6">
               <div className="bg-gray-darker border border-gray-dark rounded-lg p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-white-primary">{selectedCita.cliente}</h3>
+                  <h3 className="text-xl font-semibold text-white-primary">{selectedCita.clienteNombre}</h3>
                   <div className={`elegante-tag ${getEstadoInfo(selectedCita.estado).color} text-white`}>
                     {getEstadoInfo(selectedCita.estado).label}
                   </div>
@@ -869,13 +956,13 @@ export function AgendamientoPage() {
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-semibold text-gray-light mb-1">Información del Cliente</h4>
-                      <p className="text-white-primary">{selectedCita.cliente}</p>
+                      <p className="text-white-primary">{selectedCita.clienteNombre}</p>
                       <p className="text-gray-lightest text-sm">{selectedCita.telefono}</p>
                     </div>
 
                     <div>
                       <h4 className="text-sm font-semibold text-gray-light mb-1">Servicio</h4>
-                      <p className="text-white-primary">{selectedCita.servicio}</p>
+                      <p className="text-white-primary">{selectedCita.servicioNombre}</p>
                       <p className="text-orange-primary font-semibold">{formatearPrecio(selectedCita.precio)}</p>
                     </div>
                   </div>
@@ -889,7 +976,7 @@ export function AgendamientoPage() {
 
                     <div>
                       <h4 className="text-sm font-semibold text-gray-light mb-1">Barbero Asignado</h4>
-                      <p className="text-white-primary">{selectedCita.barbero}</p>
+                      <p className="text-white-primary">{selectedCita.barberoNombre}</p>
                     </div>
                   </div>
                 </div>
@@ -915,13 +1002,20 @@ export function AgendamientoPage() {
                     <Edit className="w-4 h-4 mr-2" />
                     Editar Cita
                   </button>
+                  <button
+                    onClick={() => handleDeleteCita(selectedCita)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center transition-all"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Eliminar Cita
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
           {/* Footer del modal */}
-          
+
         </DialogContent>
       </Dialog>
 
@@ -938,7 +1032,7 @@ export function AgendamientoPage() {
               </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-gray-lightest">
-              ¿Estás seguro de que deseas eliminar la cita de {citaToDelete?.cliente}? Esta acción no se puede deshacer.
+              ¿Estás seguro de que deseas eliminar la cita de {citaToDelete?.clienteNombre}? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -953,7 +1047,10 @@ export function AgendamientoPage() {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white border-none"
-              onClick={confirmDeleteCita}
+              onClick={() => {
+                console.log("Botón ELIMINAR del Dialog presionado");
+                confirmDeleteCita();
+              }}
             >
               Eliminar
             </AlertDialogAction>

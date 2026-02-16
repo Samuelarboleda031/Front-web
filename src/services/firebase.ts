@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
+import {
+  getAuth,
+  GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
@@ -60,7 +60,7 @@ export class FirebaseAuthService {
   async signIn(email: string, password: string): Promise<UserCredential> {
     try {
       const result = await signInWithEmailAndPassword(this.auth, email, password);
-      
+
       // Temporalmente desactivada la verificación de email para pruebas
       // TODO: Reactivar cuando el sistema esté en producción
       /*
@@ -70,7 +70,7 @@ export class FirebaseAuthService {
         throw new Error('Por favor, verifica tu email antes de iniciar sesión. Hemos enviado un email de verificación a ' + email);
       }
       */
-      
+
       return result;
     } catch (error: any) {
       throw this.handleAuthError(error);
@@ -81,10 +81,10 @@ export class FirebaseAuthService {
   async signUp(email: string, password: string): Promise<UserCredential> {
     try {
       const result = await createUserWithEmailAndPassword(this.auth, email, password);
-      
+
       // Enviar email de verificación
       await this.sendEmailVerification();
-      
+
       return result;
     } catch (error: any) {
       throw this.handleAuthError(error);
@@ -118,7 +118,33 @@ export class FirebaseAuthService {
   // Recuperar contraseña
   async resetPassword(email: string): Promise<void> {
     try {
-      await sendPasswordResetEmail(this.auth, email);
+      // Configuramos para que el link redirija de vuelta a la aplicación
+      // Usamos el origen actual + una ruta descriptiva
+      const actionCodeSettings = {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: true,
+      };
+      await sendPasswordResetEmail(this.auth, email, actionCodeSettings);
+    } catch (error: any) {
+      throw this.handleAuthError(error);
+    }
+  }
+
+  // Verificar código de restablecimiento
+  async verifyPasswordResetCode(code: string): Promise<string> {
+    try {
+      const { verifyPasswordResetCode } = await import("firebase/auth");
+      return await verifyPasswordResetCode(this.auth, code);
+    } catch (error: any) {
+      throw this.handleAuthError(error);
+    }
+  }
+
+  // Confirmar nuevo password
+  async confirmPasswordReset(code: string, newPassword: string): Promise<void> {
+    try {
+      const { confirmPasswordReset } = await import("firebase/auth");
+      await confirmPasswordReset(this.auth, code, newPassword);
     } catch (error: any) {
       throw this.handleAuthError(error);
     }

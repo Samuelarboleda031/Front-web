@@ -84,7 +84,7 @@ class ProductoService {
         console.error(`❌ Request Method: ${config.method || 'GET'}`);
         console.error(`❌ Request Headers:`, config.headers);
         console.error(`❌ Request Body:`, config.body);
-        
+
         // Intentar parsear el error como JSON para más detalles
         try {
           const errorJson = JSON.parse(errorText);
@@ -135,7 +135,7 @@ class ProductoService {
       const response = await this.request('/productos');
       const text = await response.text();
       const data = text ? JSON.parse(text) : [];
-      
+
       console.log('📦 Productos crudos de API:', data);
       if (Array.isArray(data) && data.length > 0) {
         console.log('📦 Primer producto crudo:', data[0]);
@@ -147,7 +147,7 @@ class ProductoService {
       if (mappedData.length > 0) {
         console.log('📦 Primer producto mapeado:', mappedData[0]);
       }
-      
+
       return mappedData;
     } catch (error) {
       console.error('Error fetching productos:', error);
@@ -171,7 +171,7 @@ class ProductoService {
     try {
       // Obtener el ID de la categoría
       const categoriaId = CATEGORIA_MAP[productoData.categoria || ''] || 1;
-      
+
       // Enviar los campos exactos que la API espera
       const apiBody = {
         nombre: productoData.nombre || '',
@@ -185,7 +185,7 @@ class ProductoService {
         imagen: productoData.imagen || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
-      
+
       console.log('🔵 Creando producto - Datos originales:', productoData);
       console.log('🔵 Creando producto - Datos mapeados (enviados):', apiBody);
 
@@ -221,7 +221,7 @@ class ProductoService {
     try {
       // Obtener el ID de la categoría
       const categoriaId = CATEGORIA_MAP[productoData.categoria || ''] || 1;
-      
+
       // Enviar los campos exactos que la API espera para PUT
       const apiBody = {
         id: id,
@@ -237,7 +237,7 @@ class ProductoService {
         imagen: productoData.imagen || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
-      
+
       console.log('🔵 Actualizando producto - Datos originales:', productoData);
       console.log('🔵 Actualizando producto - Datos mapeados (enviados):', apiBody);
 
@@ -254,7 +254,7 @@ class ProductoService {
     } catch (error: any) {
       console.error('❌ Error updating producto:', error);
       console.error('❌ Datos que causaron el error:', productoData);
-      
+
       // Detectar errores específicos de PUT
       const errorMessage = error.message.toLowerCase();
       if (errorMessage.includes('precioventa') || errorMessage.includes('precio')) {
@@ -264,7 +264,7 @@ class ProductoService {
         customError.name = 'PrecioInvalido';
         throw customError;
       }
-      
+
       if (errorMessage.includes('categoriaid') || errorMessage.includes('categoría')) {
         const customError = new Error(
           'Error en la categoría: La categoría seleccionada no es válida.'
@@ -272,7 +272,7 @@ class ProductoService {
         customError.name = 'CategoriaInvalida';
         throw customError;
       }
-      
+
       throw error;
     }
   }
@@ -289,16 +289,16 @@ class ProductoService {
     } catch (error: any) {
       console.error('❌ Error deleting producto:', error);
       console.error('❌ Detalles del error:', error.message);
-      
+
       // Detectar errores de restricción de clave externa
       const errorMessage = error.message.toLowerCase();
-      if (errorMessage.includes('foreign key') || 
-          errorMessage.includes('constraint') || 
-          errorMessage.includes('relación') ||
-          errorMessage.includes('referencia') ||
-          errorMessage.includes('related') ||
-          errorMessage.includes('dependiente')) {
-        
+      if (errorMessage.includes('foreign key') ||
+        errorMessage.includes('constraint') ||
+        errorMessage.includes('relación') ||
+        errorMessage.includes('referencia') ||
+        errorMessage.includes('related') ||
+        errorMessage.includes('dependiente')) {
+
         const customError = new Error(
           'No se puede eliminar el producto porque está relacionado con otros registros (ventas, compras, etc.). ' +
           'Primero debe eliminar o actualizar los registros relacionados.'
@@ -306,7 +306,7 @@ class ProductoService {
         customError.name = 'ForeignKeyConstraint';
         throw customError;
       }
-      
+
       throw error;
     }
   }
@@ -315,55 +315,17 @@ class ProductoService {
   // MÉTODOS ADICIONALES
   // =============================================================================
 
-  async toggleProductoActivo(id: number): Promise<ApiProducto> {
+  async toggleProductoActivo(id: number, currentEstado: boolean): Promise<void> {
     try {
-      // Primero obtener el producto actual
-      const producto = await this.getProductoById(id);
-      if (!producto) {
-        throw new Error('Producto no encontrado');
-      }
+      const nuevoEstado = !currentEstado;
+      console.log(`🔄 Toggle activo - ID: ${id}, Nuevo estado: ${nuevoEstado}`);
 
-      // Obtener el ID de la categoría
-      const categoriaId = CATEGORIA_MAP[producto.categoria || ''] || 1;
-      
-      // Enviar solo los campos necesarios para cambiar el estado
-      const apiBody = {
-        id: id,
-        nombre: producto.nombre,
-        descripcion: producto.descripcion || '',
-        precioVenta: Number(producto.precioBase) || 0,
-        precioCompra: Number(producto.precioBase) || 0,
-        stockVentas: Number(producto.stockVentas) || 0,
-        stockInsumos: Number(producto.stockInsumos) || 0,
-        stockMinimo: Number(producto.minCantidad) || 0,
-        categoriaId: categoriaId,
-        estado: !producto.activo  // Solo cambiar este campo
-      };
-      
-      console.log('🔄 Toggle activo - Producto:', producto.nombre);
-      console.log('🔄 Toggle activo - Estado actual:', producto.activo);
-      console.log('🔄 Toggle activo - Nuevo estado:', !producto.activo);
-      console.log('🔄 Toggle activo - Payload enviado:', apiBody);
-
-      const response = await this.request(`/productos/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(apiBody),
+      await this.request(`/productos/${id}/estado`, {
+        method: 'POST',
+        body: JSON.stringify({ estado: nuevoEstado }),
       });
 
-      const text = await response.text();
-      if (!text) {
-        // Si la respuesta está vacía, retornar el producto con el estado actualizado
-        return {
-          ...producto,
-          activo: !producto.activo
-        } as ApiProducto;
-      }
-
-      const result = JSON.parse(text);
-      const updatedProducto = this.mapFromApiFormat(result);
-      console.log(`✅ Producto ${!producto.activo ? 'activado' : 'desactivado'}:`, updatedProducto);
-      
-      return updatedProducto;
+      console.log(`✅ Producto ${nuevoEstado ? 'activado' : 'desactivado'}`);
     } catch (error) {
       console.error('Error toggling producto activo:', error);
       throw error;
@@ -428,9 +390,9 @@ class ProductoService {
       const response = await this.request('/categorias');
       const text = await response.text();
       const data = text ? JSON.parse(text) : [];
-      
+
       console.log('📂 Categorías crudas de API:', data);
-      
+
       // Si vienen como objetos, extraer los nombres y IDs
       if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
         const categoriasConIds = data.map((cat: any) => ({
@@ -438,25 +400,25 @@ class ProductoService {
           nombre: cat.Nombre || cat.nombre
         }));
         console.log('📂 Categorías mapeadas con IDs:', categoriasConIds);
-        
+
         // Actualizar el mapeo con los IDs reales
         categoriasConIds.forEach((cat: any) => {
           CATEGORIA_MAP[cat.nombre] = cat.id;
         });
-        
+
         return categoriasConIds.map(cat => cat.nombre);
       }
-      
+
       // Si vienen como strings directos
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching categorias:', error);
       // Categorías por defecto si la API no tiene el endpoint
       return [
-        "Cuidado Capilar", 
-        "Cuidado Barba", 
-        "Herramientas", 
-        "Suministros", 
+        "Cuidado Capilar",
+        "Cuidado Barba",
+        "Herramientas",
+        "Suministros",
         "Accesorios"
       ];
     }
@@ -488,7 +450,7 @@ export const formatearPrecio = (precio: number): string => {
 // Prueba simplificada para POST
 async function testSimplePost() {
   console.log('🧪 Probando POST simple con estructura correcta...');
-  
+
   try {
     const testData = {
       nombre: 'Producto Test Simple',
@@ -517,7 +479,7 @@ async function testSimplePost() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Error response:', errorText);
-      
+
       try {
         const errorJson = JSON.parse(errorText);
         console.error('❌ Error JSON:', errorJson);
@@ -603,34 +565,34 @@ async function testProductosCRUD() {
 // Prueba de eliminación
 async function testDeleteProducto() {
   console.log('🧪 Probando eliminación de productos...');
-  
+
   try {
     const productos = await productoService.getProductos();
     console.log('📦 Productos disponibles:', productos.map((p: any) => ({ id: p.id, nombre: p.nombre })));
-    
+
     if (productos.length === 0) {
       console.log('❌ No hay productos para eliminar');
       return;
     }
-    
+
     const productoAEliminar = productos[0];
     console.log(`🗑️ Intentando eliminar producto: "${productoAEliminar.nombre}" (ID: ${productoAEliminar.id})`);
-    
+
     try {
       await productoService.deleteProducto(productoAEliminar.id);
       console.log('✅ Producto eliminado exitosamente');
-      
+
       const productosDespues = await productoService.getProductos();
       const eliminado = !productosDespues.some((p: any) => p.id === productoAEliminar.id);
       console.log('✅ Verificación: Producto', eliminado ? 'SÍ fue eliminado' : 'NO fue eliminado');
-      
+
     } catch (deleteError: any) {
       console.error('❌ Error al eliminar producto:', deleteError.message);
-      
+
       if (deleteError.name === 'ForeignKeyConstraint') {
         console.log('🔗 Error de clave externa detectado');
         console.log('💡 Solución: Desactivar el producto en lugar de eliminarlo');
-        
+
         try {
           console.log('🔄 Intentando desactivar el producto como alternativa...');
           const productoDesactivado = await productoService.toggleProductoActivo(productoAEliminar.id);
@@ -642,30 +604,30 @@ async function testDeleteProducto() {
         console.log('❓ Otro tipo de error:', deleteError.name);
       }
     }
-    
+
   } catch (error) {
     console.error('❌ Error general en la prueba:', error);
   }
-  
+
   console.log('🧪 Fin de la prueba de eliminación');
 }
 
 // Prueba de actualización
 async function testUpdateProducto() {
   console.log('🧪 Probando actualización de productos (PUT)...');
-  
+
   try {
     const productos = await productoService.getProductos();
     console.log('📦 Productos disponibles:', productos.map((p: any) => ({ id: p.id, nombre: p.nombre })));
-    
+
     if (productos.length === 0) {
       console.log('❌ No hay productos para actualizar');
       return;
     }
-    
+
     const productoAActualizar = productos[0];
     console.log(`✏️ Intentando actualizar producto: "${productoAActualizar.nombre}" (ID: ${productoAActualizar.id})`);
-    
+
     const datosActualizacion = {
       nombre: `${productoAActualizar.nombre} - EDITADO`,
       descripcion: `Descripción actualizada: ${new Date().toLocaleTimeString()}`,
@@ -676,20 +638,20 @@ async function testUpdateProducto() {
       categoria: productoAActualizar.categoria || 'Cuidado Capilar',
       activo: productoAActualizar.activo !== false
     };
-    
+
     console.log('📝 Datos de actualización:', datosActualizacion);
-    
+
     try {
       const productoActualizado = await productoService.updateProducto(
-        productoAActualizar.id, 
+        productoAActualizar.id,
         datosActualizacion
       );
-      
+
       console.log('✅ Producto actualizado exitosamente:', productoActualizado);
-      
+
       const productosDespues = await productoService.getProductos();
       const productoVerificado = productosDespues.find((p: any) => p.id === productoAActualizar.id);
-      
+
       if (productoVerificado) {
         console.log('✅ Verificación: Producto actualizado en la lista');
         console.log('📊 Cambios aplicados:', {
@@ -700,10 +662,10 @@ async function testUpdateProducto() {
       } else {
         console.log('❌ Verificación: Producto no encontrado después de actualizar');
       }
-      
+
     } catch (updateError: any) {
       console.error('❌ Error al actualizar producto:', updateError.message);
-      
+
       if (updateError.name === 'PrecioInvalido') {
         console.log('💰 Error de precio detectado');
       } else if (updateError.name === 'CategoriaInvalida') {
@@ -712,18 +674,18 @@ async function testUpdateProducto() {
         console.log('❓ Otro tipo de error:', updateError.name);
       }
     }
-    
+
   } catch (error) {
     console.error('❌ Error general en la prueba:', error);
   }
-  
+
   console.log('🧪 Fin de la prueba de actualización');
 }
 
 // Debug API
 async function debugAPI() {
   console.log('🔍 === DEPURACIÓN DE API ===');
-  
+
   try {
     // 1. Ver categorías
     console.log('\n📂 1. Obteniendo categorías...');
@@ -736,7 +698,7 @@ async function debugAPI() {
       console.log('Primera categoría:', catData[0]);
       console.log('Keys de primera categoría:', Object.keys(catData[0]));
     }
-    
+
     // 2. Ver productos existentes
     console.log('\n📦 2. Obteniendo productos existentes...');
     const prodResponse = await fetch('/api/productos?t=' + Date.now());
@@ -747,11 +709,11 @@ async function debugAPI() {
       console.log('Primer producto:', prodData[0]);
       console.log('Keys de primer producto:', Object.keys(prodData[0]));
     }
-    
+
   } catch (error) {
     console.error('❌ Error en depuración:', error);
   }
-  
+
   console.log('\n🔍 === FIN DEPURACIÓN ===');
 }
 
@@ -765,7 +727,7 @@ if (typeof window !== 'undefined') {
   (window as any).testDeleteProducto = testDeleteProducto;
   (window as any).testUpdateProducto = testUpdateProducto;
   (window as any).debugAPI = debugAPI;
-  
+
   console.log('🧪 Funciones de prueba disponibles en consola:');
   console.log('  - testSimplePost()');
   console.log('  - testProductosCRUD()');

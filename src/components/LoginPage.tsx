@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -12,9 +12,11 @@ import logo from '../assets/a51cd14e3664f3752eaa436dadb14492d91e40aa.png';
 interface LoginPageProps {
   onRequestRegister?: () => void;
   onBackToLanding?: () => void;
+  initialResetData?: { email: string; token: string } | null;
+  onResetComplete?: () => void;
 }
 
-export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps) {
+export function LoginPage({ onRequestRegister, onBackToLanding, initialResetData, onResetComplete }: LoginPageProps) {
   const { login, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
@@ -28,9 +30,20 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
   const [resetEmail, setResetEmail] = useState<string>('');
   const [captchaValidated, setCaptchaValidated] = useState<boolean>(false);
 
+  // Efecto para manejar redirección desde email de recuperación
+  useEffect(() => {
+    if (initialResetData && initialResetData.token) {
+      console.log('🔄 Inbox reset detected, switching to reset view');
+      setResetToken(initialResetData.token);
+      setResetEmail(initialResetData.email);
+      setCurrentView('password-reset');
+      setCaptchaValidated(true); // Saltamos captcha para el flujo de reset desde link
+    }
+  }, [initialResetData]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Verificar que el captcha esté validado
     if (!captchaValidated) {
       setError('Completa la verificación "No soy un robot" para continuar');
@@ -93,7 +106,8 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
     setCurrentView('login');
     setResetToken('');
     setResetEmail('');
-    // Mostrar mensaje de éxito (opcional)
+    if (onResetComplete) onResetComplete();
+    // Mostrar mensaje de éxito
     alert('Contraseña actualizada correctamente. Ya puedes iniciar sesión con tu nueva contraseña.');
   };
 
@@ -103,7 +117,7 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
 
   if (currentView === 'password-reset') {
     return (
-      <PasswordResetPage 
+      <PasswordResetPage
         token={resetToken}
         email={resetEmail}
         onComplete={handlePasswordResetComplete}
@@ -115,7 +129,7 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
   // Vista principal de login
   return (
     <div className="min-h-screen bg-black-primary flex items-center justify-center p-4 relative">
-      
+
       <div className="w-full max-w-sm">
         {/* Logo y título */}
         <div className="text-center mb-8">
@@ -193,9 +207,8 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
             <Button
               type="submit"
               disabled={isLoading || !captchaValidated}
-              className={`elegante-button-primary w-full flex items-center justify-center ${
-                !captchaValidated ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`elegante-button-primary w-full flex items-center justify-center ${!captchaValidated ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {isLoading ? (
                 <>
@@ -204,22 +217,22 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
                 </>
               ) : (
                 <>
-                  
+
                   Iniciar Sesión
                 </>
               )}
             </Button>
 
             {onBackToLanding && (
-                <button
-                  onClick={onBackToLanding}
-                  className=" top-6 left-6 text-sm text-gray-lightest hover:text-white-primary flex items-center gap-2" 
-                  style={{marginBottom: '4px'}}
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" />
-                  Volver al inicio
-                </button>
-              )}
+              <button
+                onClick={onBackToLanding}
+                className=" top-6 left-6 text-sm text-gray-lightest hover:text-white-primary flex items-center gap-2"
+                style={{ marginBottom: '4px' }}
+              >
+                <ArrowRight className="w-4 h-4 rotate-180" />
+                Volver al inicio
+              </button>
+            )}
 
             {/* Botón de Google Sign-In */}
             <div className="mt-4">
@@ -261,7 +274,7 @@ export function LoginPage({ onRequestRegister, onBackToLanding }: LoginPageProps
               >
                 ¿Olvidaste tu contraseña?
               </button>
-              
+
               <button
                 type="button"
                 onClick={onRequestRegister}

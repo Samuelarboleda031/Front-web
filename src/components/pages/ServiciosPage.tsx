@@ -140,9 +140,11 @@ export function ServiciosPage() {
     try {
       const nuevoEstado = !servicio.estado;
       await apiService.updateServicioStatus(servicioId, nuevoEstado);
-      await loadServicios(); // Recargar todos los servicios
 
-      edited(`Servicio ${!servicio.estado ? 'activado' : 'desactivado'} ✔️`, `El servicio "${servicio.nombre}" ha sido ${!servicio.estado ? 'activado' : 'desactivado'} exitosamente.`);
+      // Actualizar localmente para respuesta inmediata
+      setServicios(prev => prev.map(s => s.id === servicioId ? { ...s, estado: nuevoEstado, activo: nuevoEstado } : s));
+
+      edited(`Servicio ${nuevoEstado ? 'activado' : 'desactivado'} ✔️`, `El servicio "${servicio.nombre}" ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`);
     } catch (err: any) {
       console.error('Error actualizando estado del servicio:', err);
       setError(err.message || 'Error al actualizar el estado del servicio');
