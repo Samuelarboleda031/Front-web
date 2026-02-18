@@ -7,15 +7,15 @@ export interface ClienteAPI {
   documento: string;
   correo: string;
   telefono?: string;
+  direccion?: string;
+  barrio?: string;
   fechaNacimiento?: string;
   estado: boolean;
-  agendamientos?: any[];
-  devoluciones?: any[];
-  venta?: any[];
+  fotoPerfil?: string;
   usuario?: any;
 }
 
-// Interface para el componente Cliente (mantener compatibilidad con el código existente)
+// Interface para el componente Cliente
 export interface Cliente {
   id: string;
   tipoDocumento: string;
@@ -28,16 +28,16 @@ export interface Cliente {
   barrio: string;
   fechaNacimiento: string;
   fechaRegistro: string;
-  ultimaVisita: string;
   activo: boolean;
-  saldoAFavor: number;
   fotoPerfil?: string;
-  contraseña: string;
+  // Campos para compatibilidad con el frontend
+  ultimaVisita?: string;
+  saldoAFavor?: number;
+  contraseña?: string;
 }
 
 // Interface para crear cliente
 export interface CreateClienteData {
-  usuarioId?: number; // Agregado para vinculación
   nombre: string;
   apellido: string;
   documento: string;
@@ -49,203 +49,115 @@ export interface CreateClienteData {
   fotoPerfil?: string;
 }
 
-// Interface para actualizar cliente
-export interface UpdateClienteData extends CreateClienteData {
-  id: number;
-  estado?: boolean; // Agregar campo estado
-}
-
 const API_BASE_URL = '/api/clientes';
+const USUARIOS_API_URL = '/api/usuarios';
 
 class ClientesService {
-  // Mapear datos de la API al formato del componente
-  mapApiToComponent(apiCliente: ClienteAPI): Cliente {
-    // Extraer tipo y número de documento del campo documento
-    const partesDocumento = apiCliente.documento.split(' ');
+  // Mapear datos de la API al formato del componente (usando campos aplanados)
+  mapApiToComponent(apiCliente: any): Cliente {
+    const documentoStr = apiCliente.documento || (apiCliente.usuario?.documento) || '';
+    const partesDocumento = documentoStr.split(' ');
     const tipoDocumento = partesDocumento.length > 1 ? partesDocumento[0] : 'CC';
-    const numeroDocumento = partesDocumento.length > 1 ? partesDocumento.slice(1).join(' ') : apiCliente.documento;
+    const numeroDocumento = partesDocumento.length > 1 ? partesDocumento.slice(1).join(' ') : documentoStr;
 
     return {
-      id: apiCliente.id.toString(),
+      id: (apiCliente.id || apiCliente.Id || 0).toString(),
       tipoDocumento: tipoDocumento || 'CC',
       numeroDocumento: numeroDocumento,
-      nombre: apiCliente.nombre,
-      apellido: apiCliente.apellido,
-      email: apiCliente.correo,
-      telefono: apiCliente.telefono || '',
-      direccion: '', // La API no tiene campo dirección
-      barrio: '', // La API no tiene campo barrio
-      fechaNacimiento: apiCliente.fechaNacimiento || '',
-      fechaRegistro: new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-      ultimaVisita: '', // La API no tiene este campo
-      activo: apiCliente.estado,
-      saldoAFavor: 0, // La API no tiene este campo
-      fotoPerfil: '', // La API no tiene este campo
-      contraseña: '' // La API no maneja contraseñas
+      nombre: apiCliente.nombre || apiCliente.Nombre || '',
+      apellido: apiCliente.apellido || apiCliente.Apellido || '',
+      email: apiCliente.correo || apiCliente.Correo || '',
+      telefono: apiCliente.telefono || apiCliente.Telefono || '',
+      direccion: apiCliente.direccion || apiCliente.Direccion || '',
+      barrio: apiCliente.barrio || apiCliente.Barrio || '',
+      fechaNacimiento: apiCliente.fechaNacimiento || apiCliente.FechaNacimiento || '',
+      fechaRegistro: new Date().toLocaleDateString(),
+      activo: apiCliente.estado === true || apiCliente.Estado === true,
+      fotoPerfil: apiCliente.fotoPerfil || apiCliente.FotoPerfil || apiCliente.imagenUrl || ''
     };
   }
 
-  // Mapear datos del componente a la API (PascalCase para .NET)
-  mapComponentToApi(componenteCliente: CreateClienteData | UpdateClienteData): any {
-    const baseData: any = {
-      UsuarioId: componenteCliente.usuarioId,
-      Nombre: componenteCliente.nombre,
-      Apellido: componenteCliente.apellido,
-      Documento: componenteCliente.documento,
-      Correo: componenteCliente.correo,
-      Telefono: componenteCliente.telefono,
-      FechaNacimiento: componenteCliente.fechaNacimiento,
-      Direccion: componenteCliente.direccion,
-      Barrio: componenteCliente.barrio,
-      FotoPerfil: componenteCliente.fotoPerfil,
-      Estado: true // Por defecto activo
+  // Mapear para envío al servidor (PascalCase)
+  private mapToApiFormat(data: any): any {
+    return {
+      Nombre: data.nombre,
+      Apellido: data.apellido,
+      Documento: data.documento,
+      Correo: data.correo,
+      Telefono: data.telefono,
+      Direccion: data.direccion,
+      Barrio: data.barrio,
+      FechaNacimiento: data.fechaNacimiento,
+      FotoPerfil: data.fotoPerfil || '',
+      Estado: true
     };
-
-    // Si es actualización, agregar id
-    if ('id' in componenteCliente) {
-      baseData.Id = componenteCliente.id;
-    }
-
-    return baseData;
   }
 
-  // Obtener todos los clientes
   async getClientes(): Promise<ClienteAPI[]> {
-    try {
-      const response = await fetch(API_BASE_URL);
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error obteniendo clientes:', error);
-      throw error;
-    }
+    const response = await fetch(API_BASE_URL);
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
+    return await response.json();
   }
 
-  // Obtener un cliente por ID
   async getClienteById(id: number): Promise<ClienteAPI> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}`);
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error obteniendo cliente:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/${id}`);
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
+    return await response.json();
   }
 
-  // Crear un nuevo cliente
-  async createCliente(clienteData: CreateClienteData): Promise<ClienteAPI> {
-    try {
-      const apiData = this.mapComponentToApi(clienteData);
+  // Creación vía /api/usuarios (Recomendado según guía de arquitectura)
+  async createCliente(clienteData: CreateClienteData): Promise<any> {
+    const apiData = {
+      ...this.mapToApiFormat(clienteData),
+      RolId: 3, // Rol de Cliente
+      Contrasena: clienteData.documento || "Cliente123*" // Contraseña temporal
+    };
 
-      console.log('🔵 Creando cliente - Datos originales:', clienteData);
-      console.log('🔵 Creando cliente - Datos mapeados (enviados):', apiData);
+    console.log('🔵 Creando Cliente vía Usuarios API:', apiData.Correo);
 
-      const response = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiData),
-      });
+    const response = await fetch(USUARIOS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apiData),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error del servidor:', errorText);
-        throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error creando cliente:', error);
-      throw error;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error ${response.status}: ${errorText}`);
     }
+
+    return await response.json();
   }
 
-  // Actualizar un cliente
-  async updateCliente(id: number, clienteData: UpdateClienteData): Promise<ClienteAPI> {
-    try {
-      const apiData = this.mapComponentToApi(clienteData);
+  async updateCliente(id: number, clienteData: any): Promise<any> {
+    const apiData = {
+      Id: id,
+      ...this.mapToApiFormat(clienteData),
+      Estado: clienteData.estado !== undefined ? clienteData.estado : true
+    };
 
-      console.log('PUT request data:', JSON.stringify(apiData, null, 2));
-      console.log('PUT request URL:', `${API_BASE_URL}/${id}`);
+    const response = await fetch(`${API_BASE_URL}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apiData),
+    });
 
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...apiData,
-          estado: clienteData.estado // Usar el estado real del cliente
-        }),
-      });
-
-      console.log('PUT response status:', response.status);
-      console.log('PUT response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
-      }
-
-      // Manejar respuesta 204 No Content (común en PUT operations)
-      if (response.status === 204) {
-        return clienteData as ClienteAPI; // Devolver los datos enviados
-      }
-
-      // Si hay contenido, parsear JSON
-      const text = await response.text();
-      return text ? JSON.parse(text) : (clienteData as ClienteAPI);
-    } catch (error) {
-      console.error('Error actualizando cliente:', error);
-      throw error;
-    }
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
+    return response.status === 204 ? clienteData : await response.json();
   }
 
-  // Eliminar un cliente
   async deleteCliente(id: number): Promise<void> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Error eliminando cliente:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
   }
 
-  // Cambiar estado de un cliente (activar/desactivar)
   async toggleClienteEstado(id: number, estado: boolean): Promise<void> {
-    try {
-      console.log(`🔄 Cambiando estado del cliente ${id} a ${estado}`);
-
-      const response = await fetch(`${API_BASE_URL}/${id}/estado`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ estado }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      console.log(`✅ Estado del cliente ${id} actualizado a ${estado}`);
-    } catch (error) {
-      console.error('Error cambiando estado del cliente:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/${id}/estado`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado }),
+    });
+    if (!response.ok) throw new Error(`Error: ${response.status}`);
   }
 }
 

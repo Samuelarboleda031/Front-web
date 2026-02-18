@@ -243,7 +243,7 @@ export function ServiciosPage() {
                           <span className="text-gray-lighter">{servicio.duracion} min</span>
                         </td>
                         <td className="py-4 px-4 text-right">
-                          <span className="text-gray-lighter">${servicio.precio.toLocaleString('es-CO')}</span>
+                          <span className="text-gray-lighter">${(servicio.precio ?? 0).toLocaleString('es-CO')}</span>
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-end gap-2">
@@ -438,7 +438,7 @@ export function ServiciosPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-light mb-2">Precio</p>
-                  <p className="font-semibold text-orange-primary text-lg">${selectedServicio.precio.toLocaleString('es-CO')}</p>
+                  <p className="font-semibold text-orange-primary text-lg">${(selectedServicio.precio ?? 0).toLocaleString('es-CO')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-light mb-2">Estado del Servicio</p>

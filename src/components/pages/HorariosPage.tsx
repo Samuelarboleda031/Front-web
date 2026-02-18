@@ -15,6 +15,7 @@ import {
   X,
   ToggleRight,
   ToggleLeft,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -74,6 +75,7 @@ export function HorariosPage() {
   const [horarios, setHorarios] = useState<HorarioSemanal[]>([]);
   const [barberos, setBarberos] = useState<Barbero[]>([]);
   const [loading, setLoading] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -81,12 +83,12 @@ export function HorariosPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  
+
   // Selection states
   const [editingHorario, setEditingHorario] = useState<HorarioSemanal | null>(null);
   const [horarioToDelete, setHorarioToDelete] = useState<HorarioSemanal | null>(null);
   const [selectedHorario, setSelectedHorario] = useState<HorarioSemanal | null>(null);
-  
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBarbero, setFilterBarbero] = useState("all");
@@ -124,36 +126,47 @@ export function HorariosPage() {
         barberosService.getBarberos(),
         horariosService.getHorarios()
       ]);
-      
-      setBarberos(barberosData);
+
+      // Mapear barberos de API a formato local para evitar problemas de nombres de propiedades
+      const barberosMapeados = barberosData.map(b => ({
+        id: b.id,
+        nombre: b.nombres || (b as any).nombre,
+        apellido: b.apellidos || (b as any).apellido,
+        estado: b.estado
+      }));
+
+      setBarberos(barberosMapeados as any);
 
       // Agrupar horarios por barberoId
       const horariosPorBarbero: Record<number, HorarioBarbero[]> = {};
       horariosData.forEach(h => {
         if (!horariosPorBarbero[h.barberoId]) {
-            horariosPorBarbero[h.barberoId] = [];
+          horariosPorBarbero[h.barberoId] = [];
         }
         horariosPorBarbero[h.barberoId].push(h);
       });
 
       // Mapear a la estructura de la vista
-      const horariosMapeados: HorarioSemanal[] = barberosData
+      const horariosMapeados: HorarioSemanal[] = barberosMapeados
         .filter(b => b.id !== undefined && horariosPorBarbero[b.id] && horariosPorBarbero[b.id].length > 0)
         .map(b => {
-             const bloquesBarbero = horariosPorBarbero[b.id!] || [];
-             return {
-                id: b.id!,
-                barberoId: b.id!,
-                barbero: `${b.nombre} ${b.apellido}`,
-                activo: b.estado, 
-                bloques: bloquesBarbero.map(h => ({
-                    id: h.id,
-                    dia: h.dia,
-                    horaInicio: h.horaInicio,
-                    horaFin: h.horaFin,
-                    estado: h.estado ?? true
-                }))
-             };
+          const bloquesBarbero = horariosPorBarbero[b.id!] || [];
+          // El estado activo del horario depende de si tiene al menos un bloque activo
+          const representsActivo = bloquesBarbero.some(h => h.estado !== false);
+
+          return {
+            id: b.id!,
+            barberoId: b.id!,
+            barbero: `${b.nombre} ${b.apellido}`,
+            activo: representsActivo,
+            bloques: bloquesBarbero.map(h => ({
+              id: h.id,
+              dia: h.dia,
+              horaInicio: h.horaInicio,
+              horaFin: h.horaFin,
+              estado: h.estado ?? true
+            }))
+          };
         });
 
       setHorarios(horariosMapeados);
@@ -193,8 +206,8 @@ export function HorariosPage() {
     }
 
     setNuevoHorario({
-        ...nuevoHorario,
-        bloques: [...nuevoHorario.bloques, { ...nuevoBloque, estado: true }],
+      ...nuevoHorario,
+      bloques: [...nuevoHorario.bloques, { ...nuevoBloque, estado: true }],
     });
     setNuevoBloque({ dia: "", horaInicio: "", horaFin: "" });
   };
@@ -226,7 +239,7 @@ export function HorariosPage() {
       error("Sin bloques", "Debes agregar al menos un bloque de horario (día + horas).");
       return;
     }
-    
+
     if (horarios.some(h => h.barberoId.toString() === nuevoHorario.barberoId)) {
       error("Duplicado", "Este barbero ya tiene horarios asignados. Edítalos en su lugar.");
       return;
@@ -237,28 +250,28 @@ export function HorariosPage() {
 
   const confirmCreateHorario = async () => {
     try {
-        const barberoIdNum = parseInt(nuevoHorario.barberoId);
-        const promises = nuevoHorario.bloques.map(bloque => {
-            const horarioData: HorarioBarbero = {
-                barberoId: barberoIdNum,
-                dia: bloque.dia,
-                horaInicio: bloque.horaInicio,
-                horaFin: bloque.horaFin,
-                estado: true
-            };
-            return horariosService.createHorario(horarioData);
-        });
+      const barberoIdNum = parseInt(nuevoHorario.barberoId);
+      const promises = nuevoHorario.bloques.map(bloque => {
+        const horarioData: HorarioBarbero = {
+          barberoId: barberoIdNum,
+          dia: bloque.dia,
+          horaInicio: bloque.horaInicio,
+          horaFin: bloque.horaFin,
+          estado: true
+        };
+        return horariosService.createHorario(horarioData);
+      });
 
-        await Promise.all(promises);
+      await Promise.all(promises);
 
-        resetFormulario();
-        setIsDialogOpen(false);
-        setIsCreateDialogOpen(false);
-        await loadData();
-        success("¡Horario creado!", "Se han registrado los horarios correctamente.");
+      resetFormulario();
+      setIsDialogOpen(false);
+      setIsCreateDialogOpen(false);
+      await loadData();
+      success("¡Horario creado!", "Se han registrado los horarios correctamente.");
     } catch (err) {
-        console.error(err);
-        error("Error", "No se pudieron crear los horarios.");
+      console.error(err);
+      error("Error", "No se pudieron crear los horarios.");
     }
   };
 
@@ -288,56 +301,56 @@ export function HorariosPage() {
     if (!editingHorario) return;
 
     try {
-        const barberoIdNum = parseInt(nuevoHorario.barberoId);
-        
-        // Bloques actuales en BD (traídos en loadData y guardados en editingHorario)
-        const bloquesActuales = editingHorario.bloques;
-        
-        // Bloques en el formulario
-        const bloquesNuevos = nuevoHorario.bloques;
+      const barberoIdNum = parseInt(nuevoHorario.barberoId);
 
-        // 1. Eliminar los que ya no están
-        // Un bloque se elimina si tiene ID y ese ID no está en la lista nueva
-        const idsNuevos = new Set(bloquesNuevos.map(b => b.id).filter(id => id !== undefined));
-        const bloquesAEliminar = bloquesActuales.filter(b => b.id !== undefined && !idsNuevos.has(b.id));
-        
-        // 2. Crear los nuevos (no tienen ID)
-        const bloquesACrear = bloquesNuevos.filter(b => b.id === undefined);
+      // Bloques actuales en BD (traídos en loadData y guardados en editingHorario)
+      const bloquesActuales = editingHorario.bloques;
 
-        // 3. Actualizar los existentes (tienen ID)
-        const bloquesAActualizar = bloquesNuevos.filter(b => b.id !== undefined);
+      // Bloques en el formulario
+      const bloquesNuevos = nuevoHorario.bloques;
 
-        const deletePromises = bloquesAEliminar.map(b => horariosService.deleteHorario(b.id!));
-        
-        const createPromises = bloquesACrear.map(b => horariosService.createHorario({
-            barberoId: barberoIdNum,
-            dia: b.dia,
-            horaInicio: b.horaInicio,
-            horaFin: b.horaFin,
-            estado: true
-        }));
+      // 1. Eliminar los que ya no están
+      // Un bloque se elimina si tiene ID y ese ID no está en la lista nueva
+      const idsNuevos = new Set(bloquesNuevos.map(b => b.id).filter(id => id !== undefined));
+      const bloquesAEliminar = bloquesActuales.filter(b => b.id !== undefined && !idsNuevos.has(b.id));
 
-        const updatePromises = bloquesAActualizar.map(b => horariosService.updateHorario(b.id!, {
-            id: b.id,
-            barberoId: barberoIdNum,
-            dia: b.dia,
-            horaInicio: b.horaInicio,
-            horaFin: b.horaFin,
-            estado: true
-        }));
+      // 2. Crear los nuevos (no tienen ID)
+      const bloquesACrear = bloquesNuevos.filter(b => b.id === undefined);
 
-        await Promise.all([...deletePromises, ...createPromises, ...updatePromises]);
+      // 3. Actualizar los existentes (tienen ID)
+      const bloquesAActualizar = bloquesNuevos.filter(b => b.id !== undefined);
 
-        setEditingHorario(null);
-        resetFormulario();
-        setIsDialogOpen(false);
-        setIsEditDialogOpen(false);
-        await loadData();
+      const deletePromises = bloquesAEliminar.map(b => horariosService.deleteHorario(b.id!));
 
-        success("¡Horario actualizado!", "Los cambios han sido guardados exitosamente.");
-    } catch(err) {
-        console.error(err);
-        error("Error", "Ocurrió un error al actualizar los horarios.");
+      const createPromises = bloquesACrear.map(b => horariosService.createHorario({
+        barberoId: barberoIdNum,
+        dia: b.dia,
+        horaInicio: b.horaInicio,
+        horaFin: b.horaFin,
+        estado: true
+      }));
+
+      const updatePromises = bloquesAActualizar.map(b => horariosService.updateHorario(b.id!, {
+        id: b.id,
+        barberoId: barberoIdNum,
+        dia: b.dia,
+        horaInicio: b.horaInicio,
+        horaFin: b.horaFin,
+        estado: true
+      }));
+
+      await Promise.all([...deletePromises, ...createPromises, ...updatePromises]);
+
+      setEditingHorario(null);
+      resetFormulario();
+      setIsDialogOpen(false);
+      setIsEditDialogOpen(false);
+      await loadData();
+
+      success("¡Horario actualizado!", "Los cambios han sido guardados exitosamente.");
+    } catch (err) {
+      console.error(err);
+      error("Error", "Ocurrió un error al actualizar los horarios.");
     }
   };
 
@@ -348,47 +361,46 @@ export function HorariosPage() {
 
   const handleConfirmDelete = async () => {
     if (horarioToDelete) {
-        try {
-            const promises = horarioToDelete.bloques.map(b => 
-                b.id ? horariosService.deleteHorario(b.id) : Promise.resolve()
-            );
-            await Promise.all(promises);
+      try {
+        const promises = horarioToDelete.bloques.map(b =>
+          b.id ? horariosService.deleteHorario(b.id) : Promise.resolve()
+        );
+        await Promise.all(promises);
 
-            setIsDeleteDialogOpen(false);
-            setHorarioToDelete(null);
-            await loadData();
-            success("¡Horario eliminado!", `El horario de ${horarioToDelete.barbero} ha sido eliminado.`);
-        } catch (err) {
-            console.error(err);
-            error("Error", "No se pudo eliminar el horario.");
-        }
+        setIsDeleteDialogOpen(false);
+        setHorarioToDelete(null);
+        await loadData();
+        success("¡Horario eliminado!", `El horario de ${horarioToDelete.barbero} ha sido eliminado.`);
+      } catch (err) {
+        console.error(err);
+        error("Error", "No se pudo eliminar el horario.");
+      }
     }
   };
 
   const toggleEstadoHorario = async (horario: HorarioSemanal) => {
-    // Si queremos "desactivar" un horario completo, podríamos iterar y poner estado=false a sus bloques
-    // O si solo es visual. De momento no hay endpoint "toggleAll".
-    // Lo dejaremos visual o update.
-    // Implementación: update all blocks status
     try {
-        const nuevoEstado = !horario.activo;
-        const promises = horario.bloques.map(b => {
-             if (!b.id) return Promise.resolve();
-             return horariosService.updateHorario(b.id, {
-                 id: b.id,
-                 barberoId: horario.barberoId,
-                 dia: b.dia,
-                 horaInicio: b.horaInicio,
-                 horaFin: b.horaFin,
-                 estado: nuevoEstado
-             });
+      setTogglingId(horario.id);
+      const nuevoEstado = !horario.activo;
+      const promises = horario.bloques.map(b => {
+        if (!b.id) return Promise.resolve();
+        return horariosService.updateHorario(b.id, {
+          id: b.id,
+          barberoId: horario.barberoId,
+          dia: b.dia,
+          horaInicio: b.horaInicio,
+          horaFin: b.horaFin,
+          estado: nuevoEstado
         });
-        await Promise.all(promises);
-        await loadData();
-        success("Estado actualizado", `El horario de ${horario.barbero} ahora está ${nuevoEstado ? 'activo' : 'inactivo'}`);
+      });
+      await Promise.all(promises);
+      await loadData();
+      success("Estado actualizado", `El horario de ${horario.barbero} ahora está ${nuevoEstado ? 'activo' : 'inactivo'}`);
     } catch (err) {
-        console.error(err);
-        error("Error", "No se pudo cambiar el estado.");
+      console.error(err);
+      error("Error", "No se pudo cambiar el estado.");
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -497,103 +509,106 @@ export function HorariosPage() {
           {/* Tabla */}
           <div className="overflow-x-auto">
             {loading ? (
-                <div className="text-center py-8 text-gray-lightest">Cargando horarios de barberos...</div>
+              <div className="text-center py-8 text-gray-lightest">Cargando horarios de barberos...</div>
             ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-dark">
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
-                    Barbero
-                  </th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
-                    Días
-                  </th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
-                    Horas
-                  </th>
-                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
-                    Bloques
-                  </th>
-                  <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedHorarios.map((horario) => (
-                  <tr
-                    key={horario.id}
-                    className="border-b border-gray-dark hover:bg-gray-darker transition-colors"
-                  >
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-lighter" />
-                        </div>
-                        <span className="text-gray-lighter">
-                          {horario.barbero}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-gray-lighter">
-                        {getDiasResumen(horario.bloques)}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-gray-lighter text-sm">
-                        {horario.bloques.length > 0 && (
-                          <div className="text-gray-lighter">
-                            {horario.bloques[0].horaInicio} - {horario.bloques[0].horaFin}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="px-2 py-1 rounded bg-gray-medium text-gray-lighter text-sm">
-                        {horario.bloques.length} bloque{horario.bloques.length !== 1 ? "s" : ""}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleViewDetail(horario)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Ver detalle"
-                        >
-                          <Eye className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => toggleEstadoHorario(horario)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title={horario.activo ? "Desactivar" : "Activar"}
-                        >
-                          {horario.activo ? (
-                            <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEditHorario(horario)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteHorario(horario)}
-                          className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-dark">
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
+                      Barbero
+                    </th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
+                      Días
+                    </th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
+                      Horas
+                    </th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">
+                      Bloques
+                    </th>
+                    <th className="text-right py-3 px-4 text-white-primary font-bold text-sm">
+                      Acciones
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedHorarios.map((horario) => (
+                    <tr
+                      key={horario.id}
+                      className="border-b border-gray-dark hover:bg-gray-darker transition-colors"
+                    >
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
+                            <User className="w-5 h-5 text-gray-lighter" />
+                          </div>
+                          <span className="text-gray-lighter">
+                            {horario.barbero}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-lighter">
+                          {getDiasResumen(horario.bloques)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="text-gray-lighter text-sm">
+                          {horario.bloques.length > 0 && (
+                            <div className="text-gray-lighter">
+                              {horario.bloques[0].horaInicio} - {horario.bloques[0].horaFin}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="px-2 py-1 rounded bg-gray-medium text-gray-lighter text-sm">
+                          {horario.bloques.length} bloque{horario.bloques.length !== 1 ? "s" : ""}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleViewDetail(horario)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Ver detalle"
+                          >
+                            <Eye className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
+                          </button>
+                          <button
+                            onClick={() => toggleEstadoHorario(horario)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title={horario.activo ? "Desactivar" : "Activar"}
+                            disabled={togglingId === horario.id}
+                          >
+                            {togglingId === horario.id ? (
+                              <Loader2 className="w-4 h-4 text-orange-primary animate-spin" />
+                            ) : horario.activo ? (
+                              <ToggleRight className="w-4 h-4 text-gray-lightest group-hover:text-green-400" />
+                            ) : (
+                              <ToggleLeft className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleEditHorario(horario)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4 text-gray-lightest group-hover:text-orange-primary" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHorario(horario)}
+                            className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-lightest group-hover:text-red-400" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
 
             {!loading && displayedHorarios.length === 0 && (
@@ -855,7 +870,7 @@ export function HorariosPage() {
             <AlertDialogDescription className="text-gray-lightest">
               Se actualizará el horario de{" "}
               <span className="font-semibold text-white-primary">
-                 {barberos.find(b => b.id.toString() === nuevoHorario.barberoId)?.nombre || 'Barbero'}
+                {barberos.find(b => b.id.toString() === nuevoHorario.barberoId)?.nombre || 'Barbero'}
               </span>.
             </AlertDialogDescription>
           </AlertDialogHeader>

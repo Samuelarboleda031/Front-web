@@ -248,11 +248,13 @@ class RolesApiService {
       }
 
       const createdRole = await roleResponse.json();
-      const roleId = createdRole.id;
+      console.log('✅ Rol base creado:', createdRole);
+      const roleId = createdRole.id; // Puede ser id o Id dependiendo del backend
 
       // Asignar módulos con los permisos enviados desde el frontend
-      for (const moduloId of roleData.modulos) {
-        const permisosDelModulo = roleData.permisos?.[moduloId] || {
+      for (const moduloIdStr of roleData.modulos) {
+        const moduloId = parseInt(moduloIdStr, 10); // Asegurar que sea número
+        const permisosDelModulo = roleData.permisos?.[moduloIdStr] || {
           puedeVer: true,
           puedeCrear: true,
           puedeEditar: true,
@@ -260,16 +262,30 @@ class RolesApiService {
         };
 
         const rolesModulosPayload = {
-          rolId: roleId,
-          moduloId: moduloId,
-          ...permisosDelModulo
+          Id: 0,
+          RolId: typeof roleId === 'string' ? parseInt(roleId, 10) : roleId,
+          ModuloId: moduloId,
+          PuedeVer: permisosDelModulo.puedeVer,
+          PuedeCrear: permisosDelModulo.puedeCrear,
+          PuedeEditar: permisosDelModulo.puedeEditar,
+          PuedeEliminar: permisosDelModulo.puedeEliminar
         };
 
-        await fetch(`${API_BASE_URL}/rolesmodulos`, {
+        console.log(`📤 Enviando asignación módulo ${moduloId}:`, rolesModulosPayload);
+
+        const response = await fetch(`${API_BASE_URL}/rolesmodulos`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(rolesModulosPayload),
         });
+
+        if (!response.ok) {
+          console.error(`❌ Error asignando módulo ${moduloId}. Status: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('Body:', errorText);
+        } else {
+          console.log(`✅ Módulo ${moduloId} asignado correctamente`);
+        }
       }
 
       // Obtener el rol completo con módulos
@@ -343,17 +359,26 @@ class RolesApiService {
       };
 
       for (const moduloId of modulosToAdd) {
+        const moduloIdInt = parseInt(moduloId, 10);
         const rolesModulosPayload = {
-          rolId: roleId,
-          moduloId: moduloId,
-          ...permisosDefault
+          Id: 0,
+          RolId: typeof roleId === 'string' ? parseInt(roleId, 10) : roleId,
+          ModuloId: moduloIdInt,
+          PuedeVer: permisosDefault.puedeVer,
+          PuedeCrear: permisosDefault.puedeCrear,
+          PuedeEditar: permisosDefault.puedeEditar,
+          PuedeEliminar: permisosDefault.puedeEliminar
         };
 
-        await fetch(`${API_BASE_URL}/rolesmodulos`, {
+        const response = await fetch(`${API_BASE_URL}/rolesmodulos`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(rolesModulosPayload),
         });
+
+        if (!response.ok) {
+          console.error(`❌ Error asignando módulo ${moduloId}:`, await response.text());
+        }
       }
 
       // Actualizar permisos si se proporcionan
@@ -361,15 +386,23 @@ class RolesApiService {
         for (const [moduloId, permisos] of Object.entries(roleData.permisos)) {
           const rolesModulo = currentRole.rolesModulos?.find(rm => rm.moduloId === moduloId);
           if (rolesModulo) {
-            await fetch(`${API_BASE_URL}/rolesmodulos/${rolesModulo.id}`, {
+            const response = await fetch(`${API_BASE_URL}/rolesmodulos/${rolesModulo.id}`, {
               method: 'PUT',
               headers: getAuthHeaders(),
               body: JSON.stringify({
-                rolId: roleId,
-                moduloId: moduloId,
-                ...permisos
+                Id: rolesModulo.id,
+                RolId: typeof roleId === 'string' ? parseInt(roleId, 10) : roleId,
+                ModuloId: typeof moduloId === 'string' ? parseInt(moduloId, 10) : moduloId,
+                PuedeVer: permisos.puedeVer,
+                PuedeCrear: permisos.puedeCrear,
+                PuedeEditar: permisos.puedeEditar,
+                PuedeEliminar: permisos.puedeEliminar
               }),
             });
+
+            if (!response.ok) {
+              console.error(`❌ Error actualizando permisos módulo ${moduloId}:`, await response.text());
+            }
           }
         }
       }

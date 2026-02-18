@@ -44,7 +44,11 @@ const formatCurrency = (amount: number): string => {
   return amount.toLocaleString('es-CO');
 };
 
+import { useAuth } from "../AuthContext";
+// ... imports ...
+
 export function ComprasPage() {
+  const { user } = useAuth();
   const { confirmDeleteAction, DoubleConfirmationContainer } = useDoubleConfirmation();
   const { created, AlertContainer } = useCustomAlert();
   const [compras, setCompras] = useState<Compra[]>([]);
@@ -63,6 +67,16 @@ export function ComprasPage() {
   // Función para generar fecha automática (solo visualización o defaults)
   const generateCurrentDate = () => {
     return new Date().toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Función para formatear fecha en formato estándar DD/MM/YYYY
+  const formatDate = (date: string | Date) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('es-CO', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -167,7 +181,7 @@ export function ComprasPage() {
 
     // Validación de stock es opcional en compras o requerida según lógica de negocio.
     if (stockVentas + stockInsumos !== cantidadProducto) {
-      toast.error("Error en distribución", "La suma de Stock Ventas y Entregas debe ser igual a la Cantidad Total");
+      toast.error("Error en distribución", { description: "La suma de Stock Ventas y Entregas debe ser igual a la Cantidad Total" });
       return;
     }
 
@@ -230,6 +244,11 @@ export function ComprasPage() {
   };
 
   const handleCreateCompra = async () => {
+    if (!user || !user.id) {
+      toast.error("Error de sesión", { description: "No se ha identificado el usuario responsable. Por favor inicie sesión nuevamente." });
+      return;
+    }
+
     if (!nuevaCompra.proveedorId || !nuevaCompra.metodoPago || !nuevaCompra.fechaFactura || nuevaCompra.productos.length === 0) {
       toast.error("Por favor completa todos los campos obligatorios y agrega al menos un producto");
       return;
@@ -247,7 +266,7 @@ export function ComprasPage() {
       // subtotal and total removed as per API requirement
       iva: 0,
       descuento: descuento,
-      usuarioId: 1, // Harcoded 
+      usuarioId: user?.id ? Number(user.id) : 0, // Usar ID del usuario autenticado
       detalles: nuevaCompra.productos.map(p => ({
         productoId: p.id,
         cantidad: p.cantidad,
@@ -336,7 +355,7 @@ export function ComprasPage() {
         <div class="header">
           <div class="company-name">BARBERÍA ELEGANTE</div>
           <div class="report-title">Reporte de Compra</div>
-          <div>Fecha de generación: ${new Date().toLocaleDateString('es-CO')}</div>
+          <div>Fecha de generación: ${formatDate(new Date())}</div>
         </div>
 
         <div class="info-section">
@@ -364,11 +383,11 @@ export function ComprasPage() {
             </div>
             <div class="info-item">
               <div class="info-label">Fecha de Registro:</div>
-              <div class="info-value">${new Date(compra.fecha).toLocaleDateString()}</div>
+              <div class="info-value">${formatDate(compra.fecha)}</div>
             </div>
             <div class="info-item">
               <div class="info-label">Fecha de Factura:</div>
-              <div class="info-value">${compra.fechaFactura ? new Date(compra.fechaFactura).toLocaleDateString() : 'N/A'}</div>
+              <div class="info-value">${compra.fechaFactura ? formatDate(compra.fechaFactura) : 'N/A'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">Método de Pago:</div>
@@ -425,7 +444,7 @@ export function ComprasPage() {
 
         <div class="footer">
           <p>Este es un documento generado automáticamente por el sistema de gestión de barbería.</p>
-          <p>Reporte generado el ${new Date().toLocaleDateString('es-CO')} a las ${new Date().toLocaleTimeString('es-CO')}</p>
+          <p>Reporte generado el ${formatDate(new Date())} a las ${new Date().toLocaleTimeString('es-CO')}</p>
         </div>
       </body>
       </html>
@@ -507,7 +526,7 @@ export function ComprasPage() {
                           Fecha de Registro
                         </Label>
                         <Input
-                          value={nuevaCompra.fechaRegistro}
+                          value={formatDate(nuevaCompra.fechaRegistro)}
                           disabled
                           readOnly
                           className="elegante-input bg-gray-medium"
@@ -800,7 +819,7 @@ export function ComprasPage() {
                         </div>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="text-gray-lighter">{new Date(compra.fecha).toLocaleDateString()}</span>
+                        <span className="text-gray-lighter">{formatDate(compra.fecha)}</span>
                       </td>
                       <td className="py-4 px-4 text-right">
                         <span className="text-gray-lighter">${formatCurrency(compra.total)}</span>
@@ -874,7 +893,7 @@ export function ComprasPage() {
                     </div>
                     <div>
                       <span className="block text-gray-500 mb-1">Fecha de Registro</span>
-                      <span className="font-semibold">{new Date(selectedCompra.fecha).toLocaleDateString()}</span>
+                      <span className="font-semibold">{formatDate(selectedCompra.fecha)}</span>
                     </div>
                     <div>
                       <span className="block text-gray-500 mb-1">Proveedor</span>

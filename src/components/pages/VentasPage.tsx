@@ -34,12 +34,12 @@ import { useDoubleConfirmation } from "../ui/double-confirmation";
 import { ventaService, Venta } from "../../services/ventaService";
 import { servicioService, Servicio } from "../../services/servicioService";
 import { productoService, ApiProducto } from "../../services/productos";
-import { apiService, ApiUser } from "../../services/api";
+import { apiService, ApiUser, Paquete } from "../../services/api";
 import { AppRole } from "../../services/authSyncService";
 
 // Función para formatear moneda colombiana con puntos para separar miles
 const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('es-CO');
+  return (amount ?? 0).toLocaleString('es-CO');
 };
 
 
@@ -50,6 +50,7 @@ export function VentasPage() {
   const { confirmEditAction, DoubleConfirmationContainer } = useDoubleConfirmation();
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
   const [productosAPI, setProductosAPI] = useState<ApiProducto[]>([]);
   const [clientesAPI, setClientesAPI] = useState<ApiUser[]>([]);
   const [barberosAPI, setBarberosAPI] = useState<ApiUser[]>([]);
@@ -80,20 +81,23 @@ export function VentasPage() {
       setError(null);
 
       // Cargar todos los datos necesarios en paralelo
-      const [ventasData, serviciosData, productosData, usuariosData] = await Promise.all([
+      const [ventasData, serviciosData, productosData, usuariosData, paquetesData] = await Promise.all([
         ventaService.getVentas(),
         servicioService.getServicios(),
         productoService.getProductos(),
-        apiService.getUsuarios()
+        apiService.getUsuarios(),
+        apiService.getPaquetes()
       ]);
 
       console.log('🔍 Ventas cargadas:', ventasData.length);
       console.log('🔍 Servicios cargados:', serviciosData?.length || 0);
+      console.log('🔍 Paquetes cargados:', paquetesData?.length || 0);
       console.log('🔍 Productos cargados:', productosData?.length || 0);
       console.log('🔍 Usuarios cargados:', usuariosData?.length || 0);
 
       setVentas(ventasData);
       setServicios(serviciosData || []);
+      setPaquetes(paquetesData || []);
       setProductosAPI(productosData || []);
 
       // Filtrar clientes: Mostrar TODOS los usuarios excepto los administradores
@@ -145,13 +149,15 @@ export function VentasPage() {
     productos: [] as { id: string; nombre: string; cantidad: number; precio: number }[],
   };
 
-  // Usar servicios cargados desde la API con fallback
+  // Usar servicios y paquetes cargados desde la API
   const serviciosDisponibles = useMemo(() => {
-    const serviciosDesdeAPI = servicios.map(servicio => servicio.nombre).filter(Boolean);
+    const serviciosNombres = servicios.map(s => s.nombre).filter(Boolean);
+    const paquetesNombres = paquetes.map(p => `[PAQUETE] ${p.nombre}`).filter(Boolean);
 
-    // Si no hay servicios desde la API, usar servicios de fallback
-    if (serviciosDesdeAPI.length === 0) {
-      console.log('🔍 Usando servicios de fallback - no se cargaron servicios desde API');
+    const combinado = [...serviciosNombres, ...paquetesNombres].sort();
+
+    // Si no hay nada, usar fallback
+    if (combinado.length === 0) {
       return [
         "Corte Clásico",
         "Barba Completa",
@@ -161,9 +167,8 @@ export function VentasPage() {
       ];
     }
 
-    console.log('🔍 Usando servicios desde API:', serviciosDesdeAPI);
-    return serviciosDesdeAPI.sort();
-  }, [servicios]);
+    return combinado;
+  }, [servicios, paquetes]);
 
   // Barberos disponibles para el filtro y la creación
   const barberosDisponibles = useMemo(() => {
@@ -265,26 +270,28 @@ export function VentasPage() {
       );
     }
 
-    // Calcular subtotal de servicios
-    serviciosAgregados.forEach(nombreServicio => {
-      const servicio = servicios.find(s => s.nombre === nombreServicio);
-      if (servicio && servicio.precio) {
-        subtotal += servicio.precio;
-        console.log(`🔍 Agregando servicio "${nombreServicio}" con precio ${servicio.precio}`);
+    // Calcular subtotal de servicios y paquetes
+    serviciosAgregados.forEach(nombreSeleccionado => {
+      // Verificar si es paquete
+      if (nombreSeleccionado.startsWith('[PAQUETE] ')) {
+        const nombreReal = nombreSeleccionado.replace('[PAQUETE] ', '');
+        const paquete = paquetes.find(p => p.nombre === nombreReal);
+        if (paquete) subtotal += paquete.precio;
       } else {
-        // Usar precios de fallback si no se encuentra el servicio
-        const preciosFallback: { [key: string]: number } = {
-          "Corte Clásico": 25000,
-          "Barba Completa": 20000,
-          "Corte + Barba": 40000,
-          "Tinte Cabello": 80000,
-          "Tratamiento Capilar": 35000
-        };
-
-        const precioFallback = preciosFallback[nombreServicio];
-        if (precioFallback) {
-          subtotal += precioFallback;
-          console.log(`🔍 Usando precio fallback para "${nombreServicio}": ${precioFallback}`);
+        // Es un servicio normal
+        const servicio = servicios.find(s => s.nombre === nombreSeleccionado);
+        if (servicio && servicio.precio) {
+          subtotal += servicio.precio;
+        } else {
+          // Fallback
+          const preciosFallback: { [key: string]: number } = {
+            "Corte Clásico": 25000,
+            "Barba Completa": 20000,
+            "Corte + Barba": 40000,
+            "Tinte Cabello": 80000,
+            "Tratamiento Capilar": 35000
+          };
+          subtotal += preciosFallback[nombreSeleccionado] || 0;
         }
       }
     });
@@ -435,24 +442,34 @@ export function VentasPage() {
         metodoPago: nuevaVenta.metodoPago,
         productosDetalle: productosActuales,
         serviciosDetalle: tieneServicios
-          ? serviciosAgregados.map((nombreServicio) => {
-            const servicio = servicios.find(s => s.nombre === nombreServicio);
-            const precio = servicio?.precio || (() => {
-              const preciosFallback: { [key: string]: number } = {
-                "Corte Clásico": 25000,
-                "Barba Completa": 20000,
-                "Corte + Barba": 40000,
-                "Tinte Cabello": 80000,
-                "Tratamiento Capilar": 35000
+          ? serviciosAgregados.map((nombreSeleccionado) => {
+            if (nombreSeleccionado.startsWith('[PAQUETE] ')) {
+              const nombreReal = nombreSeleccionado.replace('[PAQUETE] ', '');
+              const paquete = paquetes.find(p => p.nombre === nombreReal);
+              return {
+                id: `PAQ-${paquete?.id || 0}`,
+                nombre: nombreReal,
+                precio: paquete?.precio || 0
               };
-              return preciosFallback[nombreServicio] || 0;
-            })();
+            } else {
+              const servicio = servicios.find(s => s.nombre === nombreSeleccionado);
+              const precio = servicio?.precio || (() => {
+                const preciosFallback: { [key: string]: number } = {
+                  "Corte Clásico": 25000,
+                  "Barba Completa": 20000,
+                  "Corte + Barba": 40000,
+                  "Tinte Cabello": 80000,
+                  "Tratamiento Capilar": 35000
+                };
+                return preciosFallback[nombreSeleccionado] || 0;
+              })();
 
-            return {
-              id: servicio ? `SERV-${servicio.id}` : `SERVPERS-${Date.now()}`,
-              nombre: nombreServicio,
-              precio: precio
-            };
+              return {
+                id: servicio ? `SERV-${servicio.id}` : `SERVPERS-${Date.now()}`,
+                nombre: nombreSeleccionado,
+                precio: precio
+              };
+            }
           })
           : []
       };
@@ -520,7 +537,7 @@ export function VentasPage() {
       `${venta.numeroVenta} - ${venta.cliente}`,
       async () => {
         try {
-          await ventaService.updateVentaStatus(venta.id, nuevoEstado);
+          await ventaService.anularVenta(venta.id);
 
           // Actualizar estado local
           setVentas(prev => prev.map(v =>

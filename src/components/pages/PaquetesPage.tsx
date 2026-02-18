@@ -26,6 +26,8 @@ import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
 import { apiService, Paquete } from "../../services/api";
 
+import { servicioService, Servicio } from "../../services/servicioService";
+
 const categorias = ["Premium", "Clásico", "Moderno", "Especial"];
 
 export function PaquetesPage() {
@@ -45,21 +47,28 @@ export function PaquetesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
 
-  // Load paquetes from API
+  // Servicios disponibles cargados desde la API
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<Servicio[]>([]);
+
+  // Load initial data
   useEffect(() => {
-    const loadPaquetes = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getPaquetes();
-        setPaquetes(data);
+        const [paquetesData, serviciosData] = await Promise.all([
+          apiService.getPaquetes(),
+          servicioService.getServicios()
+        ]);
+        setPaquetes(paquetesData);
+        setServiciosDisponibles(serviciosData);
       } catch (error) {
-        console.error('Error loading paquetes:', error);
+        console.error('Error loading data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadPaquetes();
+    fetchData();
   }, []);
 
   // Function to reload paquetes
@@ -79,8 +88,16 @@ export function PaquetesPage() {
   const loadDetallePaquete = async (paqueteId: number) => {
     try {
       setLoadingDetalle(true);
+
+      // 1. Obtener los detalles específicos desde el endpoint de detalles
       const data = await apiService.getDetallePaquetesByPaqueteId(paqueteId);
       setDetallePaquete(data);
+
+      // 2. Opcionalmente recargar el paquete por ID para asegurar que tiene los strings de servicios
+      const fullPaquete = await apiService.getPaqueteById(paqueteId);
+      if (fullPaquete) {
+        setSelectedPaquete(fullPaquete);
+      }
     } catch (error) {
       console.error('Error loading detalle paquete:', error);
       setDetallePaquete([]);
@@ -120,20 +137,6 @@ export function PaquetesPage() {
     porcentajeDescuento: 0
   };
 
-  // Servicios disponibles con precios (similar a ventas)
-  const serviciosDisponibles = [
-    { nombre: 'Corte de cabello', precio: 25000 },
-    { nombre: 'Recorte de barba', precio: 15000 },
-    { nombre: 'Afeitado de barba', precio: 20000 },
-    { nombre: 'Perfilado de cejas', precio: 8000 },
-    { nombre: 'Lavado', precio: 12000 },
-    { nombre: 'Masaje capilar', precio: 18000 },
-    { nombre: 'Tratamiento capilar', precio: 30000 },
-    { nombre: 'Colorización', precio: 45000 },
-    { nombre: 'Depilación facial', precio: 22000 },
-    { nombre: 'Limpieza facial', precio: 35000 }
-  ];
-
   const filteredPaquetes = paquetes.filter(paquete => {
     const matchesSearch = paquete.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       paquete.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
@@ -154,9 +157,15 @@ export function PaquetesPage() {
     const yaExiste = serviciosAgregados.find(s => s.nombre === servicioSeleccionado);
     if (!yaExiste) {
       const servicioEncontrado = serviciosDisponibles.find(s => s.nombre === servicioSeleccionado);
-      const precioServicio = servicioEncontrado ? servicioEncontrado.precio : 0;
+      if (!servicioEncontrado) return;
 
-      const nuevosServicios = [...serviciosAgregados, { nombre: servicioSeleccionado, precio: precioServicio }];
+      const precioServicio = servicioEncontrado.precio;
+
+      const nuevosServicios = [...serviciosAgregados, {
+        id: servicioEncontrado.id,
+        nombre: servicioSeleccionado,
+        precio: precioServicio
+      }];
 
       setServiciosAgregados(nuevosServicios);
       setNuevoPaquete({
@@ -198,28 +207,33 @@ export function PaquetesPage() {
   };
 
   const handleCreatePaquete = async () => {
-    if (!nuevoPaquete.nombre || !nuevoPaquete.descripcion || nuevoPaquete.servicios.length === 0) {
+    if (!nuevoPaquete.nombre || !nuevoPaquete.descripcion || serviciosAgregados.length === 0) {
       return;
     }
 
     try {
+      // 1. Preparar la estructura para el endpoint /completo
       const paqueteData = {
         ...nuevoPaquete,
         precio: parseFloat(nuevoPaquete.precio.toString()),
-        precioOriginal: parseFloat(nuevoPaquete.precio.toString()) * (1 + nuevoPaquete.descuento / 100),
-        clientesAtendidos: 0,
-        categoria: nuevoPaquete.categoria || 'General'
+        duracion: Number(nuevoPaquete.duracion),
+        detalles: serviciosAgregados.map(s => ({
+          servicioId: (s as any).id,
+          cantidad: 1
+        }))
       };
 
-      const createdPaquete = await apiService.createPaquete(paqueteData);
+      // 2. Crear paquete y detalles en una sola transacción API
+      const createdPaquete = await apiService.createPaqueteCompleto(paqueteData);
+
       setPaquetes([...paquetes, createdPaquete]);
       setNuevoPaquete({ ...estadoInicialPaquete });
       setServiciosAgregados([]);
       setIsDialogOpen(false);
 
-      created("Paquete creado exitosamente", `El paquete "${createdPaquete.nombre}" ha sido creado correctamente.`);
+      created("Paquete creado exitosamente ✔️", `El paquete "${createdPaquete.nombre}" ha sido creado correctamente con todos sus servicios en una sola operación.`);
     } catch (error) {
-      console.error('Error creating paquete:', error);
+      console.error('Error creating paquete completo:', error);
     }
   };
 
@@ -232,6 +246,7 @@ export function PaquetesPage() {
     const serviciosConPrecio = serviciosArray.map((nombreServicio: string) => {
       const servicioEncontrado = serviciosDisponibles.find(s => s.nombre === nombreServicio);
       return {
+        id: servicioEncontrado ? servicioEncontrado.id : 0,
         nombre: nombreServicio,
         precio: servicioEncontrado ? servicioEncontrado.precio : 0
       };
@@ -273,6 +288,18 @@ export function PaquetesPage() {
             precio: parseFloat(tempPaqueteData.precio.toString()),
             precioOriginal: parseFloat(tempPaqueteData.precio.toString()) * (1 + tempPaqueteData.descuento / 100)
           });
+
+          // Actualizar detalles (borrar y volver a crear)
+          console.log(`🔄 Actualizando detalles para el paquete ${editingPaquete.id}`);
+          await apiService.deleteDetallePaquetesByPaqueteId(editingPaquete.id);
+
+          for (const servicio of serviciosAgregados) {
+            await apiService.createDetallePaquete({
+              paqueteId: editingPaquete.id,
+              servicioId: (servicio as any).id,
+              cantidad: 1
+            });
+          }
 
           await loadPaquetes(); // Recargar todos los paquetes como en ServiciosPage
           setEditingPaquete(null);
@@ -453,7 +480,7 @@ export function PaquetesPage() {
                           <span className="text-gray-lighter">{paquete.duracion} min</span>
                         </td>
                         <td className="py-4 px-4 text-right">
-                          <span className="text-gray-lighter">${paquete.precio.toLocaleString('es-CO')}</span>
+                          <span className="text-gray-lighter">${(paquete.precio ?? 0).toLocaleString('es-CO')}</span>
                         </td>
                         <td className="py-4 px-4 text-center">
                           <span className="px-3 py-1 rounded-full text-xs bg-gray-medium text-gray-lighter">
@@ -672,7 +699,7 @@ export function PaquetesPage() {
                       <option value="">Selecciona un servicio</option>
                       {serviciosDisponibles.map((servicio, index) => (
                         <option key={index} value={servicio.nombre}>
-                          {servicio.nombre} - ${servicio.precio.toLocaleString('es-CO')}
+                          {servicio.nombre} - ${(servicio.precio ?? 0).toLocaleString('es-CO')}
                         </option>
                       ))}
                     </select>
@@ -698,8 +725,8 @@ export function PaquetesPage() {
                           <div className="flex-1">
                             <span className="text-white-primary font-medium">{servicio.nombre}</span>
                             <div className="text-sm text-gray-lightest">
-                              Cantidad: 1 | Precio: ${servicio.precio.toLocaleString('es-CO')} |
-                              Subtotal: ${servicio.precio.toLocaleString('es-CO')}
+                              Cantidad: 1 | Precio: ${(servicio.precio ?? 0).toLocaleString('es-CO')} |
+                              Subtotal: ${(servicio.precio ?? 0).toLocaleString('es-CO')}
                             </div>
                           </div>
                           <button
@@ -809,7 +836,7 @@ export function PaquetesPage() {
                                 <span className="text-gray-lightest font-medium">{detalle.nombreServicio}</span>
                               </div>
                               <span className="text-gray-lightest">
-                                ${detalle.precioServicio.toLocaleString('es-CO')}
+                                ${(detalle.precioServicio ?? 0).toLocaleString('es-CO')}
                               </span>
                             </div>
                           ))
@@ -824,7 +851,7 @@ export function PaquetesPage() {
                                   <span className="text-gray-lightest font-medium">{servicio}</span>
                                 </div>
                                 <span className="text-gray-lightest">
-                                  ${servicioInfo ? servicioInfo.precio.toLocaleString('es-CO') : '0'}
+                                  ${servicioInfo ? (servicioInfo.precio ?? 0).toLocaleString('es-CO') : '0'}
                                 </span>
                               </div>
                             );
@@ -842,13 +869,13 @@ export function PaquetesPage() {
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-semibold text-white-primary">Precio Final</span>
                       <span className="text-2xl font-bold text-primary-orange">
-                        ${selectedPaquete.precio.toLocaleString('es-CO')}
+                        ${(selectedPaquete.precio ?? 0).toLocaleString('es-CO')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-lightest">Precio original:</span>
                       <span className="line-through text-gray-lighter">
-                        ${selectedPaquete.precioOriginal.toLocaleString('es-CO')}
+                        ${(selectedPaquete.precioOriginal ?? 0).toLocaleString('es-CO')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">

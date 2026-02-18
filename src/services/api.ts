@@ -56,6 +56,7 @@ export interface Paquete {
 export interface DetallePaquete {
   id: number;
   paqueteId: number;
+  servicioId: number;
   nombreServicio: string;
   precioServicio: number;
   cantidad: number;
@@ -108,7 +109,10 @@ class ApiService {
     const mapped: any = {};
 
     if (data.id !== undefined) mapped.Id = data.id;
-    if (data.nombre !== undefined) mapped.Nombre = data.nombre;
+    if (data.nombre !== undefined) {
+      mapped.Nombre = data.nombre;
+      mapped.nombre = data.nombre;
+    }
     if (data.apellido !== undefined) mapped.Apellido = data.apellido;
     if (data.correo !== undefined) mapped.Correo = data.correo;
     if (data.contrasena !== undefined) mapped.Contrasena = data.contrasena;
@@ -120,13 +124,49 @@ class ApiService {
     if (data.barrio !== undefined) mapped.Barrio = data.barrio;
     if (data.fechaNacimiento !== undefined) mapped.FechaNacimiento = data.fechaNacimiento;
     if (data.fotoPerfil !== undefined) mapped.FotoPerfil = data.fotoPerfil;
-    if (data.estado !== undefined) mapped.Estado = !!data.estado;
 
-    // Campos para Servicios
-    if (data.descripcion !== undefined) mapped.Descripcion = data.descripcion;
-    if (data.duracion !== undefined) mapped.Duracion = Number(data.duracion);
-    if (data.precio !== undefined) mapped.Precio = Number(data.precio);
-    if (data.estado !== undefined) mapped.Activo = !!data.estado;
+    // Estado/Activo (Resiliencia total)
+    if (data.estado !== undefined) {
+      const e = !!data.estado;
+      mapped.Estado = e;
+      mapped.estado = e;
+      mapped.Activo = e;
+      mapped.activo = e;
+    }
+
+    // Campos para Servicios y Paquetes
+    if (data.descripcion !== undefined) {
+      mapped.Descripcion = data.descripcion;
+      mapped.descripcion = data.descripcion;
+    }
+    if (data.duracion !== undefined) {
+      const d = Number(data.duracion);
+      mapped.Duracion = d;
+      mapped.DuracionMinutos = d;
+      mapped.DuracionMinutes = d;
+      mapped.duracion = d;
+      mapped.duracionMinutos = d;
+      mapped.duracionMinutes = d;
+    }
+    if (data.precio !== undefined) {
+      const p = Number(data.precio);
+      mapped.Precio = p;
+      mapped.precio = p;
+    }
+    if (data.servicios !== undefined) mapped.Servicios = data.servicios;
+
+    // 🔥 Para creación completa de paquetes
+    if (data.detalles !== undefined) {
+      mapped.Detalles = data.detalles.map((d: any) => ({
+        ServicioId: Number(d.servicioId),
+        Cantidad: Number(d.cantidad || 1)
+      }));
+    }
+
+    // Campos para DetallePaquete (Minimalistas para EF Core)
+    if (data.paqueteId !== undefined) mapped.PaqueteId = Number(data.paqueteId);
+    if (data.servicioId !== undefined) mapped.ServicioId = Number(data.servicioId);
+    if (data.cantidad !== undefined) mapped.Cantidad = Number(data.cantidad);
 
     return mapped;
   }
@@ -137,7 +177,11 @@ class ApiService {
       id: Number(data.id || data.Id) || 0,
       nombre: String(data.nombre || data.Nombre || ''),
       descripcion: String(data.descripcion || data.Descripcion || ''),
-      duracion: Number(data.duracion || data.Duracion) || 0,
+      duracion: Number(
+        data.duracionMinutos || data.DuracionMinutos ||
+        data.duracionMinutes || data.DuracionMinutes ||
+        data.duracion || data.Duracion || 0
+      ),
       precio: Number(data.precio || data.Precio) || 0,
       estado: Boolean(
         data.estado === true ||
@@ -154,11 +198,15 @@ class ApiService {
   }
 
   private normalizePaqueteData(data: any): Paquete {
+    const rawDetalles = data.detallePaquetes || data.DetallePaquetes || data.detalles || data.Detalles || [];
     let serviciosStrings: string[] = [];
-    if (data.detallePaquetes && Array.isArray(data.detallePaquetes)) {
-      serviciosStrings = data.detallePaquetes.map((dp: any) => dp.servicio?.nombre || dp.nombreServicio || 'Servicio');
-    } else if (Array.isArray(data.servicios)) {
-      serviciosStrings = data.servicios;
+
+    if (Array.isArray(rawDetalles) && rawDetalles.length > 0) {
+      serviciosStrings = rawDetalles.map((dp: any) =>
+        (dp.servicio?.Nombre || dp.servicio?.nombre || dp.nombreServicio || dp.NombreServicio || 'Servicio')
+      );
+    } else if (Array.isArray(data.servicios || data.Servicios)) {
+      serviciosStrings = data.servicios || data.Servicios;
     }
 
     return {
@@ -166,26 +214,33 @@ class ApiService {
       nombre: String(data.nombre || data.Nombre || ''),
       descripcion: String(data.descripcion || data.Descripcion || ''),
       servicios: serviciosStrings,
-      duracion: Number(data.duracionMinutos || data.duracion || 0),
+      duracion: Number(
+        data.duracionMinutos || data.DuracionMinutos ||
+        data.duracionMinutes || data.DuracionMinutes ||
+        data.duracion || data.Duracion || 0
+      ),
       precio: Number(data.precio || data.Precio) || 0,
-      descuento: Number(data.descuento || 0),
-      precioOriginal: Number(data.precioOriginal) || Number(data.precio || data.Precio) || 0,
-      clientesAtendidos: Number(data.clientesAtendidos || 0),
-      categoria: String(data.categoria || 'General'),
+      descuento: Number(data.descuento || data.Descuento || 0),
+      precioOriginal: Number(data.precioOriginal || data.PrecioOriginal) || Number(data.precio || data.Precio) || 0,
+      clientesAtendidos: Number(data.clientesAtendidos || data.ClientesAtendidos || 0),
+      categoria: String(data.categoria || data.Categoria || 'General'),
       activo: Boolean(
-        data.activo === true || data.activo === 'true' || data.activo === 1 || data.Activo === true || data.estado === true
+        data.activo === true || data.activo === 'true' || data.activo === 1 ||
+        data.Activo === true || data.estado === true || data.Estado === true
       )
     };
   }
 
   private normalizeDetallePaqueteData(data: any): DetallePaquete {
+    const servicio = data.servicio || data.Servicio;
     return {
       id: Number(data.id || data.Id) || 0,
       paqueteId: Number(data.paqueteId || data.PaqueteId) || 0,
-      nombreServicio: String(data.servicio?.nombre || data.nombreServicio || 'Servicio'),
-      precioServicio: Number(data.servicio?.precio || data.precioServicio || 0),
+      servicioId: Number(data.servicioId || data.ServicioId || servicio?.id || servicio?.Id) || 0,
+      nombreServicio: String(servicio?.nombre || servicio?.Nombre || data.nombreServicio || data.NombreServicio || 'Servicio'),
+      precioServicio: Number(servicio?.precio || servicio?.Precio || data.precioServicio || data.PrecioServicio || data.precio || data.Precio || 0),
       cantidad: Number(data.cantidad || data.Cantidad) || 1,
-      subtotal: Number(data.subtotal || data.Subtotal) || (Number(data.servicio?.precio || 0) * (Number(data.cantidad) || 1))
+      subtotal: Number(data.subtotal || data.Subtotal) || (Number(servicio?.precio || servicio?.Precio || 0) * (Number(data.cantidad || data.Cantidad) || 1))
     };
   }
 
@@ -695,6 +750,24 @@ class ApiService {
     }
   }
 
+  async createPaqueteCompleto(paqueteData: any): Promise<Paquete> {
+    try {
+      const mapped = this.mapToApiFormat(paqueteData);
+      console.log('📤 Creando paquete completo:', mapped);
+      const response = await this.request('/Paquetes/completo', {
+        method: 'POST',
+        body: JSON.stringify(mapped),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      console.log('✅ Paquete completo creado:', data);
+      return this.normalizePaqueteData(data);
+    } catch (error: any) {
+      console.error('❌ Error creando paquete completo:', error);
+      throw error;
+    }
+  }
+
   async updatePaquete(id: number, paqueteData: Partial<Paquete>): Promise<Paquete> {
     try {
       const mapped = this.mapToApiFormat({ ...paqueteData, id });
@@ -730,8 +803,8 @@ class ApiService {
     try {
       console.log(`📤 Actualizando estado del paquete ${id} a ${activo}...`);
       await this.request(`/Paquetes/${id}/estado`, {
-        method: 'POST',
-        body: JSON.stringify({ estado: activo }), // 🔥 CAMBIAR A estado para coincidir con backend
+        method: 'PUT',
+        body: JSON.stringify({ estado: activo }),
       });
       console.log(`✅ Estado del paquete ${id} actualizado`);
     } catch (error: any) {

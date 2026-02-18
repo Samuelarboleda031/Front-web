@@ -14,7 +14,7 @@ import {
   Upload, ToggleRight, ToggleLeft, X, Loader2
 } from "lucide-react";
 import { useCustomAlert } from "../ui/custom-alert";
-import { barberosService, Barbero, CreateBarberoData, UpdateBarberoData } from "../../services/barberosService";
+import { barberosService, Barbero, CreateBarberoData } from "../../services/barberosService";
 
 const tiposDocumento = ["Cédula", "Cédula de Extranjería", "Pasaporte"];
 
@@ -61,9 +61,9 @@ export function BarberosPage() {
       const data = await barberosService.getBarberos();
       const mappedData = data.map(barbero => barberosService.mapApiToComponent(barbero));
       setBarberos(mappedData);
-    } catch (error: unknown) {
-      console.error('Error cargando barberos:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    } catch (err: unknown) {
+      console.error('Error cargando barberos:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       error("Error", `No se pudieron cargar los barberos: ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -131,17 +131,15 @@ export function BarberosPage() {
     }
 
     try {
-      // Mapear datos del componente a la API
-      const apiData = barberosService.mapComponentToApi(newBarbero);
-      const createdBarbero = await barberosService.createBarbero(apiData);
+      const createdBarbero = await barberosService.createBarbero(newBarbero);
       const mappedBarbero = barberosService.mapApiToComponent(createdBarbero);
       setBarberos([mappedBarbero, ...barberos]);
       resetForm();
       setIsDialogOpen(false);
       success("¡Barbero creado exitosamente!", `El barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" ha sido registrado en el sistema.`);
-    } catch (error: unknown) {
-      console.error('Error creando barbero:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    } catch (err: unknown) {
+      console.error('Error creando barbero:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       error("Error", `No se pudo crear el barbero: ${errorMessage}`);
     }
   };
@@ -190,9 +188,9 @@ export function BarberosPage() {
       setIsDialogOpen(false);
       setEditingBarbero(null);
       success("¡Barbero actualizado!", `Los datos del barbero "${mappedBarbero.nombre} ${mappedBarbero.apellido}" han sido actualizados exitosamente.`);
-    } catch (error: unknown) {
-      console.error('Error actualizando barbero:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    } catch (err: unknown) {
+      console.error('Error actualizando barbero:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       error("Error", `No se pudo actualizar el barbero: ${errorMessage}`);
     }
   };
@@ -211,9 +209,9 @@ export function BarberosPage() {
       setIsDeleteDialogOpen(false);
       setBarberoToDelete(null);
       success("¡Barbero eliminado!", `El barbero "${barberoToDelete.nombre || barberoToDelete.nombres} ${barberoToDelete.apellido || barberoToDelete.apellidos}" ha sido eliminado del sistema.`);
-    } catch (error: unknown) {
-      console.error('Error eliminando barbero:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    } catch (err: unknown) {
+      console.error('Error eliminando barbero:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       error("Error", `No se pudo eliminar el barbero: ${errorMessage}`);
     }
   };

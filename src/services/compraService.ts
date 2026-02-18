@@ -30,6 +30,7 @@ export interface DetalleCompra {
 
 export interface CreateCompraRequest {
     proveedorId: number;
+    numeroFactura?: string; // Opcional desde front, pero backend lo usa
     fecha: string; // Fecha Registro
     fechaFactura: string;
     metodoPago: string;
@@ -44,6 +45,7 @@ export interface CreateCompraRequest {
 }
 
 class CompraService {
+    // ... (request method stays the same) ...
     private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
         const isGet = !options.method || options.method === 'GET';
         const separator = endpoint.includes('?') ? '&' : '?';
@@ -83,14 +85,17 @@ class CompraService {
     }
 
     private mapToApiFormat(data: CreateCompraRequest): any {
+        // Generar un número de factura temporal si no se proporciona, para evitar error 500 en backend
+        const facturaDefault = Date.now().toString().slice(-6);
+
         return {
             proveedorId: data.proveedorId,
-            fechaRegistro: data.fecha, // API expects fechaRegistro
-            fechaFactura: data.fechaFactura,
+            usuarioId: data.usuarioId,
+            numeroFactura: data.numeroFactura || facturaDefault,
+            fechaFactura: data.fechaFactura, // DateOnly en backend, string YYYY-MM-DD funciona
             metodoPago: data.metodoPago,
             iva: data.iva,
             descuento: data.descuento,
-            usuarioId: data.usuarioId,
             detalles: data.detalles.map(d => ({
                 productoId: d.productoId,
                 cantidad: d.cantidad,
@@ -99,6 +104,7 @@ class CompraService {
         };
     }
 
+    // ... (normalizeCompraData stays the same) ...
     private async normalizeCompraData(data: any): Promise<Compra> {
         if (!data) return {} as Compra;
 
@@ -190,20 +196,13 @@ class CompraService {
 
     async anularCompra(id: number): Promise<void> {
         try {
-            await this.request(`/Compras/${id}/anular`, {
-                method: 'POST'
+            // Updated to DELETE specific verb as per Backend ComprasController
+            await this.request(`/Compras/${id}`, {
+                method: 'DELETE'
             });
         } catch (error) {
-            // If the specific /anular endpoint doesn't exist, we might need a general PUT or DELETE
-            console.warn('Anular specific endpoint failed, trying generic status update...');
-            try {
-                await this.request(`/Compras/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ estado: 'Anulada' })
-                });
-            } catch (innerError) {
-                throw error;
-            }
+            console.error('Error anulando compra:', error);
+            throw error;
         }
     }
     async getDetallesPorCompra(compraId: number): Promise<DetalleCompra[]> {

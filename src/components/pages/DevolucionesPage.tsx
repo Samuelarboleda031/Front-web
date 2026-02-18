@@ -380,7 +380,14 @@ export function DevolucionesPage() {
       `${nuevaDevolucion.producto} - ${nuevaDevolucion.cliente}`,
       async () => {
         try {
-          const currentUserId = user?.id ? parseInt(user.id) : 1;
+          // Validar sesión de usuario
+          const stringUserId = user?.id ? String(user.id) : null;
+          const currentUserId = stringUserId ? parseInt(stringUserId) : 0;
+
+          if (!currentUserId || isNaN(currentUserId) || currentUserId <= 0) {
+            toast.error("Error de sesión", { description: "No se ha identificado el usuario responsable. Por favor inicie sesión nuevamente." });
+            return;
+          }
 
           const payload = {
             ventaId: Number(nuevaDevolucion.ventaId),
@@ -391,7 +398,7 @@ export function DevolucionesPage() {
             motivoDetalle: getMotivoLabel(nuevaDevolucion.motivoCategoria),
             montoDevuelto: Number(nuevaDevolucion.monto),
             saldoAFavor: Number(nuevaDevolucion.monto),
-            usuarioId: isNaN(currentUserId) ? 1 : currentUserId,
+            usuarioId: currentUserId,
             observaciones: nuevaDevolucion.observaciones || ''
           };
 

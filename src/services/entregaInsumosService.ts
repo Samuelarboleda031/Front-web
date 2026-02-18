@@ -138,7 +138,7 @@ class EntregaInsumosService {
       console.log('🔄 Payload enviado al backend:', payload);
 
       const response = await this.request(`/EntregasInsumos/${id}/estado`, {
-        method: 'POST',
+        method: 'PUT',
         body: JSON.stringify(payload),
       });
 

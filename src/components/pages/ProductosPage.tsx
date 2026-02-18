@@ -11,7 +11,7 @@ import { useCustomAlert } from "../ui/custom-alert";
 import { productoService, ApiProducto } from "../../services/productos";
 
 const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('es-CO');
+  return (amount ?? 0).toLocaleString('es-CO');
 };
 
 export function ProductosPage() {
@@ -61,8 +61,8 @@ export function ProductosPage() {
         console.log('🔍 First product structure:', productosData[0]);
         setProductos(productosData);
         setCategorias(categoriasData);
-      } catch (error: any) {
-        console.error('Error loading data:', error);
+      } catch (err: any) {
+        console.error('Error loading data:', err);
         error('Error de carga', 'No se pudieron cargar los productos y categorías desde el servidor.');
       } finally {
         setLoading(false);
@@ -115,53 +115,7 @@ export function ProductosPage() {
   const accesorios = productos.filter((p) => p.categoria === "Accesorios");
   const productosActivos = productos.filter((p) => p.activo);
 
-  // Cantidad que se quiere mover entre inventarios dentro del formulario (ventas <-> insumos)
-  const [ajusteStockEdicion, setAjusteStockEdicion] = useState(0);
 
-  const moverStockEnFormulario = (destino: "ventas" | "insumos") => {
-    const cantidadMovimiento = ajusteStockEdicion || 0;
-    if (cantidadMovimiento <= 0) {
-      error(
-        "Cantidad inválida",
-        "Ingresa una cantidad mayor a 0 para mover inventario."
-      );
-      return;
-    }
-
-    let stockVentas = nuevoProducto.stockVentas || 0;
-    let stockInsumos = nuevoProducto.stockInsumos || 0;
-
-    if (destino === "ventas") {
-      // Mover desde insumos hacia ventas
-      if (stockInsumos < cantidadMovimiento) {
-        error(
-          "Stock insuficiente",
-          "No hay suficientes unidades en entregas para mover a ventas."
-        );
-        return;
-      }
-      stockInsumos -= cantidadMovimiento;
-      stockVentas += cantidadMovimiento;
-    } else {
-      // Mover desde ventas hacia insumos
-      if (stockVentas < cantidadMovimiento) {
-        error(
-          "Stock insuficiente",
-          "No hay suficientes unidades en ventas para mover a entregas."
-        );
-        return;
-      }
-      stockVentas -= cantidadMovimiento;
-      stockInsumos += cantidadMovimiento;
-    }
-
-    setNuevoProducto({
-      ...nuevoProducto,
-      stockVentas,
-      stockInsumos,
-    });
-    setAjusteStockEdicion(0);
-  };
 
   // Total de ventas potenciales (solo stock destinado a ventas)
   const totalVentasPotenciales = productos.reduce((acum, producto) => {
@@ -220,9 +174,9 @@ export function ProductosPage() {
       setIsCreateDialogOpen(false);
 
       created("Producto creado ✔️", `El producto "${productoCreado.nombre}" ha sido agregado exitosamente al inventario con un precio de ${formatCurrency(precioFinal)}.`);
-    } catch (error: any) {
-      console.error('Error creating product:', error);
-      error('Error al crear producto', error.message || 'No se pudo crear el producto. Inténtalo nuevamente.');
+    } catch (err: any) {
+      console.error('Error creating product:', err);
+      error('Error al crear producto', err.message || 'No se pudo crear el producto. Inténtalo nuevamente.');
     }
   };
 
@@ -298,9 +252,9 @@ export function ProductosPage() {
       setIsEditDialogOpen(false);
 
       edited("Producto editado ✔️", `El producto "${productoActualizado.nombre}" ha sido actualizado exitosamente. El nuevo precio es ${formatCurrency(precioFinal)}.`);
-    } catch (error: any) {
-      console.error('Error updating product:', error);
-      error('Error al actualizar producto', error.message || 'No se pudo actualizar el producto. Inténtalo nuevamente.');
+    } catch (err: any) {
+      console.error('Error updating product:', err);
+      error('Error al actualizar producto', err.message || 'No se pudo actualizar el producto. Inténtalo nuevamente.');
     }
   };
 
@@ -325,9 +279,9 @@ export function ProductosPage() {
       setIsDeleteDialogOpen(false);
       setProductoToDelete(null);
       deleted("Producto eliminado ✔️", `El producto "${productoToDelete.nombre}" ha sido eliminado exitosamente del inventario.`);
-    } catch (error: any) {
-      console.error('Error deleting product:', error);
-      error('Error al eliminar producto', error.message || 'No se pudo eliminar el producto. Inténtalo nuevamente.');
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      error('Error al eliminar producto', err.message || 'No se pudo eliminar el producto. Inténtalo nuevamente.');
     }
   };
 
@@ -339,10 +293,13 @@ export function ProductosPage() {
       const productosActualizados = await productoService.getProductos();
       setProductos(productosActualizados);
 
-      edited(`Producto ${!productoActualizado.activo ? 'activado' : 'desactivado'} ✔️`, `El producto "${productoActualizado.nombre}" ha sido ${!productoActualizado.activo ? 'activado' : 'desactivado'} exitosamente.`);
-    } catch (error: any) {
-      console.error('Error toggling product active status:', error);
-      error('Error al cambiar estado', error.message || 'No se pudo cambiar el estado del producto. Inténtalo nuevamente.');
+      if (productoActualizado) {
+        const accion = productoActualizado.activo ? 'activado' : 'desactivado';
+        edited(`Producto ${accion} ✔️`, `El producto "${productoActualizado.nombre}" ha sido ${accion} exitosamente.`);
+      }
+    } catch (err: any) {
+      console.error('Error toggling product active status:', err);
+      error('Error al cambiar estado', err.message || 'No se pudo cambiar el estado del producto. Inténtalo nuevamente.');
     }
   };
 
@@ -419,8 +376,8 @@ export function ProductosPage() {
       // Subir al servidor
       const imageUrl = await uploadImage(file);
       setNuevoProducto({ ...nuevoProducto, imagen: imageUrl });
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
+    } catch (err: any) {
+      console.error('Error uploading image:', err);
       error('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
       // Limpiar preview si falló
       setImagenPreview(null);
@@ -624,46 +581,11 @@ export function ProductosPage() {
 
                       {/* Inventario - Solo Lectura */}
                       <div className="space-y-4">
-                        <div className="p-4 bg-orange-primary/10 border border-orange-primary/30 rounded-lg">
-                          <p className="text-orange-primary text-sm flex items-center gap-2">
-                            <Boxes className="w-4 h-4" />
-                            <span className="font-medium">El stock se gestiona automáticamente desde el módulo de Compras por seguridad.</span>
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                           <div className="space-y-2">
                             <Label className="text-white-primary flex items-center gap-2">
                               <Boxes className="w-4 h-4 text-orange-primary" />
-                              Stock para Ventas
-                            </Label>
-                            <Input
-                              type="number"
-                              value={nuevoProducto.stockVentas}
-                              className="elegante-input bg-gray-darkest cursor-not-allowed"
-                              disabled
-                              readOnly
-                            />
-                            <p className="text-xs text-gray-lighter">Solo lectura - Se actualiza desde Compras</p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Boxes className="w-4 h-4 text-orange-primary" />
-                              Stock para Entregas
-                            </Label>
-                            <Input
-                              type="number"
-                              value={nuevoProducto.stockInsumos}
-                              className="elegante-input bg-gray-darkest cursor-not-allowed"
-                              disabled
-                              readOnly
-                            />
-                            <p className="text-xs text-gray-lighter">Solo lectura - Se actualiza desde Compras</p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-white-primary flex items-center gap-2">
-                              <Boxes className="w-4 h-4 text-orange-primary" />
-                              Cantidad Mínima (Total)
+                              Cantidad Total
                             </Label>
                             <Input
                               type="number"
@@ -681,46 +603,7 @@ export function ProductosPage() {
                         </div>
                       </div>
 
-                      {/* Ajuste de stock entre ventas y entregas (solo en edición) */}
-                      {editingProducto && (
-                        <div className="mt-4 space-y-2 bg-gray-darker p-4 rounded-lg border border-gray-dark">
-                          <Label className="text-white-primary flex items-center gap-2">
-                            <Boxes className="w-4 h-4 text-orange-primary" />
-                            Ajustar stock entre ventas y entregas
-                          </Label>
-                          <p className="text-gray-lightest text-xs">
-                            Ingresa la cantidad a mover y elige hacia dónde transferirla. El
-                            stock total se mantiene constante.
-                          </p>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={ajusteStockEdicion}
-                              onChange={(e) =>
-                                setAjusteStockEdicion(parseInt(e.target.value) || 0)
-                              }
-                              className="elegante-input w-24 text-xs"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => moverStockEnFormulario("ventas")}
-                                className="px-3 py-1 rounded-lg bg-green-900/30 border border-green-700 text-green-400 text-xs hover:bg-green-900/50"
-                              >
-                                → Ventas
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moverStockEnFormulario("insumos")}
-                                className="px-3 py-1 rounded-lg bg-blue-900/30 border border-blue-700 text-blue-300 text-xs hover:bg-blue-900/50"
-                              >
-                                → Entregas
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+
 
                       {/* Vista Previa de Imagen */}
                       {imagenPreview && (
@@ -1109,7 +992,7 @@ export function ProductosPage() {
                         </div>
 
                         <div>
-                          <Label className="text-gray-lighter text-sm mb-1 block">Cantidad Mínima</Label>
+                          <Label className="text-gray-lighter text-sm mb-1 block">Cantidad Total</Label>
                           <p className="text-white-primary text-lg">
                             {selectedProducto.minCantidad} unidades
                           </p>

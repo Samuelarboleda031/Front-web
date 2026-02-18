@@ -44,8 +44,11 @@ const getFullName = (nombre?: string, apellido?: string) => {
   return `${nombre || ''}${apellido ? ` ${apellido}` : ''}`.trim();
 };
 
+import { useAuth } from "../AuthContext"; // Import newly added
+
 export function EntregaInsumosPage() {
-  const { confirmCreateAction, confirmDeleteAction, DoubleConfirmationContainer } = useDoubleConfirmation();
+  const { user } = useAuth(); // Get user from context
+  const { confirmCreateAction, confirmDeleteAction, confirmEditAction, DoubleConfirmationContainer } = useDoubleConfirmation();
 
   // Estados para el componente
   const [barberos, setBarberos] = useState<Barbero[]>([]);
@@ -89,7 +92,7 @@ export function EntregaInsumosPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        
+
         // Cargar barberos, insumos, entregas y usuarios desde la API en paralelo
         const [barberosData, insumosData, entregasData, usersData] = await Promise.all([
           barberosService.getBarberos(),
@@ -136,7 +139,7 @@ export function EntregaInsumosPage() {
   const filteredEntregas = entregas.filter(entrega => {
     const barberoNombre = getBarberoNombreById((entrega as any).barberoId);
     const entregaId = String(entrega.id || '');
-    
+
     return barberoNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entregaId.toLowerCase().includes(searchTerm.toLowerCase());
   });
@@ -254,6 +257,12 @@ export function EntregaInsumosPage() {
   };
 
   const handleCreateEntrega = async () => {
+    // Validate session
+    if (!user || !user.id) {
+      toast.error("Error de sesión", { description: "No se ha identificado el usuario responsable." });
+      return;
+    }
+
     console.log('🧪 Click Registrar Entrega', {
       barberoSeleccionado: nuevaEntrega.barberoSeleccionado,
       fechaEntrega: nuevaEntrega.fechaEntrega,
@@ -268,7 +277,7 @@ export function EntregaInsumosPage() {
 
     try {
       setCreatingDelivery(true);
-      
+
       const barbero = barberos.find(b => b.id === nuevaEntrega.barberoSeleccionado);
       if (!barbero) {
         toast.error('Barbero no encontrado');
@@ -280,22 +289,22 @@ export function EntregaInsumosPage() {
       const numeroEntrega = `ENT${String(Date.now())}`;
       const total = calcularTotalEntrega();
       const insumosActuales = nuevaEntrega.insumos || [];
-      const cantidadTotal = insumosActuales.length > 0 
+      const cantidadTotal = insumosActuales.length > 0
         ? insumosActuales.reduce((sum, insumo) => sum + insumo.cantidad, 0)
         : 0;
 
-     const entregaData: CreateEntregaData = {
-  barberoId: nuevaEntrega.barberoSeleccionado,
-  usuarioId: 1,
-  detalles: nuevaEntrega.insumos.map(insumo => ({
-    productoId: insumo.id,
-    cantidad: insumo.cantidad
-  }))
-};
+      const entregaData: CreateEntregaData = {
+        barberoId: nuevaEntrega.barberoSeleccionado,
+        usuarioId: Number(user?.id) || 0,
+        detalles: nuevaEntrega.insumos.map(insumo => ({
+          productoId: insumo.id,
+          cantidad: insumo.cantidad
+        }))
+      };
 
-console.log('📤 Enviando a API:', entregaData);
+      console.log('📤 Enviando a API:', entregaData);
 
-const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
+      const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
 
       // Actualizar stock de insumos (simulado localmente)
       const nuevosInsumos = insumos.map(insumo => {
@@ -315,7 +324,7 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
       setEntregas(entregasActualizadas);
       setNuevaEntrega(inicialNuevaEntrega);
       setIsDialogOpen(false);
-      
+
       toast.success(`Entrega ${numeroEntrega} registrada exitosamente para ${getFullName(barbero?.nombre, barbero?.apellido) || 'Sin asignar'}`);
     } catch (error: any) {
       console.error('Error creando entrega:', error);
@@ -329,10 +338,10 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
   const handleViewDetails = async (entrega: EntregaInsumo) => {
     try {
       console.log(`🔍 Obteniendo detalles completos de entrega ${entrega.id}...`);
-      
+
       // Obtener detalles completos desde la API
       const entregaCompleta = await entregaInsumosService.getEntregaById(entrega.id.toString());
-      
+
       if (entregaCompleta) {
         console.log('✅ Detalles completos obtenidos:', entregaCompleta);
         console.log('🔍 Estructura del barbero:', (entregaCompleta as any).barbero);
@@ -346,7 +355,7 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
         console.warn('⚠️ No se pudieron obtener detalles completos, usando datos locales');
         setSelectedEntrega(entrega);
       }
-      
+
       setIsDetailDialogOpen(true);
     } catch (error) {
       console.error('❌ Error obteniendo detalles de entrega:', error);
@@ -360,47 +369,61 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
   // Función para anular una entrega
   const handleAnularClick = async (entrega: EntregaInsumo) => {
     // Confirmación antes de anular
-    const confirmado = window.confirm(`¿Estás seguro de anular la entrega ${entrega.id}? Esta acción devolverá los insumos al inventario.`);
-    if (!confirmado) return;
+    confirmEditAction(
+      `entrega #${entrega.id}`,
+      async () => {
+        try {
+          console.log(`🚫 Anulando entrega ${entrega.id}...`);
 
-    try {
-      console.log(`🚫 Anulando entrega ${entrega.id}...`);
-      
-      const response = await entregaInsumosService.updateEntrega(entrega.id, {
-        id: entrega.id,
-        estado: 'Anulado'
-      });
+          const response = await entregaInsumosService.updateEntrega(entrega.id, {
+            id: entrega.id,
+            estado: 'Anulado'
+          });
 
-      console.log('✅ Entrega anulada:', response);
-      
-      // Actualizar lista local
-      setEntregas(entregas.map(e => 
-        e.id === entrega.id ? { ...e, estado: 'Anulado' } : e
-      ));
+          console.log('✅ Entrega anulada:', response);
 
-      // Devolver stock de insumos al inventario
-      // Usar el campo correcto según la API: detalleEntregasInsumos
-      const detalles = (entrega as any).detalleEntregasInsumos || entrega.insumosDetalle || [];
-      console.log('🔄 Devolviendo stock para detalles:', detalles);
-      
-      const nuevosInsumos = insumos.map(insumo => {
-        const detalleDevuelto = detalles.find((d: any) => d.productoId === insumo.id);
-        if (detalleDevuelto) {
-          console.log(`📦 Devolviendo ${detalleDevuelto.cantidad} unidades de ${insumo.nombre} al stock`);
-          return {
-            ...insumo,
-            stock: insumo.stock + detalleDevuelto.cantidad
-          };
+          // Actualizar lista local
+          setEntregas(entregas.map(e =>
+            e.id === entrega.id ? { ...e, estado: 'Anulado' } : e
+          ));
+
+          // Devolver stock de insumos al inventario
+          // Usar el campo correcto según la API: detalleEntregasInsumos
+          const detalles = (entrega as any).detalleEntregasInsumos || entrega.insumosDetalle || [];
+          console.log('🔄 Devolviendo stock para detalles:', detalles);
+
+          const nuevosInsumos = insumos.map(insumo => {
+            const detalleDevuelto = detalles.find((d: any) => d.productoId === insumo.id);
+            if (detalleDevuelto) {
+              console.log(`📦 Devolviendo ${detalleDevuelto.cantidad} unidades de ${insumo.nombre} al stock`);
+              return {
+                ...insumo,
+                stock: insumo.stock + detalleDevuelto.cantidad
+              };
+            }
+            return insumo;
+          });
+          setInsumos(nuevosInsumos);
+
+          // No need to toast success here as confirmEditAction handles success message if configured, 
+          // or we can toast if we prefer custom handling. But DoubleConfirmation usually shows success dialog.
+          // However, double confirmation shows a success dialog, so let's keep it clean.
+        } catch (error) {
+          console.error('❌ Error anulando entrega:', error);
+          toast.error('Error al anular la entrega');
+          throw error; // Propagate error so dialog knows it failed
         }
-        return insumo;
-      });
-      setInsumos(nuevosInsumos);
-
-      toast.success(`Entrega ${entrega.id} anulada exitosamente`);
-    } catch (error) {
-      console.error('❌ Error anulando entrega:', error);
-      toast.error('Error al anular la entrega');
-    }
+      },
+      {
+        confirmTitle: 'Confirmar Anulación',
+        confirmMessage: `¿Estás seguro de anular la entrega ${entrega.id}? Esta acción devolverá los insumos al inventario.`,
+        successTitle: '¡Entrega anulada!',
+        successMessage: `La entrega ${entrega.id} ha sido anulada exitosamente.`,
+        requireInput: false,
+        confirmButtonText: 'Sí, anular entrega',
+        confirmButtonColor: 'bg-red-600 hover:bg-red-700'
+      }
+    );
   };
 
   // Generar reporte PDF individual por entrega
@@ -712,7 +735,7 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
             </div>
           </div>
         )}
-        
+
         {/* Sección Principal */}
         <div className="elegante-card">
           {/* Barra de Controles */}
@@ -740,15 +763,16 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                         <Label className="text-white-primary">Barbero</Label>
                         <select
                           value={nuevaEntrega.barberoSeleccionado}
-                          onChange={(e) => setNuevaEntrega({...nuevaEntrega, barberoSeleccionado: Number(e.target.value)})}
+                          onChange={(e) => setNuevaEntrega({ ...nuevaEntrega, barberoSeleccionado: Number(e.target.value) })}
                           className="w-full px-3 py-2 bg-gray-darker border border-gray-dark rounded-lg text-white-primary focus:outline-none focus:ring-2 focus:ring-blue-primary"
                         >
-                          <option value={0}>Seleccionar barbero...</option>
-                          {barberos.map((barbero) => (
-                            <option key={barbero.id} value={barbero.id}>
-                              {barbero.nombre} {barbero.apellido ? ` ${barbero.apellido}` : "Sin asignar"}
-                            </option>
-                          ))}
+                          {barberos
+                            .filter(barbero => (barbero as any).estado === true || barbero.status === 'active')
+                            .map((barbero) => (
+                              <option key={barbero.id} value={barbero.id}>
+                                {barbero.nombre} {barbero.apellido ? ` ${barbero.apellido}` : ""}
+                              </option>
+                            ))}
                         </select>
                       </div>
 
@@ -772,11 +796,13 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                               onChange={(e) => setInsumoSeleccionado(Number(e.target.value))}
                             >
                               <option value={0}>Seleccionar insumo...</option>
-                              {insumos.map((insumo) => (
-                                <option key={insumo.id} value={insumo.id} disabled={insumo.stock <= 0}>
-                                  {insumo.nombre} (Stock: {insumo.stock})
-                                </option>
-                              ))}
+                              {insumos
+                                .filter(insumo => insumo.stock > 0 && insumo.categoria === 'Suministros')
+                                .map((insumo) => (
+                                  <option key={insumo.id} value={insumo.id}>
+                                    {insumo.nombre} (Stock: {insumo.stock})
+                                  </option>
+                                ))}
                             </select>
                             <Input
                               type="number"
@@ -786,6 +812,19 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                               value={cantidadInsumo}
                               onChange={(e) => setCantidadInsumo(parseInt(e.target.value) || 1)}
                             />
+                          </div>
+                          <div className="space-y-2">
+                            {/* Imagen del insumo seleccionado */}
+                            {insumoSeleccionado > 0 && insumos.find(i => i.id === insumoSeleccionado)?.imagen && (
+                              <div className="w-full h-10 flex items-center gap-2 px-3 py-1 bg-gray-darker border border-gray-dark rounded-lg">
+                                <img
+                                  src={insumos.find(i => i.id === insumoSeleccionado)?.imagen}
+                                  alt="Vista previa"
+                                  className="w-8 h-8 rounded object-cover"
+                                />
+                                <span className="text-xs text-gray-lightest truncate">Imagen disponible</span>
+                              </div>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -828,9 +867,14 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                           ) : (
                             (nuevaEntrega.insumos || []).map((insumo) => (
                               <div key={insumo.id} className="flex justify-between items-center p-3 bg-gray-darker rounded-lg border border-gray-dark">
-                                <div className="flex-1">
-                                  <div className="text-white-primary font-medium">{insumo.nombre}</div>
-                                  <div className="text-sm text-gray-lightest">{insumo.categoria} • ${formatCurrency(insumo.precio)} c/u</div>
+                                <div className="flex items-center gap-2 flex-1">
+                                  {insumo.imagen && (
+                                    <img src={insumo.imagen} alt={insumo.nombre} className="w-8 h-8 rounded object-cover" />
+                                  )}
+                                  <div>
+                                    <div className="text-white-primary font-medium">{insumo.nombre}</div>
+                                    <div className="text-sm text-gray-lightest">{insumo.categoria} • ${formatCurrency(insumo.precio)} c/u</div>
+                                  </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <span className="text-orange-primary font-semibold">{insumo.cantidad}</span>
@@ -928,7 +972,7 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="text-gray-lighter">{entrega.fecha}</span>
+                      <span className="text-sm text-gray-lighter">{entrega.fecha?.split(' ')[0] || entrega.fecha}</span>
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-gray-lighter">{entrega.cantidadTotal} unidades</span>
@@ -1019,16 +1063,16 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                       <span className="text-gray-lightest">Barbero:</span>
                       <p className="text-white-primary font-semibold">
                         {(selectedEntrega as any).barbero
-                          ? (typeof (selectedEntrega as any).barbero === 'object' 
-                              ? getFullName((selectedEntrega as any).barbero.nombre, (selectedEntrega as any).barbero.apellido)
-                              : String((selectedEntrega as any).barbero))
+                          ? (typeof (selectedEntrega as any).barbero === 'object'
+                            ? getFullName((selectedEntrega as any).barbero.nombre, (selectedEntrega as any).barbero.apellido)
+                            : String((selectedEntrega as any).barbero))
                           : getBarberoNombreById((selectedEntrega as any).barberoId)}
                       </p>
                     </div>
                     <div>
                       <span className="text-gray-lightest">Fecha y Hora:</span>
                       <p className="text-white-primary font-semibold">
-                        {selectedEntrega.fecha || 'Sin fecha'} - {selectedEntrega.hora || 'Sin hora'}
+                        {selectedEntrega.fecha?.split(' ')[0] || 'Sin fecha'} - {selectedEntrega.hora || 'Sin hora'}
                       </p>
                     </div>
                   </div>
@@ -1069,39 +1113,45 @@ const entregaCreada = await entregaInsumosService.createEntrega(entregaData);
                   <h4 className="text-white-primary font-semibold mb-3">Insumos Entregados</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {(() => {
-                      const insumos = selectedEntrega.insumosDetalle || 
-                                     (selectedEntrega as any).detalleEntregasInsumos || 
-                                     (selectedEntrega as any).detalles || 
-                                     (selectedEntrega as any).insumos || 
-                                     (selectedEntrega as any).productos || 
-                                     [];
-                      
+                      const insumos = selectedEntrega.insumosDetalle ||
+                        (selectedEntrega as any).detalleEntregasInsumos ||
+                        (selectedEntrega as any).detalles ||
+                        (selectedEntrega as any).insumos ||
+                        (selectedEntrega as any).productos ||
+                        [];
+
                       console.log('🔍 Insumos a mostrar:', insumos);
-                      
+
                       return insumos && insumos.length > 0 ? (
                         insumos.map((detalle: any, index: number) => {
                           const insumo = detalle.producto || detalle;
                           return (
-                        <div key={detalle.id || index} className="flex justify-between items-center p-3 bg-gray-darker rounded-lg border border-gray-dark">
-                          <div className="flex-1">
-                            <div className="text-white-primary font-medium">
-                              {insumo.nombre || `Insumo ${index + 1}`}
+                            <div key={detalle.id || index} className="flex justify-between items-center p-3 bg-gray-darker rounded-lg border border-gray-dark">
+                              <div className="flex items-center gap-2 flex-1">
+                                {insumo.imagen && (
+                                  <img src={insumo.imagen} alt={insumo.nombre} className="w-8 h-8 rounded object-cover" />
+                                )}
+                                <div>
+                                  <div className="text-white-primary font-medium">
+                                    {insumo.nombre || `Insumo ${index + 1}`}
+                                  </div>
+                                  <div className="text-sm text-gray-lightest">
+                                    {insumo.categoria?.nombre || 'Sin categoría'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-orange-primary font-semibold">{detalle.cantidad || 0} unidades</div>
+                                <div className="text-sm text-gray-lightest">${formatCurrency(detalle.precioHistorico || insumo.precioVenta || 0)} c/u</div>
+                              </div>
+                              <div className="ml-4 text-right">
+                                <div className="text-white-primary font-semibold">
+                                  ${formatCurrency((detalle.cantidad || 0) * (detalle.precioHistorico || insumo.precioVenta || 0))}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-lightest">
-                              {insumo.categoria?.nombre || 'Sin categoría'}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-orange-primary font-semibold">{detalle.cantidad || 0} unidades</div>
-                            <div className="text-sm text-gray-lightest">${formatCurrency(detalle.precioHistorico || insumo.precioVenta || 0)} c/u</div>
-                          </div>
-                          <div className="ml-4 text-right">
-                            <div className="text-white-primary font-semibold">
-                              ${formatCurrency((detalle.cantidad || 0) * (detalle.precioHistorico || insumo.precioVenta || 0))}
-                            </div>
-                          </div>
-                        </div>
-                      )})
+                          )
+                        })
                       ) : (
                         <div className="text-center py-8 text-gray-lightest">
                           No hay detalles de insumos disponibles para esta entrega

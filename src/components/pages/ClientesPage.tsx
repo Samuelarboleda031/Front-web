@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../AuthContext";
-import { clientesService, ClienteAPI, CreateClienteData, UpdateClienteData } from "../../services/clientesService";
+import { clientesService, Cliente, CreateClienteData } from "../../services/clientesService";
 import {
   Users,
   User as UserIcon,
   Phone,
   Mail,
-  Plus,
+
   Edit,
   Search,
   Eye,
@@ -14,24 +13,23 @@ import {
   ChevronRight,
   Calendar,
   UserCheck,
-  AlertCircle,
-  CreditCard,
+
+
   UserPlus,
   MapPin,
-  Calendar as CalendarIcon,
+
   IdCard,
   Wallet,
-  RotateCcw,
+
   TrendingUp,
-  History,
+
   Camera,
-  Upload,
+
   X,
   ToggleLeft,
   ToggleRight,
   UserX,
   Trash2,
-  Clock,
   FileText,
   Hash
 } from "lucide-react";
@@ -41,7 +39,6 @@ import { Label } from "../ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
-import { toast } from "sonner";
 
 // Tipos de documento
 const TIPOS_DOCUMENTO = [
@@ -53,25 +50,7 @@ const TIPOS_DOCUMENTO = [
   { value: 'NIT', label: 'NIT' }
 ];
 
-// Tipo de datos del cliente actualizado
-interface Cliente {
-  id: string;
-  tipoDocumento: string;
-  numeroDocumento: string;
-  nombre: string;
-  apellido: string;
-  email: string;
-  telefono: string;
-  direccion: string;
-  barrio: string;
-  fechaNacimiento: string;
-  fechaRegistro: string;
-  ultimaVisita: string;
-  activo: boolean;
-  saldoAFavor: number;
-  fotoPerfil?: string; // Nueva propiedad para la foto de perfil
-  contraseña: string;
-}
+// Interface para devoluciones (simulada desde el módulo de devoluciones)
 
 // Interface para devoluciones (simulada desde el módulo de devoluciones)
 interface Devolucion {
@@ -94,7 +73,7 @@ interface Devolucion {
 
 
 export function ClientesPage() {
-  const { success, error: showAlert, created, edited, deleted, AlertContainer } = useCustomAlert();
+  const { success, error, created, edited, deleted, AlertContainer } = useCustomAlert();
   const { confirmDeleteAction, DoubleConfirmationContainer } = useDoubleConfirmation();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +84,7 @@ export function ClientesPage() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Estados para acciones de cliente
@@ -158,10 +137,10 @@ export function ClientesPage() {
       const data = await clientesService.getClientes();
       const mappedData = data.map(cliente => clientesService.mapApiToComponent(cliente));
       setClientes(mappedData);
-    } catch (error: unknown) {
-      console.error('Error cargando clientes:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      showAlert('error', 'Error', `No se pudieron cargar los clientes: ${errorMessage}`);
+    } catch (err: unknown) {
+      console.error('Error cargando clientes:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      error('Error', `No se pudieron cargar los clientes: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -193,13 +172,12 @@ export function ClientesPage() {
     if (file) {
       // Validar tipo de archivo
       if (!file.type.startsWith('image/')) {
-        showAlert('error', 'Archivo inválido', 'Por favor selecciona una imagen válida (JPG, PNG, etc.)');
+        error('Archivo inválido', 'Por favor selecciona una imagen válida (JPG, PNG, etc.)');
         return;
       }
 
-      // Validar tamaño de archivo (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        showAlert('error', 'Archivo muy grande', 'La imagen debe pesar menos de 5MB');
+        error('Archivo muy grande', 'La imagen debe pesar menos de 5MB');
         return;
       }
 
@@ -241,20 +219,20 @@ export function ClientesPage() {
     });
     setSelectedProfileImage(null);
     setPreviewUrl(null);
-    setError('');
+    setFormError('');
     setIsCreateDialogOpen(true);
   };
 
   const validateForm = (form: any) => {
     if (!form.numeroDocumento || !form.nombre || !form.apellido || !form.email) {
-      showAlert('error', 'Campos obligatorios faltantes', 'Por favor completa todos los campos obligatorios: tipo de documento, número de documento, nombre, apellido y email.');
+      error('Campos obligatorios faltantes', 'Por favor completa todos los campos obligatorios: número de documento, nombre, apellido y email.');
       return false;
     }
 
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.email)) {
-      showAlert('error', 'Email inválido', 'Por favor ingresa un email válido con el formato correcto.');
+      error('Email inválido', 'Por favor ingresa un email válido con el formato correcto.');
       return false;
     }
 
@@ -265,7 +243,7 @@ export function ClientesPage() {
     );
 
     if (documentoExiste) {
-      showAlert('error', 'Documento duplicado', 'Ya existe un cliente registrado con este tipo y número de documento.');
+      error('Documento duplicado', 'Ya existe un cliente registrado con este tipo y número de documento.');
       return false;
     }
 
@@ -273,7 +251,7 @@ export function ClientesPage() {
     const emailExiste = clientes.some(c => c.email === form.email);
 
     if (emailExiste) {
-      showAlert('error', 'Email duplicado', 'Ya existe un cliente registrado con este email.');
+      error('Email duplicado', 'Ya existe un cliente registrado con este email.');
       return false;
     }
 
@@ -329,19 +307,19 @@ export function ClientesPage() {
       });
       setSelectedProfileImage(null);
       setPreviewUrl(null);
-      setError('');
+      setFormError('');
 
       created('Cliente creado exitosamente ✔️', `El cliente ${mappedCliente.nombre} ${mappedCliente.apellido} ha sido registrado en el sistema.`);
-    } catch (error: unknown) {
-      console.error('Error creando cliente:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      showAlert('error', 'Error', `No se pudo crear el cliente: ${errorMessage}`);
+    } catch (err: unknown) {
+      console.error('Error creando cliente:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      error('Error', `No se pudo crear el cliente: ${errorMessage}`);
     }
   };
 
   // Función para formatear moneda colombiana
-  const formatCurrency = (amount: number): string => {
-    return amount.toLocaleString('es-CO');
+  const formatCurrency = (amount: number | undefined | null): string => {
+    return (amount ?? 0).toLocaleString('es-CO');
   };
 
   // Función para calcular el saldo a favor acumulativo de un cliente
@@ -433,13 +411,13 @@ export function ClientesPage() {
     if (file) {
       // Validar tipo de archivo
       if (!file.type.startsWith('image/')) {
-        showAlert('error', 'Archivo inválido', 'Por favor selecciona una imagen válida (JPG, PNG, etc.)');
+        error('Archivo inválido', 'Por favor selecciona una imagen válida (JPG, PNG, etc.)');
         return;
       }
 
       // Validar tamaño de archivo (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        showAlert('error', 'Archivo muy grande', 'La imagen debe pesar menos de 5MB');
+        error('Archivo muy grande', 'La imagen debe pesar menos de 5MB');
         return;
       }
 
@@ -469,14 +447,14 @@ export function ClientesPage() {
 
   const validateEditForm = (form: any) => {
     if (!form.numeroDocumento || !form.nombre || !form.apellido || !form.email) {
-      showAlert('error', 'Campos obligatorios faltantes', 'Por favor completa todos los campos obligatorios: tipo de documento, número de documento, nombre, apellido y email.');
+      error('Campos obligatorios faltantes', 'Por favor completa todos los campos obligatorios: número de documento, nombre, apellido y email.');
       return false;
     }
 
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.email)) {
-      showAlert('error', 'Email inválido', 'Por favor ingresa un email válido con el formato correcto.');
+      error('Email inválido', 'Por favor ingresa un email válido con el formato correcto.');
       return false;
     }
 
@@ -488,7 +466,7 @@ export function ClientesPage() {
     );
 
     if (documentoExiste) {
-      showAlert('error', 'Documento duplicado', 'Ya existe otro cliente registrado con este tipo y número de documento.');
+      error('Documento duplicado', 'Ya existe otro cliente registrado con este tipo y número de documento.');
       return false;
     }
 
@@ -496,7 +474,7 @@ export function ClientesPage() {
     const emailExiste = clientes.some(c => c.id !== selectedCliente?.id && c.email === form.email);
 
     if (emailExiste) {
-      showAlert('error', 'Email duplicado', 'Ya existe otro cliente registrado con este email.');
+      error('Email duplicado', 'Ya existe otro cliente registrado con este email.');
       return false;
     }
 
@@ -540,7 +518,7 @@ export function ClientesPage() {
       }
 
       // Preparar datos para la API
-      const updateData: UpdateClienteData = {
+      const updateData: any = {
         id: parseInt(selectedCliente.id),
         nombre: editForm.nombre,
         apellido: editForm.apellido,
@@ -570,10 +548,10 @@ export function ClientesPage() {
       setEditPreviewUrl(null);
 
       edited('Cliente actualizado exitosamente ✔️', `Los datos de ${mappedCliente.nombre} ${mappedCliente.apellido} han sido actualizados.`);
-    } catch (error: unknown) {
-      console.error('Error actualizando cliente:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      showAlert('error', 'Error', `No se pudo actualizar el cliente: ${errorMessage}`);
+    } catch (err: unknown) {
+      console.error('Error actualizando cliente:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      error('Error', `No se pudo actualizar el cliente: ${errorMessage}`);
     }
   };
 
@@ -587,10 +565,10 @@ export function ClientesPage() {
           setClientes(prev => prev.filter(c => c.id !== cliente.id));
           setSelectedItems(prev => prev.filter(id => id !== cliente.id));
           deleted('Cliente eliminado exitosamente ✔️', `El cliente ${cliente.nombre} ${cliente.apellido} ha sido eliminado permanentemente del sistema.`);
-        } catch (error: unknown) {
-          console.error('Error eliminando cliente:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-          showAlert('error', 'Error', `No se pudo eliminar el cliente: ${errorMessage}`);
+        } catch (err: unknown) {
+          console.error('Error eliminando cliente:', err);
+          const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+          error('Error', `No se pudo eliminar el cliente: ${errorMessage}`);
         }
       },
       {
@@ -620,20 +598,22 @@ export function ClientesPage() {
       // Actualizar localmente
       setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, activo: nuevoEstado } : c));
 
+      const updatedCliente = clientes.find(c => c.id === clienteId);
+
       success(
         `Cliente ${nuevoEstado ? 'activado' : 'desactivado'}`,
-        `El cliente ${mappedCliente.nombre} ${mappedCliente.apellido} ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`
+        `El cliente ${updatedCliente?.nombre} ${updatedCliente?.apellido} ha sido ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente.`
       );
-    } catch (error: unknown) {
-      console.error('Error cambiando estado del cliente:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      showAlert('error', 'Error', `No se pudo cambiar el estado del cliente: ${errorMessage}`);
+    } catch (err: unknown) {
+      console.error('Error cambiando estado del cliente:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      error('Error', `No se pudo cambiar el estado del cliente: ${errorMessage}`);
     }
   };
 
   // Estadísticas de saldos
-  const totalClientesConSaldo = clientes.filter(c => c.saldoAFavor > 0).length;
-  const totalSaldosAFavor = clientes.reduce((total, c) => total + c.saldoAFavor, 0);
+  const totalClientesConSaldo = clientes.filter(c => ((c.saldoAFavor || 0) || 0) > 0).length;
+  const totalSaldosAFavor = clientes.reduce((total, c) => total + ((c.saldoAFavor || 0) || 0), 0);
 
   return (
     <>
@@ -828,8 +808,8 @@ export function ClientesPage() {
                         <span className="text-gray-lighter">{cliente.telefono}</span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        {cliente.saldoAFavor > 0 ? (
-                          <span className="text-gray-lighter">${formatCurrency(cliente.saldoAFavor)}</span>
+                        {(cliente.saldoAFavor || 0) > 0 ? (
+                          <span className="text-gray-lighter">${formatCurrency((cliente.saldoAFavor || 0))}</span>
                         ) : (
                           <span className="text-gray-medium">$0</span>
                         )}

@@ -10,6 +10,7 @@ export interface Insumo {
   stock: number;
   minimo: number;
   precio: number;
+  imagen: string;
 }
 
 const API_BASE_URL = '/api';
@@ -87,7 +88,7 @@ class InsumosService {
           nombre: String(p?.nombre ?? p?.nombreProducto ?? p?.descripcion ?? ''),
           categoria: String(categoria),
           stock: (() => {
-            const direct = pickNumber(p, ['stock', 'Stock', 'existencia', 'Existencia', 'cantidad', 'Cantidad', 'stockActual', 'StockActual', 'cantidadDisponible', 'CantidadDisponible'], 0);
+            const direct = pickNumber(p, ['stockInsumos', 'StockInsumos', 'stock', 'Stock', 'existencia', 'Existencia', 'cantidad', 'Cantidad', 'stockActual', 'StockActual', 'cantidadDisponible', 'CantidadDisponible'], 0);
             if (direct !== 0) return direct;
 
             const inferred = inferNumberByKeyMatch(
@@ -147,6 +148,7 @@ class InsumosService {
             const nested = pickNumber(p?.producto ?? p?.detalle, ['PrecioVenta', 'precioVenta', 'precio', 'Precio'], 0);
             return nested;
           })(),
+          imagen: String(p?.imagen ?? p?.Imagen ?? p?.imagenUrl ?? p?.ImagenUrl ?? ''),
         };
       });
 
@@ -180,6 +182,7 @@ class InsumosService {
         stock: Number(p?.stock ?? p?.cantidad ?? 0),
         minimo: Number(p?.minimo ?? p?.stockMinimo ?? 0),
         precio: Number(p?.precio ?? p?.valor ?? 0),
+        imagen: String(p?.imagen ?? p?.Imagen ?? p?.imagenUrl ?? p?.ImagenUrl ?? ''),
       };
 
       console.log(`✅ Insumo ${id} obtenido:`, data);

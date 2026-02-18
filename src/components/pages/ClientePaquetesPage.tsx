@@ -1,193 +1,63 @@
-import { useState } from "react";
-import { Search, Star, Clock, DollarSign, Package, Scissors, User, Calendar, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Star, Clock, Package, Scissors, Calendar, Check } from "lucide-react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "../ui/dialog";
-import { toast } from "sonner@2.0.3";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { toast } from "sonner";
+import { apiService, Paquete } from "../../services/api";
 
 // Función para formatear moneda colombiana
 const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('es-CO');
+  return amount?.toLocaleString('es-CO') || '0';
 };
-
-// Datos de paquetes disponibles
-const paquetesDisponibles = [
-  {
-    id: "PAQ001",
-    nombre: "Paquete Básico",
-    descripcion: "Perfecto para el cuidado esencial de tu imagen",
-    precio: 45000,
-    precioIndividual: 55000,
-    ahorro: 10000,
-    duracion: "60 min",
-    popularidad: 4.2,
-    servicios: [
-      { nombre: "Corte de Cabello", incluido: true },
-      { nombre: "Arreglo de Barba", incluido: true },
-      { nombre: "Lavado", incluido: true }
-    ],
-    productos: [
-      { nombre: "Gel Fijador", incluido: true },
-      { nombre: "Toalla Caliente", incluido: true }
-    ],
-    beneficios: [
-      "Ideal para mantenimiento semanal",
-      "Incluye productos básicos",
-      "Atención personalizada"
-    ],
-    categoria: "Básico",
-    disponible: true
-  },
-  {
-    id: "PAQ002",
-    nombre: "Paquete Premium",
-    descripcion: "La experiencia completa de barbería de lujo",
-    precio: 80000,
-    precioIndividual: 110000,
-    ahorro: 30000,
-    duracion: "120 min",
-    popularidad: 4.8,
-    servicios: [
-      { nombre: "Corte de Cabello Premium", incluido: true },
-      { nombre: "Arreglo de Barba Profesional", incluido: true },
-      { nombre: "Afeitado con Navaja", incluido: true },
-      { nombre: "Masaje Capilar", incluido: true },
-      { nombre: "Arreglo de Cejas", incluido: true }
-    ],
-    productos: [
-      { nombre: "Aceite de Barba Premium", incluido: true },
-      { nombre: "Cera Modeladora", incluido: true },
-      { nombre: "Perfume Masculino", incluido: true },
-      { nombre: "Toalla Caliente Premium", incluido: true }
-    ],
-    beneficios: [
-      "Experiencia VIP completa",
-      "Productos premium incluidos",
-      "Masaje relajante",
-      "Bebida de cortesía",
-      "Ambiente exclusivo"
-    ],
-    categoria: "Premium",
-    disponible: true,
-    popular: true
-  },
-  {
-    id: "PAQ003",
-    nombre: "Paquete Ejecutivo",
-    descripcion: "Rápido y profesional para el hombre de negocios",
-    precio: 60000,
-    precioIndividual: 75000,
-    ahorro: 15000,
-    duracion: "90 min",
-    popularidad: 4.5,
-    servicios: [
-      { nombre: "Corte Ejecutivo", incluido: true },
-      { nombre: "Arreglo de Barba", incluido: true },
-      { nombre: "Peinado Profesional", incluido: true },
-      { nombre: "Arreglo de Cejas", incluido: true }
-    ],
-    productos: [
-      { nombre: "Gel Profesional", incluido: true },
-      { nombre: "Spray Fijador", incluido: true },
-      { nombre: "Loción Post-Afeitado", incluido: true }
-    ],
-    beneficios: [
-      "Servicio rápido y eficiente",
-      "Look profesional garantizado",
-      "Cita express disponible",
-      "Productos de larga duración"
-    ],
-    categoria: "Ejecutivo",
-    disponible: true
-  },
-  {
-    id: "PAQ004",
-    nombre: "Paquete Estudiante",
-    descripcion: "Precio especial para estudiantes con descuento",
-    precio: 35000,
-    precioIndividual: 45000,
-    ahorro: 10000,
-    duracion: "45 min",
-    popularidad: 4.0,
-    servicios: [
-      { nombre: "Corte de Cabello", incluido: true },
-      { nombre: "Arreglo de Barba Básico", incluido: true }
-    ],
-    productos: [
-      { nombre: "Gel Básico", incluido: true }
-    ],
-    beneficios: [
-      "Precio accesible para estudiantes",
-      "Calidad profesional",
-      "Requiere credencial estudiantil válida"
-    ],
-    categoria: "Estudiante",
-    disponible: true,
-    descuento: true
-  },
-  {
-    id: "PAQ005",
-    nombre: "Paquete Novio",
-    descripcion: "Especial para el día más importante de tu vida",
-    precio: 150000,
-    precioIndividual: 200000,
-    ahorro: 50000,
-    duracion: "180 min",
-    popularidad: 4.9,
-    servicios: [
-      { nombre: "Corte Premium", incluido: true },
-      { nombre: "Afeitado Clásico con Navaja", incluido: true },
-      { nombre: "Masaje Facial", incluido: true },
-      { nombre: "Manicure Masculino", incluido: true },
-      { nombre: "Pedicure Express", incluido: true },
-      { nombre: "Arreglo de Cejas", incluido: true }
-    ],
-    productos: [
-      { nombre: "Kit Completo de Cuidado", incluido: true },
-      { nombre: "Perfume de Lujo", incluido: true },
-      { nombre: "Aceites Esenciales", incluido: true },
-      { nombre: "Productos para Casa", incluido: true }
-    ],
-    beneficios: [
-      "Preparación completa para boda",
-      "Kit de productos para llevar",
-      "Atención VIP exclusiva",
-      "Sesión de fotos profesional incluida",
-      "Garantía de perfección"
-    ],
-    categoria: "Especial",
-    disponible: true,
-    especial: true
-  }
-];
 
 export function ClientePaquetesPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPaquete, setSelectedPaquete] = useState<any>(null);
+  const [selectedPaquete, setSelectedPaquete] = useState<Paquete | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [paquetes, setPaquetes] = useState<Paquete[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPaquetes = paquetesDisponibles.filter(paquete => {
+  useEffect(() => {
+    const fetchPaquetes = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getPaquetes();
+        // Filtrar solo paquetes activos para clientes
+        setPaquetes(data.filter(p => p.activo));
+      } catch (error) {
+        toast.error("Error cargando paquetes");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPaquetes();
+  }, []);
+
+  const filteredPaquetes = paquetes.filter(paquete => {
     const matchesSearch = paquete.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paquete.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
+      paquete.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
-  const handleViewDetails = (paquete: any) => {
+  const handleViewDetails = (paquete: Paquete) => {
     setSelectedPaquete(paquete);
     setIsDetailDialogOpen(true);
   };
 
-  const handleReservarPaquete = (paquete: any) => {
+  const handleReservarPaquete = (paquete: Paquete) => {
     toast.success("¡Paquete seleccionado!", {
       description: `El paquete "${paquete.nombre}" ha sido añadido a tu reserva. Serás redirigido para agendar la cita.`
     });
     setIsDetailDialogOpen(false);
+    // Aquí iría la lógica de redirección o apertura del modal de cita
   };
 
   const getCategoriaColor = (categoria: string) => {
     switch (categoria) {
       case "Básico": return "bg-blue-600 text-white";
-      case "Premium": return "bg-orange-primary text-black";
+      case "Premium": return "bg-orange-primary text-black-primary";
       case "Ejecutivo": return "bg-purple-600 text-white";
       case "Estudiante": return "bg-green-600 text-white";
       case "Especial": return "bg-red-600 text-white";
@@ -195,15 +65,14 @@ export function ClientePaquetesPage() {
     }
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number = 5) => {
     return (
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`w-4 h-4 ${
-              star <= rating ? "fill-orange-primary text-orange-primary" : "text-gray-medium"
-            }`}
+            className={`w-4 h-4 ${star <= rating ? "fill-orange-primary text-orange-primary" : "text-gray-medium"
+              }`}
           />
         ))}
         <span className="text-gray-lightest text-sm ml-1">({rating})</span>
@@ -238,84 +107,103 @@ export function ClientePaquetesPage() {
         </div>
 
         {/* Grid de Paquetes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPaquetes.map((paquete) => (
-            <div key={paquete.id} className="elegante-card relative">
+        {loading ? (
+          <div className="text-center py-12 text-white-primary">Cargando paquetes...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPaquetes.map((paquete) => {
+              const precioOriginal = paquete.precioOriginal || paquete.precio;
+              const ahorro = precioOriginal - paquete.precio;
+              const serviciosList = paquete.servicios || [];
+              const duracion = paquete.duracion || 0;
+              const categoria = paquete.categoria || 'General';
 
-
-              {/* Contenido del paquete */}
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-white-primary mb-2">{paquete.nombre}</h3>
-                <p className="text-gray-lightest text-sm mb-3">{paquete.descripcion}</p>
-                {renderStars(paquete.popularidad)}
-              </div>
-
-              {/* Servicios principales */}
-              <div className="mb-4">
-                <h4 className="text-white-primary font-medium text-sm mb-2">Incluye:</h4>
-                <div className="space-y-1">
-                  {paquete.servicios.slice(0, 3).map((servicio, index) => (
-                    <div key={index} className="flex items-center gap-2 text-xs">
-                      <Check className="w-3 h-3 text-green-400" />
-                      <span className="text-gray-lightest">{servicio.nombre}</span>
+              return (
+                <div key={paquete.id} className="elegante-card relative">
+                  {/* Contenido del paquete */}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-semibold text-white-primary">{paquete.nombre}</h3>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getCategoriaColor(categoria)}`}>
+                        {categoria}
+                      </span>
                     </div>
-                  ))}
-                  {paquete.servicios.length > 3 && (
-                    <div className="text-orange-primary text-xs font-medium">
-                      +{paquete.servicios.length - 3} servicios más
+                    <p className="text-gray-lightest text-sm mb-3 min-h-[40px]">{paquete.descripcion}</p>
+                    {renderStars(5)}
+                  </div>
+
+                  {/* Servicios principales */}
+                  <div className="mb-4">
+                    <h4 className="text-white-primary font-medium text-sm mb-2">Incluye:</h4>
+                    <div className="space-y-1">
+                      {serviciosList.slice(0, 3).map((servicio, index) => (
+                        <div key={index} className="flex items-center gap-2 text-xs">
+                          <Check className="w-3 h-3 text-green-400" />
+                          <span className="text-gray-lightest">{servicio}</span>
+                        </div>
+                      ))}
+                      {serviciosList.length > 3 && (
+                        <div className="text-orange-primary text-xs font-medium">
+                          +{serviciosList.length - 3} servicios más
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              {/* Información adicional */}
-              <div className="flex items-center justify-between text-xs text-gray-lightest mb-4">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  <span>{paquete.duracion}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Scissors className="w-3 h-3" />
-                  <span>{paquete.servicios.length} servicios</span>
-                </div>
-              </div>
+                  {/* Información adicional */}
+                  <div className="flex items-center justify-between text-xs text-gray-lightest mb-4">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{duracion} min</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Scissors className="w-3 h-3" />
+                      <span>{serviciosList.length} servicios</span>
+                    </div>
+                  </div>
 
-              {/* Precios */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-orange-primary font-bold text-xl">
-                    ${formatCurrency(paquete.precio)}
-                  </span>
-                  <span className="text-gray-lightest line-through text-sm">
-                    ${formatCurrency(paquete.precioIndividual)}
-                  </span>
-                </div>
-                <div className="text-green-400 text-sm font-medium">
-                  Ahorras ${formatCurrency(paquete.ahorro)}
-                </div>
-              </div>
+                  {/* Precios */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-orange-primary font-bold text-xl">
+                        ${formatCurrency(paquete.precio)}
+                      </span>
+                      {ahorro > 0 && (
+                        <span className="text-gray-lightest line-through text-sm">
+                          ${formatCurrency(precioOriginal)}
+                        </span>
+                      )}
+                    </div>
+                    {ahorro > 0 && (
+                      <div className="text-green-400 text-sm font-medium">
+                        Ahorras ${formatCurrency(ahorro)}
+                      </div>
+                    )}
+                  </div>
 
-              {/* Botones */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleViewDetails(paquete)}
-                  className="elegante-button-secondary flex-1 text-sm py-2"
-                >
-                  Ver Detalles
-                </button>
-                <button
-                  onClick={() => handleReservarPaquete(paquete)}
-                  className="elegante-button-primary flex-1 text-sm py-2"
-                  disabled={!paquete.disponible}
-                >
-                  {paquete.disponible ? "Reservar" : "No Disponible"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                  {/* Botones */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleViewDetails(paquete)}
+                      className="elegante-button-secondary flex-1 text-sm py-2"
+                    >
+                      Ver Detalles
+                    </button>
+                    <button
+                      onClick={() => handleReservarPaquete(paquete)}
+                      className="elegante-button-primary flex-1 text-sm py-2"
+                      disabled={!paquete.activo}
+                    >
+                      {paquete.activo ? "Reservar" : "No Disponible"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-        {filteredPaquetes.length === 0 && (
+        {!loading && filteredPaquetes.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-lightest mb-4">
               <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -342,7 +230,7 @@ export function ClientePaquetesPage() {
                   {/* Descripción y Rating */}
                   <div>
                     <p className="text-gray-lightest mb-3">{selectedPaquete.descripcion}</p>
-                    {renderStars(selectedPaquete.popularidad)}
+                    {renderStars(5)}
                   </div>
 
                   {/* Información del precio */}
@@ -353,16 +241,20 @@ export function ClientePaquetesPage() {
                         ${formatCurrency(selectedPaquete.precio)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-lightest">Precio individual:</span>
-                      <span className="text-gray-lightest line-through">
-                        ${formatCurrency(selectedPaquete.precioIndividual)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-green-400 font-medium">
-                      <span>Tu ahorro:</span>
-                      <span>${formatCurrency(selectedPaquete.ahorro)}</span>
-                    </div>
+                    {((selectedPaquete.precioOriginal || 0) > selectedPaquete.precio) && (
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-lightest">Precio individual:</span>
+                        <span className="text-gray-lightest line-through">
+                          ${formatCurrency(selectedPaquete.precioOriginal || 0)}
+                        </span>
+                      </div>
+                    )}
+                    {((selectedPaquete.precioOriginal || 0) > selectedPaquete.precio) && (
+                      <div className="flex items-center justify-between text-green-400 font-medium">
+                        <span>Tu ahorro:</span>
+                        <span>${formatCurrency((selectedPaquete.precioOriginal || 0) - selectedPaquete.precio)}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Servicios incluidos */}
@@ -372,18 +264,14 @@ export function ClientePaquetesPage() {
                       Servicios Incluidos
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {selectedPaquete.servicios.map((servicio: any, index: number) => (
+                      {(selectedPaquete.servicios || []).map((servicio: string, index: number) => (
                         <div key={index} className="flex items-center gap-2 p-2 bg-gray-darker rounded-lg">
                           <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                          <span className="text-white-primary text-sm">{servicio.nombre}</span>
+                          <span className="text-white-primary text-sm">{servicio}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-
-
-
-
 
                   {/* Información adicional */}
                   <div className="bg-gray-darker p-4 rounded-lg border border-gray-dark">
@@ -391,7 +279,7 @@ export function ClientePaquetesPage() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-orange-primary" />
-                        <span className="text-gray-lightest">Duración: {selectedPaquete.duracion}</span>
+                        <span className="text-gray-lightest">Duración: {selectedPaquete.duracion} min</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-orange-primary" />
@@ -411,9 +299,9 @@ export function ClientePaquetesPage() {
                     <Button
                       onClick={() => handleReservarPaquete(selectedPaquete)}
                       className="elegante-button-primary flex-1"
-                      disabled={!selectedPaquete.disponible}
+                      disabled={!selectedPaquete.activo}
                     >
-                      Reservar Paquete
+                      {selectedPaquete.activo ? "Reservar Paquete" : "No Disponible"}
                     </Button>
                   </div>
                 </div>

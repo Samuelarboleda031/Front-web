@@ -10,14 +10,12 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  Package,
-  List,
-  Hash,
   AlertCircle,
   Power,
   PowerOff,
   ToggleRight,
-  ToggleLeft
+  ToggleLeft,
+  Hash
 } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
@@ -25,11 +23,12 @@ import { Label } from "../ui/label";
 import { useCustomAlert } from "../ui/custom-alert";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
 import { categoriaService, Categoria } from "../../services/categoriaService";
+import { productoService, ApiProducto } from "../../services/productos";
 
 
 export function CategoriasPage() {
-  const { created, edited, deleted, AlertContainer } = useCustomAlert();
-  const { confirmDeleteAction, confirmEditAction, confirmCreateAction, DoubleConfirmationContainer } = useDoubleConfirmation();
+  const { created, edited, error: showAlertError, AlertContainer } = useCustomAlert();
+  const { confirmDeleteAction, DoubleConfirmationContainer } = useDoubleConfirmation();
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +39,10 @@ export function CategoriasPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage] = useState(5);
   const [error, setError] = useState('');
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const [productos, setProductos] = useState<ApiProducto[]>([]);
 
   const [nuevaCategoria, setNuevaCategoria] = useState({
     nombre: '',
@@ -59,11 +60,15 @@ export function CategoriasPage() {
   const loadCategorias = async () => {
     try {
       setLoading(true);
-      const data = await categoriaService.getCategorias();
-      setCategorias(data);
+      const [categoriasData, productosData] = await Promise.all([
+        categoriaService.getCategorias(),
+        productoService.getProductos()
+      ]);
+      setCategorias(categoriasData);
+      setProductos(productosData);
     } catch (error) {
-      console.error('Error cargando categorías:', error);
-      setError('Error al cargar las categorías');
+      console.error('Error cargando datos:', error);
+      setError('Error al cargar la información');
     } finally {
       setLoading(false);
     }
@@ -73,18 +78,34 @@ export function CategoriasPage() {
     loadCategorias();
   }, []);
 
-  const filteredCategorias = categorias.filter(categoria =>
-    categoria.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    categoria.id.toString().includes(searchTerm)
-  );
+  const filteredCategorias = categorias.filter(categoria => {
+    const searchMatch = categoria.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      categoria.id.toString().includes(searchTerm);
 
-  const totalPages = Math.ceil(filteredCategorias.length / itemsPerPage);
+    const statusMatch = filterStatus === "all" ||
+      (filterStatus === "active" && categoria.estado) ||
+      (filterStatus === "inactive" && !categoria.estado);
+
+    return searchMatch && statusMatch;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredCategorias.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const displayedCategorias = filteredCategorias.slice(startIndex, startIndex + itemsPerPage);
 
   const validateForm = (form: any, isEdit: boolean = false) => {
-    if (!form.nombre) {
+    if (!form.nombre || form.nombre.trim().length === 0) {
       setError('El nombre de la categoría es obligatorio');
+      return false;
+    }
+
+    if (form.nombre.length < 3 || form.nombre.length > 50) {
+      setError('El nombre debe tener entre 3 y 50 caracteres');
+      return false;
+    }
+
+    if (form.descripcion && form.descripcion.length > 200) {
+      setError('La descripción no puede exceder los 200 caracteres');
       return false;
     }
 
@@ -113,9 +134,9 @@ export function CategoriasPage() {
         descripcion: nuevaCategoria.descripcion,
         estado: nuevaCategoria.estado
       });
-      
+
       await loadCategorias(); // Recargar las categorías
-      
+
       setIsDialogOpen(false);
       setNuevaCategoria({
         nombre: '',
@@ -123,7 +144,7 @@ export function CategoriasPage() {
         estado: true
       });
       setError('');
-      
+
       created(nuevaCategoria.nombre, 'Categoría creada exitosamente');
     } catch (error) {
       console.error('Error creando categoría:', error);
@@ -154,13 +175,13 @@ export function CategoriasPage() {
         descripcion: editCategoria.descripcion,
         estado: editCategoria.estado
       });
-      
+
       await loadCategorias(); // Recargar las categorías
-      
+
       setIsEditDialogOpen(false);
       setSelectedCategoria(null);
       setError('');
-      
+
       edited(editCategoria.nombre, 'Categoría actualizada exitosamente');
     } catch (error) {
       console.error('Error actualizando categoría:', error);
@@ -168,14 +189,39 @@ export function CategoriasPage() {
     }
   };
   const handleDeleteClick = async (categoria: Categoria) => {
-    try {
-      await categoriaService.deleteCategoria(categoria.id);
-      await loadCategorias(); // Recargar las categorías
-      deleted(categoria.nombre, 'Categoría eliminada exitosamente');
-    } catch (error) {
-      console.error('Error eliminando categoría:', error);
-      setError('Error al eliminar la categoría');
+    // 1. Verificar si hay productos asociados a esta categoría
+    const productosAsociados = productos.filter(p =>
+      p.categoria && (p.categoria.id === categoria.id || p.categoria.nombre === categoria.nombre)
+    );
+
+    if (productosAsociados.length > 0) {
+      // Si hay productos asociados, no permitir la eliminación y mostrar mensaje de error
+      showAlertError(
+        "No se puede eliminar",
+        `La categoría "${categoria.nombre}" tiene ${productosAsociados.length} productos asociados. Por favor, remueva o cambie la categoría de estos productos antes de eliminarla.`
+      );
+      return;
     }
+
+    // 2. Si no hay productos asociados, mostrar confirmación
+    confirmDeleteAction(
+      categoria.nombre,
+      async () => {
+        try {
+          await categoriaService.deleteCategoria(categoria.id);
+          await loadCategorias(); // Recargar las categorías y productos
+        } catch (error) {
+          console.error('Error eliminando categoría:', error);
+          setError('Error al eliminar la categoría');
+          throw error;
+        }
+      },
+      {
+        confirmMessage: `¿Estás seguro de que deseas eliminar la categoría "${categoria.nombre}"? esta acción no se puede deshacer.`,
+        successMessage: `La categoría "${categoria.nombre}" ha sido eliminada exitosamente.`,
+        requireInput: false
+      }
+    );
   };
 
   const handleToggleStatus = async (categoria: Categoria) => {
@@ -303,9 +349,19 @@ export function CategoriasPage() {
                   placeholder="Buscar categorías..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="elegante-input pl-11 w-80"
+                  className="elegante-input pl-11 w-64"
                 />
               </div>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="elegante-input w-48"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+              </select>
             </div>
 
             <div className="flex items-center gap-4">
@@ -320,6 +376,7 @@ export function CategoriasPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-dark">
+                  <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">ID</th>
                   <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Nombre</th>
                   <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Descripción</th>
                   <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Estado</th>
@@ -335,9 +392,9 @@ export function CategoriasPage() {
                         {loading ? 'Cargando categorías...' : 'No hay categorías'}
                       </h3>
                       <p className="text-gray-lightest">
-                        {loading ? 'Por favor espera un momento.' : 
-                         searchTerm ? 'No se encontraron categorías con ese criterio de búsqueda.' : 
-                         'Comience agregando una nueva categoría.'}
+                        {loading ? 'Por favor espera un momento.' :
+                          searchTerm ? 'No se encontraron categorías con ese criterio de búsqueda.' :
+                            'Comience agregando una nueva categoría.'}
                       </p>
                     </td>
                   </tr>
@@ -347,6 +404,9 @@ export function CategoriasPage() {
                       key={categoria.id}
                       className="border-b border-gray-dark hover:bg-gray-darker transition-colors"
                     >
+                      <td className="py-4 px-4 text-orange-primary font-mono text-xs">
+                        #{categoria.id}
+                      </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-orange-primary rounded-lg flex items-center justify-center">

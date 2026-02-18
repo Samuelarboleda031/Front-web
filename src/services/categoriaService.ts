@@ -136,7 +136,7 @@ class CategoriaService {
   async updateCategoriaStatus(id: number, estado: boolean): Promise<void> {
     try {
       await this.request(`/categorias/${id}/estado`, {
-        method: 'POST',
+        method: 'PUT',
         body: JSON.stringify({ estado: estado }),
       });
       console.log(`✅ Estado de categoría ${id} actualizado a ${estado}`);

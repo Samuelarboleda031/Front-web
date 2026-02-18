@@ -96,51 +96,61 @@ class VentaService {
     const mapped: any = {};
 
     // Campos requeridos por el backend (VentaInput)
-    if (data.id !== undefined) mapped.id = data.id;
-    if (data.clienteId !== undefined) mapped.clienteId = data.clienteId;
+    if (data.id !== undefined) mapped.Id = data.id;
+    if (data.clienteId !== undefined) mapped.ClienteId = data.clienteId;
 
-    // Mapear usuarioId para el barbero
+    // Mapear UsuarioId para el barbero
     if (data.barberoId !== undefined && data.barberoId !== null) {
-      mapped.usuarioId = data.barberoId;
+      mapped.UsuarioId = data.barberoId;
     } else if (data.usuarioId !== undefined) {
-      mapped.usuarioId = data.usuarioId;
+      mapped.UsuarioId = data.usuarioId;
     }
 
-    if (data.metodoPago !== undefined) mapped.metodoPago = data.metodoPago;
-    if (data.descuento !== undefined) mapped.descuento = Number(data.descuento);
-    // Aunque el usuario sugirió que el backend recalcula, incluimos IVA si está presente para consistencia
-    if (data.iva !== undefined) mapped.iva = Number(data.iva);
+    if (data.metodoPago !== undefined) mapped.MetodoPago = data.metodoPago;
+    if (data.descuento !== undefined) mapped.Descuento = Number(data.descuento);
+    if (data.iva !== undefined) mapped.IVA = Number(data.iva);
 
-    // Unificar detalles en la propiedad 'detalles' (camelCase)
+    // Unificar detalles en la propiedad 'Detalles' (PascalCase)
     const detalles: any[] = [];
 
     if (data.productosDetalle && Array.isArray(data.productosDetalle)) {
       data.productosDetalle.forEach((p: any) => {
         detalles.push({
-          productoId: parseInt(p.id),
-          cantidad: Number(p.cantidad),
-          precioUnitario: Number(p.precio)
+          ProductoId: parseInt(p.id),
+          Cantidad: Number(p.cantidad),
+          PrecioUnitario: Number(p.precio)
         });
       });
     }
 
     if (data.serviciosDetalle && Array.isArray(data.serviciosDetalle)) {
       data.serviciosDetalle.forEach((s: any) => {
-        // Extraer ID numérico (ej: "SERV-2" -> 2)
-        const idStr = String(s.id).replace('SERV-', '');
-        const id = parseInt(idStr);
-        if (!isNaN(id)) {
-          detalles.push({
-            servicioId: id,
-            cantidad: 1,
-            precioUnitario: Number(s.precio)
-          });
+        const idStr = String(s.id);
+
+        if (idStr.startsWith('PAQ-')) {
+          const id = parseInt(idStr.replace('PAQ-', ''));
+          if (!isNaN(id)) {
+            detalles.push({
+              PaqueteId: id,
+              Cantidad: 1,
+              PrecioUnitario: Number(s.precio)
+            });
+          }
+        } else {
+          const id = parseInt(idStr.replace('SERV-', ''));
+          if (!isNaN(id)) {
+            detalles.push({
+              ServicioId: id,
+              Cantidad: 1,
+              PrecioUnitario: Number(s.precio)
+            });
+          }
         }
       });
     }
 
     if (detalles.length > 0) {
-      mapped.detalles = detalles;
+      mapped.Detalles = detalles;
     }
 
     return mapped;
@@ -326,16 +336,15 @@ class VentaService {
     }
   }
 
-  async updateVentaStatus(id: number, estado: string): Promise<void> {
+  async anularVenta(id: number): Promise<void> {
     try {
-      console.log(`📤 Actualizando estado de venta ${id} a ${estado}...`);
-      await this.request(`/Ventas/${id}/estado`, {
-        method: 'POST',
-        body: JSON.stringify({ estado }),
+      console.log(`📤 Anulando venta ${id}...`);
+      await this.request(`/Ventas/${id}/anular`, {
+        method: 'PUT'
       });
-      console.log(`✅ Estado de venta ${id} actualizado`);
+      console.log(`✅ Venta ${id} anulada`);
     } catch (error: any) {
-      console.error(`❌ Error actualizando estado de venta ${id}:`, error);
+      console.error(`❌ Error anulando venta ${id}:`, error);
       throw error;
     }
   }

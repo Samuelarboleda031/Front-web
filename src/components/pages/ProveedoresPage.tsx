@@ -150,9 +150,9 @@ export function ProveedoresPage() {
   });
 
   // Cargar proveedores desde la API
-  const cargarProveedores = async () => {
+  const cargarProveedores = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       console.log('📥 Loading providers...');
       const data = await proveedorService.obtenerProveedores();
@@ -176,7 +176,7 @@ export function ProveedoresPage() {
       // Usar datos de fallback en caso de error
       setProveedores(proveedoresDataFallback);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -384,8 +384,8 @@ export function ProveedoresPage() {
         await proveedorService.cambiarEstadoProveedor(proveedor.id, nuevoEstado);
       }
 
-      // Refrescar datos desde la API para sincronizar con el servidor
-      await cargarProveedores();
+      // Refrescar datos desde la API para sincronizar con el servidor (de forma silenciosa)
+      await cargarProveedores(true);
 
       if (nuevoEstado) {
         created("Proveedor activado", `El proveedor "${proveedor.nombre}" ha sido activado.`);
@@ -429,10 +429,10 @@ export function ProveedoresPage() {
 
   // Filtrado y paginación
   const filteredProveedores = proveedores.filter(proveedor =>
-    proveedor.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.nit.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    proveedor.tipoProveedor.toLowerCase().includes(searchTerm.toLowerCase())
+    (proveedor.nombre || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (proveedor.nit || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (proveedor.correo || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (proveedor.tipoProveedor || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredProveedores.length / itemsPerPage);
@@ -484,7 +484,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Building className="w-4 h-4 text-orange-primary" />
-                          Tipo de Proveedor
+                          Tipo de Proveedor <span className="text-red-500">*</span>
                         </Label>
                         <select
                           id="tipoProveedor"
@@ -505,7 +505,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <User className="w-4 h-4 text-orange-primary" />
-                          {formData.tipoProveedor === 'Juridico' ? 'Nombre Comercial' : 'Nombre Completo'}
+                          {formData.tipoProveedor === 'Juridico' ? 'Nombre Comercial' : 'Nombre Completo'} <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="nombre"
@@ -521,7 +521,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <IdCard className="w-4 h-4 text-orange-primary" />
-                          NIT / Identificación
+                          NIT / Identificación <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="nit"
@@ -534,7 +534,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-orange-primary" />
-                          Dirección
+                          Dirección <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="direccion"
@@ -551,7 +551,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Phone className="w-4 h-4 text-orange-primary" />
-                          Teléfono Principal
+                          Teléfono Principal <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="numero"
@@ -564,7 +564,7 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <Mail className="w-4 h-4 text-orange-primary" />
-                          Correo Principal
+                          Correo <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="correo"
@@ -581,19 +581,6 @@ export function ProveedoresPage() {
                       <div className="space-y-2">
                         <Label className="text-white-primary flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-orange-primary" />
-                          Ciudad
-                        </Label>
-                        <Input
-                          id="ciudad"
-                          value={formData.ciudad}
-                          onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
-                          className="elegante-input"
-                          placeholder="Ciudad"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white-primary flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-orange-primary" />
                           Departamento
                         </Label>
                         <Input
@@ -602,6 +589,19 @@ export function ProveedoresPage() {
                           onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
                           className="elegante-input"
                           placeholder="Departamento"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white-primary flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-orange-primary" />
+                          Ciudad
+                        </Label>
+                        <Input
+                          id="ciudad"
+                          value={formData.ciudad}
+                          onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
+                          className="elegante-input"
+                          placeholder="Ciudad"
                         />
                       </div>
                     </div>
@@ -1122,14 +1122,23 @@ export function ProveedoresPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-white-primary">{selectedProveedor.nombre}</h3>
-                    <p className="text-sm text-gray-lightest">{getTipoProveedorLabel(selectedProveedor.tipoProveedor)}</p>
+                    <p className="text-sm text-gray-lightest">{getTipoProveedorLabel(selectedProveedor.tipoProveedor || "Juridico")}</p>
                   </div>
+                  
+                <div className="flex items-center gap-2">
+                  <span className={`elegante-tag ${(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                    {(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-2">
                     <IdCard className="w-4 h-4 text-gray-lightest" />
-                    <span className="text-sm text-gray-lightest">NIT:</span>
+                    <span className="text-sm text-gray-lightest">
+                      {selectedProveedor.tipoProveedor === 'Natural' ? 'Identificación:' : 'NIT:'}
+                    </span>
                     <span className="text-sm text-white-primary">{selectedProveedor.nit}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1212,21 +1221,7 @@ export function ProveedoresPage() {
                 </div>
               )}
 
-              {/* Estado */}
-              <div className="elegante-card bg-gray-darker">
-                <h4 className="text-sm font-medium text-white-primary mb-3 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-primary-orange" />
-                  Estado del Proveedor
-                </h4>
-                <div className="flex items-center gap-2">
-                  <span className={`elegante-tag ${(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                    }`}>
-                    {(selectedProveedor.estado !== undefined ? selectedProveedor.estado : selectedProveedor.activo) ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-              </div>
             </div>
-
             <div className="flex justify-end pt-4">
               <Button
                 onClick={() => setIsDetailDialogOpen(false)}

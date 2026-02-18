@@ -101,9 +101,17 @@ class ProveedorService {
     if (data.tipoProveedor !== undefined) mapped.TipoProveedor = data.tipoProveedor;
     if (data.nit !== undefined) mapped.Nit = data.nit;
     if (data.correo !== undefined) mapped.Correo = data.correo;
-    if (data.numero !== undefined) mapped.Numero = data.numero;
-    if (data.telefono !== undefined) mapped.Telefono = data.telefono;
-    if (data.contacto !== undefined) mapped.Contacto = data.contacto;
+
+    // El backend espera 'telefono' en minúsculas para el modelo base o Telefono en PascalCase
+    // Vamos a enviar ambos para asegurar compatibilidad y que no llegue null
+    const tel = data.telefono || data.numero || "";
+    mapped.Telefono = tel;
+    mapped.telefono = tel;
+
+    // Similar al teléfono, unificamos contacto y personacontacto
+    const contactValue = data.contacto || data.personaContacto || "";
+    mapped.Contacto = contactValue;
+    mapped.contacto = contactValue;
     if (data.direccion !== undefined) mapped.Direccion = data.direccion;
     if (data.fechaCreacion !== undefined) mapped.FechaCreacion = new Date().toISOString();
     // Priorizar estado sobre activo para la API
@@ -115,8 +123,14 @@ class ProveedorService {
     if (data.representanteLegal !== undefined) mapped.RepresentanteLegal = data.representanteLegal;
     if (data.numeroIdentificacionRepLegal !== undefined) mapped.NumeroIdentificacionRepLegal = data.numeroIdentificacionRepLegal;
     if (data.cargoRepLegal !== undefined) mapped.CargoRepLegal = data.cargoRepLegal;
-    if (data.ciudad !== undefined) mapped.Ciudad = data.ciudad;
-    if (data.departamento !== undefined) mapped.Departamento = data.departamento;
+    if (data.ciudad !== undefined) {
+      mapped.Ciudad = data.ciudad || "";
+      mapped.ciudad = data.ciudad || "";
+    }
+    if (data.departamento !== undefined) {
+      mapped.Departamento = data.departamento || "";
+      mapped.departamento = data.departamento || "";
+    }
 
     // Campos adicionales que tu API podría necesitar
     if (data.documentoRepresentante !== undefined) mapped.DocumentoRepresentante = data.documentoRepresentante;
@@ -134,15 +148,19 @@ class ProveedorService {
 
   // Mapeo genérico desde API
   private mapFromApi(apiData: any): Proveedor {
+    const tipo = (apiData.tipoProveedor as 'Juridico' | 'Natural') || 'Juridico';
+    // Para personas naturales, si nit está vacío usamos el número de identificación
+    const nitValue = apiData.nit || apiData.numeroIdentificacion || "";
+
     return {
       id: apiData.id,
       nombre: apiData.nombre,
-      nit: apiData.nit,
+      nit: nitValue,
       correo: apiData.correo,
       telefono: apiData.telefono,
       direccion: apiData.direccion,
       estado: apiData.estado,
-      tipoProveedor: (apiData.tipoProveedor as 'Juridico' | 'Natural') || 'Juridico', // Fallback si viene vacío
+      tipoProveedor: tipo,
       razonSocial: apiData.razonSocial,
       representanteLegal: apiData.representanteLegal,
       numeroIdentificacionRepLegal: apiData.numeroIdentificacionRepLegal,

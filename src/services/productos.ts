@@ -315,17 +315,27 @@ class ProductoService {
   // MÉTODOS ADICIONALES
   // =============================================================================
 
-  async toggleProductoActivo(id: number, currentEstado: boolean): Promise<void> {
+  async toggleProductoActivo(id: number): Promise<ApiProducto> {
     try {
-      const nuevoEstado = !currentEstado;
+      // 1. Obtener el producto actual para saber su estado
+      const producto = await this.getProductoById(id);
+      if (!producto) throw new Error('Producto no encontrado');
+
+      const nuevoEstado = !producto.activo;
       console.log(`🔄 Toggle activo - ID: ${id}, Nuevo estado: ${nuevoEstado}`);
 
+      // 2. Actualizar el estado
       await this.request(`/productos/${id}/estado`, {
         method: 'POST',
         body: JSON.stringify({ estado: nuevoEstado }),
       });
 
+      // 3. Obtener el producto actualizado para devolverlo
+      const productoActualizado = await this.getProductoById(id);
+      if (!productoActualizado) throw new Error('Error al recuperar el producto actualizado');
+
       console.log(`✅ Producto ${nuevoEstado ? 'activado' : 'desactivado'}`);
+      return productoActualizado;
     } catch (error) {
       console.error('Error toggling producto activo:', error);
       throw error;
