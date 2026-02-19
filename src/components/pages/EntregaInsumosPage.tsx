@@ -27,7 +27,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "../ui/label";
 import { toast } from "sonner";
 import { useDoubleConfirmation } from "../ui/double-confirmation";
-import { entregaInsumosService, EntregaInsumo, CreateEntregaData, UpdateEntregaData } from "../../services/entregaInsumosService";
+import { entregaInsumosService, EntregaInsumo, InsumoEntrega, CreateEntregaData, UpdateEntregaData } from "../../services/entregaInsumosService";
 import { apiService, ApiUser } from "../../services/api";
 import { barberosService, Barbero } from "../../services/barberosService";
 import { insumosService, Insumo } from "../../services/insumosService";
@@ -106,8 +106,8 @@ export function EntregaInsumosPage() {
         console.log('🔵 Entregas desde API:', entregasData);
         console.log('🔵 Usuarios desde API:', usersData);
 
-        setBarberos(barberosData);
-        setInsumos(insumosData);
+        setBarberos(barberosData.filter(b => b.estado === true));
+        setInsumos(insumosData.filter(i => i.activo === true));
         setEntregas(entregasData);
         setUsers(usersData);
       } catch (error) {
@@ -225,7 +225,8 @@ export function EntregaInsumosPage() {
           nombre: insumo.nombre,
           categoria: insumo.categoria,
           cantidad: cantidadInsumo,
-          precio: Number(insumo.precio) || 0
+          precio: Number(insumo.precio) || 0,
+          imagen: insumo.imagen
         }]
       });
     }
@@ -795,9 +796,9 @@ export function EntregaInsumosPage() {
                               value={insumoSeleccionado}
                               onChange={(e) => setInsumoSeleccionado(Number(e.target.value))}
                             >
-                              <option value={0}>Seleccionar insumo...</option>
+                              <option value={0}>Seleccionar producto...</option>
                               {insumos
-                                .filter(insumo => insumo.stock > 0 && insumo.categoria === 'Suministros')
+                                .filter(insumo => insumo.stock > 0)
                                 .map((insumo) => (
                                   <option key={insumo.id} value={insumo.id}>
                                     {insumo.nombre} (Stock: {insumo.stock})

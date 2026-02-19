@@ -64,6 +64,33 @@ export interface DetallePaquete {
 }
 
 class ApiService {
+  async uploadImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const url = `${API_BASE_URL}/upload`;
+      console.log(`API [POST]: ${url} (FormData)`);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ API Error [${response.status}]: ${errorText}`);
+        throw new Error(`Error del servidor (${response.status}): ${errorText || response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  }
+
   private async request(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const isGet = !options.method || options.method === 'GET';
     const separator = endpoint.includes('?') ? '&' : '?';
@@ -248,7 +275,32 @@ class ApiService {
     try {
       const response = await this.request('/usuarios');
       const text = await response.text();
-      return text ? JSON.parse(text) : [];
+      const data = text ? JSON.parse(text) : [];
+
+      const normalizedData = Array.isArray(data) ? data.map((item: any) => ({
+        id: item.id || item.Id,
+        nombre: item.nombre || item.Nombre,
+        apellido: item.apellido || item.Apellido,
+        correo: item.correo || item.Correo || item.email || item.Email,
+        contrasena: item.contrasena || item.Contrasena,
+        rolId: item.rolId || item.RolId,
+        tipoDocumento: item.tipoDocumento || item.TipoDocumento,
+        documento: item.documento || item.Documento,
+        telefono: item.telefono || item.Telefono,
+        direccion: item.direccion || item.Direccion,
+        barrio: item.barrio || item.Barrio,
+        fechaNacimiento: item.fechaNacimiento || item.FechaNacimiento,
+        fotoPerfil: item.fotoPerfil || item.FotoPerfil,
+        estado: item.estado === true || item.Estado === true || item.activo === true || item.Activo === true,
+        rol: item.rol || item.Rol ? {
+          id: item.rol?.id || item.Rol?.Id || item.rol?.id || item.Rol?.id,
+          nombre: item.rol?.nombre || item.Rol?.Nombre,
+          descripcion: item.rol?.descripcion || item.Rol?.Descripcion,
+          estado: item.rol?.estado === true || item.Rol?.Estado === true
+        } : undefined
+      })) : [];
+
+      return normalizedData;
     } catch (error) {
       console.error('Error fetching usuarios:', error);
       throw error;

@@ -2,7 +2,7 @@
 // MÓDULO COMPLETO DE PRODUCTOS - TODO EN UN SOLO ARCHIVO
 // =============================================================================
 
-import { useCustomAlert } from "../components/ui/custom-alert";
+
 
 // -----------------------------------------------------------------------------
 // INTERFACES Y TIPOS
@@ -25,7 +25,7 @@ export interface ApiProducto {
   cantidad: number;
   minCantidad: number;
   marca: string | null;
-  imagen: string | null;
+  imagenProduc: string | null;
   activo: boolean;
 }
 
@@ -120,7 +120,7 @@ class ProductoService {
       cantidad: Number(data.Cantidad || data.cantidad),
       minCantidad: Number(data.MinCantidad || data.minCantidad || data.stockMinimo),
       marca: data.Marca || data.marca || '',
-      imagen: data.Imagen || data.imagen || '',
+      imagenProduc: data.imagenProduc || data.ImagenProduc || data.Imagen || data.imagen || '',
       activo: data.Activo !== undefined ? !!data.Activo : (data.activo !== undefined ? !!data.activo : (data.estado !== undefined ? !!data.estado : true)),
     };
   }
@@ -170,7 +170,10 @@ class ProductoService {
   async createProducto(productoData: Partial<ApiProducto>): Promise<ApiProducto> {
     try {
       // Obtener el ID de la categoría
-      const categoriaId = CATEGORIA_MAP[productoData.categoria || ''] || 1;
+      const categoriaName = typeof productoData.categoria === 'string'
+        ? productoData.categoria
+        : (productoData.categoria as any)?.nombre || '';
+      const categoriaId = CATEGORIA_MAP[categoriaName] || 1;
 
       // Enviar los campos exactos que la API espera
       const apiBody = {
@@ -182,7 +185,7 @@ class ProductoService {
         stockInsumos: Number(productoData.stockInsumos) || 0,
         stockMinimo: Number(productoData.minCantidad) || 0,
         categoriaId: categoriaId,
-        imagen: productoData.imagen || '',
+        imagenProduc: productoData.imagenProduc || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
 
@@ -220,7 +223,10 @@ class ProductoService {
   async updateProducto(id: number, productoData: Partial<ApiProducto>): Promise<ApiProducto> {
     try {
       // Obtener el ID de la categoría
-      const categoriaId = CATEGORIA_MAP[productoData.categoria || ''] || 1;
+      const categoriaName = typeof productoData.categoria === 'string'
+        ? productoData.categoria
+        : (productoData.categoria as any)?.nombre || '';
+      const categoriaId = CATEGORIA_MAP[categoriaName] || 1;
 
       // Enviar los campos exactos que la API espera para PUT
       const apiBody = {
@@ -234,7 +240,7 @@ class ProductoService {
         stockMinimo: Number(productoData.minCantidad),
         categoriaId: categoriaId,
         marca: productoData.marca || '',
-        imagen: productoData.imagen || '',
+        imagenProduc: productoData.imagenProduc || '',
         estado: productoData.activo !== undefined ? !!productoData.activo : true
       };
 
@@ -385,7 +391,7 @@ class ProductoService {
       return productos.filter(producto =>
         producto.nombre?.toLowerCase().includes(query.toLowerCase()) ||
         producto.descripcion?.toLowerCase().includes(query.toLowerCase()) ||
-        producto.categoria?.toLowerCase().includes(query.toLowerCase()) ||
+        (producto.categoria?.nombre || '').toLowerCase().includes(query.toLowerCase()) ||
         producto.marca?.toLowerCase().includes(query.toLowerCase())
       );
     } catch (error) {
@@ -394,42 +400,36 @@ class ProductoService {
     }
   }
 
-  async getCategorias(): Promise<string[]> {
+  async getCategorias(): Promise<ApiCategoria[]> {
     try {
-      // Si la API tiene un endpoint de categorías, usarlo
       const response = await this.request('/categorias');
       const text = await response.text();
       const data = text ? JSON.parse(text) : [];
 
       console.log('📂 Categorías crudas de API:', data);
 
-      // Si vienen como objetos, extraer los nombres y IDs
-      if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
-        const categoriasConIds = data.map((cat: any) => ({
-          id: cat.Id || cat.id,
-          nombre: cat.Nombre || cat.nombre
-        }));
-        console.log('📂 Categorías mapeadas con IDs:', categoriasConIds);
+      const normalizedCategorias: ApiCategoria[] = Array.isArray(data) ? data.map((cat: any) => ({
+        id: cat.Id || cat.id,
+        nombre: cat.Nombre || cat.nombre,
+        descripcion: cat.Descripcion || cat.descripcion || null,
+        estado: cat.Estado === true || cat.estado === true || cat.Activo === true || cat.activo === true || (cat.estado !== false && cat.Estado !== false)
+      })) : [];
 
-        // Actualizar el mapeo con los IDs reales
-        categoriasConIds.forEach((cat: any) => {
-          CATEGORIA_MAP[cat.nombre] = cat.id;
-        });
+      // Actualizar el mapeo con los IDs reales para uso interno
+      normalizedCategorias.forEach(cat => {
+        CATEGORIA_MAP[cat.nombre] = cat.id;
+      });
 
-        return categoriasConIds.map(cat => cat.nombre);
-      }
-
-      // Si vienen como strings directos
-      return Array.isArray(data) ? data : [];
+      return normalizedCategorias;
     } catch (error) {
       console.error('Error fetching categorias:', error);
       // Categorías por defecto si la API no tiene el endpoint
       return [
-        "Cuidado Capilar",
-        "Cuidado Barba",
-        "Herramientas",
-        "Suministros",
-        "Accesorios"
+        { id: 1, nombre: "Cuidado Capilar", descripcion: null, estado: true },
+        { id: 2, nombre: "Cuidado Barba", descripcion: null, estado: true },
+        { id: 3, nombre: "Herramientas", descripcion: null, estado: true },
+        { id: 4, nombre: "Suministros", descripcion: null, estado: true },
+        { id: 5, nombre: "Accesorios", descripcion: null, estado: true }
       ];
     }
   }
@@ -527,7 +527,7 @@ async function testProductosCRUD() {
     const nuevoProducto = {
       nombre: 'Producto Test CRUD',
       descripcion: 'Producto creado para probar la API',
-      categoria: categorias[0] || 'Cuidado Capilar',
+      categoria: { id: 1, nombre: 'Cuidado Capilar' },
       precioBase: 25000,
       stockVentas: 10,
       stockInsumos: 5,
@@ -537,7 +537,7 @@ async function testProductosCRUD() {
       porcentajeIva: 19
     };
 
-    const productoCreado = await productoService.createProducto(nuevoProducto);
+    const productoCreado = await productoService.createProducto(nuevoProducto as any);
     console.log('✅ Producto creado:', productoCreado);
 
     // 4. Actualizar producto
@@ -580,7 +580,7 @@ async function testDeleteProducto() {
     const productos = await productoService.getProductos();
     console.log('📦 Productos disponibles:', productos.map((p: any) => ({ id: p.id, nombre: p.nombre })));
 
-    if (productos.length === 0) {
+    if (productos.length === 0 || !productos[0]) {
       console.log('❌ No hay productos para eliminar');
       return;
     }
@@ -630,7 +630,7 @@ async function testUpdateProducto() {
     const productos = await productoService.getProductos();
     console.log('📦 Productos disponibles:', productos.map((p: any) => ({ id: p.id, nombre: p.nombre })));
 
-    if (productos.length === 0) {
+    if (productos.length === 0 || !productos[0]) {
       console.log('❌ No hay productos para actualizar');
       return;
     }
@@ -645,7 +645,7 @@ async function testUpdateProducto() {
       stockVentas: (productoAActualizar.stockVentas || 0) + 1,
       stockInsumos: productoAActualizar.stockInsumos || 0,
       minCantidad: productoAActualizar.minCantidad || 5,
-      categoria: productoAActualizar.categoria || 'Cuidado Capilar',
+      categoria: productoAActualizar.categoria || { id: 1, nombre: 'Cuidado Capilar' },
       activo: productoAActualizar.activo !== false
     };
 
@@ -654,7 +654,7 @@ async function testUpdateProducto() {
     try {
       const productoActualizado = await productoService.updateProducto(
         productoAActualizar.id,
-        datosActualizacion
+        datosActualizacion as any
       );
 
       console.log('✅ Producto actualizado exitosamente:', productoActualizado);

@@ -116,8 +116,8 @@ export function ComprasPage() {
         insumosService.getInsumos()
       ]);
       setCompras(comprasData);
-      setProveedores(proveedoresData);
-      setProductos(productosData);
+      setProveedores(proveedoresData.filter(p => p.estado === true));
+      setProductos(productosData.filter(p => p.activo === true));
     } catch (error) {
       toast.error("Error al cargar datos", { description: "No se pudieron obtener los datos actualizados." });
       console.error(error);
@@ -270,7 +270,9 @@ export function ComprasPage() {
       detalles: nuevaCompra.productos.map(p => ({
         productoId: p.id,
         cantidad: p.cantidad,
-        precioUnitario: p.precio
+        precioUnitario: p.precio,
+        cantidadVentas: p.stockVentas,
+        cantidadInsumos: p.stockInsumos
       }))
     };
 
@@ -412,7 +414,11 @@ export function ComprasPage() {
               ${productosDetalle.map((producto) => `
                 <tr>
                   <td>${producto.productoNombre}</td>
-                  <td>${producto.cantidad}</td>
+                  <td>
+                    ${producto.cantidad}
+                    <br>
+                    <small style="color: #666;">(🛒: ${producto.cantidadVentas} | 📦: ${producto.cantidadInsumos})</small>
+                  </td>
                   <td>${formatCurrency(producto.precioUnitario)}</td>
                   <td>${formatCurrency(producto.subtotal || 0)}</td>
                 </tr>
@@ -617,7 +623,7 @@ export function ComprasPage() {
                             <option value="">Seleccionar producto...</option>
                             {productos.map(producto => (
                               <option key={producto.id} value={producto.id}>
-                                {producto.nombre} - ${formatCurrency(producto.precio)}
+                                {producto.nombre}
                               </option>
                             ))}
                           </select>
@@ -924,7 +930,7 @@ export function ComprasPage() {
                           <div>
                             <div className="font-medium">{detalle.productoNombre}</div>
                             <div className="text-sm text-gray-500">
-                              Cantidad: {detalle.cantidad} | Precio: ${formatCurrency(detalle.precioUnitario)}
+                              Cant: {detalle.cantidad} (🛒:{detalle.cantidadVentas} | 📦:{detalle.cantidadInsumos}) | Precio: ${formatCurrency(detalle.precioUnitario)}
                             </div>
                           </div>
                           <div className="text-orange-primary font-semibold">

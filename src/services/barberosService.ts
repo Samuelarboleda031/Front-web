@@ -14,6 +14,7 @@ export interface Barbero {
   fechaNacimiento: string;
   rol: string;
   status: 'active' | 'inactive';
+  estado?: boolean; // Added for compatibility
   fotoPerfil: string;
   especialidad?: string;
   usuarioId?: number;
@@ -21,6 +22,7 @@ export interface Barbero {
 }
 
 export interface CreateBarberoData {
+  usuarioId?: number;
   nombre: string;
   apellido: string;
   tipoDocumento: string;
@@ -34,6 +36,7 @@ export interface CreateBarberoData {
   status: string;
   fotoPerfil: string;
   especialidad?: string;
+  estado?: boolean;
 }
 
 class BarberosService {
@@ -65,43 +68,49 @@ class BarberosService {
 
     const nombre = api.nombre || api.Nombre || usuario.nombre || usuario.Nombre || "";
     const apellido = api.apellido || api.Apellido || api.apellidos || api.Apellidos || usuario.apellido || usuario.Apellido || usuario.apellidos || usuario.Apellidos || "";
-    const correo = api.correo || api.Correo || usuario.correo || usuario.Correo || api.email || api.Email || usuario.email || usuario.Email || "";
-    const documento = api.documento || api.Documento || usuario.documento || usuario.Documento || "";
-    const tipoDocumento = api.tipoDocumento || api.TipoDocumento || usuario.tipoDocumento || usuario.TipoDocumento || "CC";
-    const telefono = api.telefono || api.Telefono || api.celular || api.Celular || usuario.telefono || usuario.Telefono || usuario.celular || usuario.Celular || "";
-    const direccion = api.direccion || api.Direccion || usuario.direccion || usuario.Direccion || "";
-    const barrio = api.barrio || api.Barrio || usuario.barrio || usuario.Barrio || "";
-    const foto = api.fotoPerfil || api.FotoPerfil || api.imagenUrl || api.ImagenUrl || usuario.fotoPerfil || usuario.FotoPerfil || "";
-
-    // Manejo de fecha de nacimiento
-    let fechaNac = api.fechaNacimiento || api.FechaNacimiento || usuario.fechaNacimiento || usuario.FechaNacimiento || "";
-    if (fechaNac && typeof fechaNac === 'string') {
-      fechaNac = fechaNac.split('T')[0];
-    }
+    const isActive = (api.estado ?? api.Estado ?? usuario.estado ?? usuario.Estado ?? true);
 
     return {
       id: api.id || api.Id || 0,
       nombre: nombre,
       apellido: apellido,
-      tipoDocumento: tipoDocumento,
-      documento: documento,
-      correo: correo,
-      telefono: telefono,
-      direccion: direccion,
-      barrio: barrio,
-      fechaNacimiento: fechaNac || "No especificada",
+      tipoDocumento: api.tipoDocumento || api.TipoDocumento || usuario.tipoDocumento || usuario.TipoDocumento || "CC",
+      documento: api.documento || api.Documento || usuario.documento || usuario.Documento || "",
+      correo: api.correo || api.Correo || usuario.correo || usuario.Correo || api.email || api.Email || usuario.email || usuario.Email || "",
+      telefono: api.telefono || api.Telefono || api.celular || api.Celular || usuario.telefono || usuario.Telefono || usuario.celular || usuario.Celular || "",
+      direccion: api.direccion || api.Direccion || usuario.direccion || usuario.Direction || "",
+      barrio: api.barrio || api.Barrio || usuario.barrio || usuario.Barrio || "",
+      fechaNacimiento: api.fechaNacimiento || api.FechaNacimiento || usuario.fechaNacimiento || usuario.FechaNacimiento || "No especificada",
       rol: api.rol || api.Rol || (usuario.rol?.nombre) || (usuario.Rol?.Nombre) || 'Barbero',
-      status: (api.estado ?? api.Estado ?? usuario.estado ?? usuario.Estado ?? true) ? 'active' : 'inactive',
-      fotoPerfil: foto,
+      status: isActive ? 'active' : 'inactive',
+      estado: isActive,
+      fotoPerfil: api.fotoPerfil || api.FotoPerfil || api.imagenUrl || api.ImagenUrl || usuario.fotoPerfil || usuario.FotoPerfil || "",
       especialidad: api.especialidad || api.Especialidad || 'General',
       usuarioId: api.usuarioId || api.UsuarioId || (api.Id && api.Id !== api.id ? api.Id : 0) || (usuario.id || api.Id || 0),
       fechaCreacion: api.fechaContratacion || api.FechaContratacion || api.fechaCreacion || api.FechaCreacion || "No especificada"
     };
   }
 
-  async getBarberos(): Promise<any[]> {
+  mapComponentToApi(data: any): any {
+    return {
+      nombre: data.nombre,
+      apellido: data.apellido,
+      documento: data.documento,
+      correo: data.correo,
+      telefono: data.telefono,
+      direccion: data.direccion,
+      barrio: data.barrio,
+      fechaNacimiento: data.fechaNacimiento,
+      especialidad: data.especialidad,
+      status: data.status,
+      fotoPerfil: data.fotoPerfil
+    };
+  }
+
+  async getBarberos(): Promise<Barbero[]> {
     const response = await this.request(BARBEROS_URL);
-    return await response.json();
+    const data = await response.json();
+    return Array.isArray(data) ? data.map(item => this.mapApiToComponent(item)) : [];
   }
 
   // Creación vía Usuarios para sincronizar cuenta y perfil
@@ -142,7 +151,8 @@ class BarberosService {
       Barrio: data.barrio,
       FechaNacimiento: data.fechaNacimiento,
       Especialidad: data.especialidad,
-      Estado: data.status === 'active' || data.estado === true
+      Estado: data.status === 'active' || data.estado === true,
+      FotoPerfil: data.fotoPerfil || ''
     };
 
     const response = await this.request(`${BARBEROS_URL}/${id}`, {

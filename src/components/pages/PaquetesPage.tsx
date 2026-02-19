@@ -60,7 +60,7 @@ export function PaquetesPage() {
           servicioService.getServicios()
         ]);
         setPaquetes(paquetesData);
-        setServiciosDisponibles(serviciosData);
+        setServiciosDisponibles(serviciosData.filter(s => s.estado === true));
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {

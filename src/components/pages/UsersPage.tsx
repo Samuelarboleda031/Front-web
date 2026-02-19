@@ -1,22 +1,18 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Textarea } from "../ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import {
   Users, Plus, Edit, Trash2, Mail, Phone, Calendar,
   Search, UserCheck, UserX, Eye, User, ChevronLeft,
-  ChevronRight, IdCard, Lock, EyeOff, Settings,
-  Scissors, Star, TrendingUp, TrendingDown, Target,
-  Award, Crown, Medal, Activity, Filter, MapPin,
-  CreditCard, Home, Camera, Upload, ToggleRight, ToggleLeft,
-  X, Loader2
+  ChevronRight, Lock, EyeOff, MapPin, CreditCard, Home, Camera,
+  ToggleRight, ToggleLeft, X, Loader2, IdCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomAlert } from "../ui/custom-alert";
 import { apiService, ApiUser } from "../../services/api";
+import ImageRenderer from "../ui/ImageRenderer";
 import { clientesService } from "../../services/clientesService";
 import { barberosService } from "../../services/barberosService";
 import { rolesApiService, RoleWithModules } from "../../services/rolesApiService";
@@ -227,27 +223,7 @@ export function UsersPage() {
   // Función para subir imágenes al servidor usando el endpoint /api/upload
   // Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
   // Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
-  const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
 
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error al subir imagen: ${response.statusText}`);
-      }
-
-      const result: UploadResponse = await response.json();
-      return result.url;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
 
   const handleUserImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -278,7 +254,7 @@ export function UsersPage() {
       reader.readAsDataURL(file);
 
       // Subir al servidor
-      const imageUrl = await uploadImage(file);
+      const imageUrl = await apiService.uploadImage(file);
       setNewUser((prev) => ({ ...prev, imagenUrl: imageUrl }));
 
       toast.success('Imagen subida exitosamente', {
@@ -356,8 +332,14 @@ export function UsersPage() {
             correo: createdUser.correo,
             telefono: createdUser.telefono || newUser.celular,
             especialidad: "General", // Valor por defecto
-            fotoPerfil: createdUser.fotoPerfil || undefined,
-            estado: true
+            fotoPerfil: createdUser.fotoPerfil || '',
+            estado: true,
+            direccion: createdUser.direccion || newUser.direccion,
+            barrio: createdUser.barrio || newUser.barrio,
+            fechaNacimiento: createdUser.fechaNacimiento || newUser.fechaNacimiento,
+            tipoDocumento: createdUser.tipoDocumento || newUser.tipoDocumento || 'Cédula',
+            rol: 'Barbero',
+            status: 'active'
           });
           toast.success("Perfil de Barbero creado automáticamente");
         }
@@ -583,29 +565,15 @@ export function UsersPage() {
                       </Label>
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          {uploadingImage ? (
-                            <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                              <Loader2 className="w-6 h-6 text-orange-primary animate-spin" />
-                            </div>
-                          ) : userPreviewUrl ? (
-                            <div className="relative">
-                              <img
-                                src={userPreviewUrl}
-                                alt="Vista previa"
-                                className="w-16 h-16 rounded-full object-cover border-2 border-orange-primary"
-                              />
-                              <button
-                                onClick={removeUserProfileImage}
-                                className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
-                                type="button"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="w-16 h-16 rounded-full bg-gray-dark border-2 border-gray-medium flex items-center justify-center">
-                              <User className="w-6 h-6 text-gray-lightest" />
-                            </div>
+                          <ImageRenderer url={userPreviewUrl} className="w-16 h-16 rounded-full" />
+                          {userPreviewUrl && (
+                            <button
+                              onClick={removeUserProfileImage}
+                              className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
+                              type="button"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
                           )}
                         </div>
                         <button
@@ -888,9 +856,7 @@ export function UsersPage() {
                       <tr key={user.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-dark border border-gray-medium flex items-center justify-center">
-                              <User className="w-5 h-5 text-gray-lighter" />
-                            </div>
+                            <ImageRenderer url={user.imagenUrl} className="w-10 h-10 rounded-full" />
                             <span className="text-gray-lighter">{user.correo}</span>
                           </div>
                         </td>
@@ -1038,15 +1004,7 @@ export function UsersPage() {
             {selectedUser && (
               <div className="grid grid-cols-4 gap-6 py-6">
                 <div className="col-span-4 flex items-center gap-4 p-4 bg-gray-darker rounded-lg border border-gray-dark">
-                  <Avatar className="w-16 h-16">
-                    {selectedUser.imagenUrl ? (
-                      <AvatarImage src={selectedUser.imagenUrl} alt={`${selectedUser.nombres} ${selectedUser.apellidos}`} />
-                    ) : (
-                      <AvatarFallback className="bg-orange-primary text-black-primary text-xl font-bold">
-                        {selectedUser.avatar}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
+                  <ImageRenderer url={selectedUser.imagenUrl} className="w-16 h-16 rounded-full" />
                   <div>
                     <h3 className="text-xl font-semibold text-white-primary">{selectedUser.nombres} {selectedUser.apellidos}</h3>
                     <p className="text-gray-lighter">{selectedUser.correo}</p>

@@ -12,6 +12,7 @@ export interface Cliente {
     barrio?: string | null;
     fechaNacimiento?: string | null;
     estado: boolean;
+    fotoPerfil?: string;
 }
 
 class ClienteService {
@@ -66,6 +67,7 @@ class ClienteService {
         if (data.barrio !== undefined) mapped.Barrio = data.barrio;
         if (data.fechaNacimiento !== undefined) mapped.FechaNacimiento = data.fechaNacimiento;
         if (data.estado !== undefined) mapped.Estado = !!data.estado;
+        if (data.fotoPerfil !== undefined) mapped.FotoPerfil = data.fotoPerfil;
 
         return mapped;
     }

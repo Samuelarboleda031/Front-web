@@ -1,14 +1,32 @@
-﻿import React, { useState, useRef, useEffect } from "react";
-import { Button } from "../ui/button";
+﻿import { useState, useRef, useEffect } from "react";
 import { Input } from "../ui/input";
-import { Package, Plus, Edit, Trash2, Search, Filter, DollarSign, AlertTriangle, Watch, Eye, Sparkles, Upload, X, Image as ImageIcon, ChevronLeft, ChevronRight, Power, Percent, Calculator, ToggleRight, ToggleLeft, Tags, Boxes, FileText, Camera, Loader2 } from "lucide-react";
+import {
+  Package,
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  DollarSign,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ToggleLeft,
+  ToggleRight,
+  Boxes,
+  FileText,
+  Image as ImageIcon,
+  Camera,
+  Tags,
+  Loader2,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
 import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
-import { Switch } from "../ui/switch";
 import { useCustomAlert } from "../ui/custom-alert";
 import { productoService, ApiProducto } from "../../services/productos";
+import ImageRenderer from "../ui/ImageRenderer";
+import { apiService } from "../../services/api";
 
 const formatCurrency = (amount: number): string => {
   return (amount ?? 0).toLocaleString('es-CO');
@@ -17,7 +35,7 @@ const formatCurrency = (amount: number): string => {
 export function ProductosPage() {
   const { error, created, edited, deleted, AlertContainer } = useCustomAlert();
   const [productos, setProductos] = useState<ApiProducto[]>([]);
-  const [categorias, setCategorias] = useState<string[]>([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
@@ -35,13 +53,14 @@ export function ProductosPage() {
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: '',
     descripcion: '',
-    categoriaId: 0,  // 👈 Ahora usa ID numérico
+    categoria: '',
+    // categoriaId removed
     precioBase: 0,
     stockVentas: 0,
     stockInsumos: 0,
-    minCantidad: 10,
+    minCantidad: 0,
     marca: '',
-    imagen: '',
+    imagenProduc: '',
     activo: true
   });
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
@@ -92,14 +111,8 @@ export function ProductosPage() {
   const handleCategoriaChange = (value: string) => {
     if (value === "all") {
       setFilterCategoria("all");
-      setNuevoProducto({ ...nuevoProducto, categoriaId: 0 });
     } else {
-      // Buscar la categoría por nombre y obtener su ID
-      const categoriaEncontrada = categorias.find(cat => cat.nombre === value);
-      if (categoriaEncontrada) {
-        setFilterCategoria(value);
-        setNuevoProducto({ ...nuevoProducto, categoriaId: categoriaEncontrada.id });
-      }
+      setFilterCategoria(value);
     }
     setCurrentPage(1);
   };
@@ -109,23 +122,27 @@ export function ProductosPage() {
   const getStockTotal = (producto: any) =>
     (producto.stockVentas ?? 0) + (producto.stockInsumos ?? 0);
 
+  /*
   const productosCantidadBaja = productos.filter(
     (p) => getStockTotal(p) <= p.minCantidad
   );
-  const accesorios = productos.filter((p) => p.categoria === "Accesorios");
+  const accesorios = productos.filter((p) => (typeof p.categoria === 'string' ? p.categoria : p.categoria?.nombre) === "Accesorios");
   const productosActivos = productos.filter((p) => p.activo);
+  */
 
 
 
+  /*
   // Total de ventas potenciales (solo stock destinado a ventas)
   const totalVentasPotenciales = productos.reduce((acum, producto) => {
     const stockVentas = producto.stockVentas ?? 0;
     return acum + stockVentas * (producto.precioBase || 0);
   }, 0);
+  */
 
   const handleCreateProducto = () => {
-    if (!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase <= 0) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre, categoría y precio base mayor a 0.");
+    if (!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase < 0) {
+      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre y categoría.");
       return;
     }
     setIsCreateDialogOpen(true);
@@ -147,11 +164,11 @@ export function ProductosPage() {
         stockInsumos,
         minCantidad: nuevoProducto.minCantidad,
         marca: nuevoProducto.marca,
-        imagen: nuevoProducto.imagen,
+        imagenProduc: nuevoProducto.imagenProduc,
         activo: true
       };
 
-      const productoCreado = await productoService.createProducto(productoData);
+      const productoCreado = await productoService.createProducto(productoData as any);
 
       // Refresh products list
       const productosActualizados = await productoService.getProductos();
@@ -164,9 +181,9 @@ export function ProductosPage() {
         precioBase: 0,
         stockVentas: 0,
         stockInsumos: 0,
-        minCantidad: 10,
+        minCantidad: 0,
         marca: '',
-        imagen: '',
+        imagenProduc: '',
         activo: true
       });
       setImagenPreview(null);
@@ -191,16 +208,16 @@ export function ProductosPage() {
       stockInsumos: producto.stockInsumos ?? 0,
       minCantidad: producto.minCantidad,
       marca: producto.marca,
-      imagen: producto.imagen,
+      imagenProduc: producto.imagenProduc,
       activo: producto.activo
     });
-    setImagenPreview(producto.imagen || null);
+    setImagenPreview(producto.imagenProduc || null);
     setIsDialogOpen(true);
   };
 
   const handleUpdateProducto = () => {
-    if (!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase <= 0) {
-      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre, categoría y precio base mayor a 0.");
+    if (!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase < 0) {
+      error("Campos obligatorios faltantes", "Por favor completa todos los campos obligatorios: nombre y categoría.");
       return;
     }
     setIsEditDialogOpen(true);
@@ -224,11 +241,11 @@ export function ProductosPage() {
         stockInsumos,
         minCantidad: nuevoProducto.minCantidad,
         marca: nuevoProducto.marca,
-        imagen: nuevoProducto.imagen,
+        imagenProduc: nuevoProducto.imagenProduc,
         activo: nuevoProducto.activo
       };
 
-      const productoActualizado = await productoService.updateProducto(editingProducto.id, productoData);
+      const productoActualizado = await productoService.updateProducto(editingProducto.id, productoData as any);
 
       // Refresh products list
       const productosActualizados = await productoService.getProductos();
@@ -242,16 +259,16 @@ export function ProductosPage() {
         precioBase: 0,
         stockVentas: 0,
         stockInsumos: 0,
-        minCantidad: 10,
+        minCantidad: 0,
         marca: '',
-        imagen: '',
+        imagenProduc: '',
         activo: true
       });
       setImagenPreview(null);
       setIsDialogOpen(false);
       setIsEditDialogOpen(false);
 
-      edited("Producto editado ✔️", `El producto "${productoActualizado.nombre}" ha sido actualizado exitosamente. El nuevo precio es ${formatCurrency(precioFinal)}.`);
+      edited("Producto editado ✔️", `El producto "${productoActualizado.nombre}" ha sido actualizado exitosamente.El nuevo precio es ${formatCurrency(precioFinal)}.`);
     } catch (err: any) {
       console.error('Error updating product:', err);
       error('Error al actualizar producto', err.message || 'No se pudo actualizar el producto. Inténtalo nuevamente.');
@@ -315,34 +332,13 @@ export function ProductosPage() {
   };
 
   // Response del endpoint de upload de imágenes
-  interface UploadResponse {
-    url: string;     // URL relativa del archivo guardado
-    message: string; // Mensaje de confirmación
-  }
+
 
   // Función para subir imágenes al servidor usando el endpoint /api/upload
   // Este endpoint recibe un archivo (IFormFile) y lo guarda en wwwroot/assets/images/
   // Validaciones: Solo imágenes (jpg, jpeg, png, gif, webp) con nombre único GUID
   const uploadImage = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error al subir imagen: ${response.statusText}`);
-      }
-
-      const result: UploadResponse = await response.json();
-      return result.url;
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      throw err;
-    }
+    return await apiService.uploadImage(file);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -368,14 +364,14 @@ export function ProductosPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        setNuevoProducto({ ...nuevoProducto, imagen: result });
+        setNuevoProducto({ ...nuevoProducto, imagenProduc: result });
         setImagenPreview(result);
       };
       reader.readAsDataURL(file);
 
       // Subir al servidor
       const imageUrl = await uploadImage(file);
-      setNuevoProducto({ ...nuevoProducto, imagen: imageUrl });
+      setNuevoProducto({ ...nuevoProducto, imagenProduc: imageUrl });
     } catch (err: any) {
       console.error('Error uploading image:', err);
       error('Error al subir imagen', 'No se pudo subir la imagen al servidor. Intenta nuevamente.');
@@ -390,7 +386,7 @@ export function ProductosPage() {
   };
 
   const removeImage = () => {
-    setNuevoProducto({ ...nuevoProducto, imagen: '' });
+    setNuevoProducto({ ...nuevoProducto, imagenProduc: '' });
     setImagenPreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -399,7 +395,7 @@ export function ProductosPage() {
 
 
   const formatearPrecio = (precio: number): string => {
-    return `$ ${precio.toLocaleString('es-CO')}`;
+    return `$ ${precio.toLocaleString('es-CO')} `;
   };
 
   const getCategoriaColor = (categoria: string) => {
@@ -436,9 +432,9 @@ export function ProductosPage() {
                           precioBase: 0,
                           stockVentas: 0,
                           stockInsumos: 0,
-                          minCantidad: 10,
+                          minCantidad: 0,
                           marca: '',
-                          imagen: '',
+                          imagenProduc: '',
                           activo: true
                         });
                         setImagenPreview(null);
@@ -540,8 +536,8 @@ export function ProductosPage() {
                               className="elegante-input w-full"
                             >
                               <option value="">Seleccionar</option>
-                              {categorias.map((categoria) => (
-                                <option key={categoria} value={categoria}>{categoria}</option>
+                              {categorias.filter(c => c.estado === true).map((categoria) => (
+                                <option key={categoria.id} value={categoria.nombre}>{categoria.nombre}</option>
                               ))}
                             </select>
                           </div>
@@ -569,6 +565,7 @@ export function ProductosPage() {
                             <Input
                               type="number"
                               step="1000"
+                              min="0"
                               value={nuevoProducto.precioBase}
                               onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioBase: parseFloat(e.target.value) || 0 })}
                               className="elegante-input"
@@ -590,12 +587,14 @@ export function ProductosPage() {
                             <Input
                               type="number"
                               value={nuevoProducto.minCantidad}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
                                 setNuevoProducto({
                                   ...nuevoProducto,
-                                  minCantidad: parseInt(e.target.value) || 0,
-                                })
-                              }
+                                  minCantidad: val,
+                                  stockVentas: val
+                                });
+                              }}
                               className="elegante-input"
                               min="0"
                             />
@@ -622,7 +621,7 @@ export function ProductosPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setNuevoProducto({ ...nuevoProducto, imagen: '' });
+                                setNuevoProducto({ ...nuevoProducto, imagenProduc: '' });
                                 setImagenPreview(null);
                               }}
                               className="absolute top-2 right-2 bg-black/50 hover:bg-red-600 text-white rounded-full p-1.5 transition-colors opacity-0 group-hover:opacity-100"
@@ -655,7 +654,7 @@ export function ProductosPage() {
                       <button
                         onClick={editingProducto ? handleUpdateProducto : handleCreateProducto}
                         className="elegante-button-primary px-8"
-                        disabled={!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase <= 0}
+                        disabled={!nuevoProducto.nombre || !nuevoProducto.categoria || nuevoProducto.precioBase < 0}
                       >
                         {editingProducto ? 'Actualizar' : 'Agregar'} Producto
                       </button>
@@ -680,7 +679,7 @@ export function ProductosPage() {
                 >
                   <option value="all">Todas las categorías</option>
                   {categorias.map((categoria) => (
-                    <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>
+                    <option key={categoria.id} value={categoria.nombre}>{categoria.nombre}</option>
                   ))}
                 </select>
               </div>
@@ -694,7 +693,7 @@ export function ProductosPage() {
                     <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Imagen</th>
                     <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Nombre</th>
                     <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Precio</th>
-                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Ventas</th>
+                    <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Compradas</th>
                     <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Entregas</th>
                     <th className="text-left py-3 px-4 text-white-primary font-bold text-sm">Total</th>
                     <th className="text-center py-3 px-4 text-white-primary font-bold text-sm">Ventas Potenciales</th>
@@ -704,20 +703,13 @@ export function ProductosPage() {
                 <tbody>
                   {displayedProductos.map((producto) => {
                     const stockTotal = getStockTotal(producto);
-                    const cantidadStatus = getCantidadStatus(stockTotal, producto.minCantidad);
                     const stockVentas = producto.stockVentas ?? 0;
                     const stockInsumos = producto.stockInsumos ?? 0;
                     const totalVentasProducto = stockVentas * (producto.precioBase || 0);
                     return (
                       <tr key={producto.id} className="border-b border-gray-dark hover:bg-gray-darker transition-colors">
                         <td className="py-4 px-4">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-dark flex items-center justify-center">
-                            {producto.imagen ? (
-                              <img src={producto.imagen} alt={producto.nombre} className="w-full h-full object-cover" />
-                            ) : (
-                              <Package className="w-6 h-6 text-gray-lighter" />
-                            )}
-                          </div>
+                          <ImageRenderer url={producto.imagenProduc} alt={producto.nombre} />
                         </td>
                         <td className="py-4 text-center px-4">
                           <span className="text-gray-lighter">{producto.nombre}</span>
@@ -759,7 +751,7 @@ export function ProductosPage() {
                               <Edit className="w-4 h-4 text-gray-lightest group-hover:text-blue-400" />
                             </button>
                             <button
-                              onClick={() => toggleProductoActivo(producto.id, producto.activo)}
+                              onClick={() => toggleProductoActivo(producto.id)}
                               className="p-2 hover:bg-gray-darker rounded-lg transition-colors group"
                               title={producto.activo ? "Desactivar producto" : "Activar producto"}
                             >
@@ -909,10 +901,10 @@ export function ProductosPage() {
                         <h3 className="text-xl font-semibold text-white-primary">{selectedProducto.nombre}</h3>
                         <p className="text-gray-lighter">{selectedProducto.descripcion || 'Sin descripción'}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoriaColor(selectedProducto.categoria?.nombre || 'Sin categoría')}`}>
+                          <span className={`px - 2 py - 1 rounded - full text - xs font - medium ${getCategoriaColor(selectedProducto.categoria?.nombre || 'Sin categoría')} `}>
                             {selectedProducto.categoria?.nombre || 'Sin categoría'}
                           </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${selectedProducto.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                          <span className={`px - 2 py - 1 rounded - full text - xs font - medium ${selectedProducto.activo ? 'bg-green-600 text-white' : 'bg-red-600 text-white'} `}>
                             {selectedProducto.activo ? 'Activo' : 'Inactivo'}
                           </span>
                         </div>
@@ -1003,10 +995,10 @@ export function ProductosPage() {
                       <div className="border-t border-gray-medium pt-3">
                         <div className="flex justify-between items-center">
                           <Label className="text-gray-lighter text-sm">Estado del Inventario</Label>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStockTotal(selectedProducto) <= selectedProducto.minCantidad
+                          <span className={`px - 3 py - 1 rounded - full text - xs font - medium ${getStockTotal(selectedProducto) <= selectedProducto.minCantidad
                             ? 'bg-red-600 text-white'
                             : 'bg-green-600 text-white'
-                            }`}>
+                            } `}>
                             {getStockTotal(selectedProducto) <= selectedProducto.minCantidad ? 'Stock Bajo' : 'Stock Normal'}
                           </span>
                         </div>
@@ -1021,13 +1013,13 @@ export function ProductosPage() {
 
                       <div>
                         <Label className="text-gray-lighter text-sm mb-1 block">URL Imagen</Label>
-                        <p className="text-white-primary break-all text-sm">{selectedProducto.imagen || 'Sin imagen definida'}</p>
+                        <p className="text-white-primary break-all text-sm">{selectedProducto.imagenProduc || 'Sin imagen definida'}</p>
                       </div>
 
                       <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-dark bg-gray-darker flex items-center justify-center">
-                        {selectedProducto.imagen ? (
+                        {selectedProducto.imagenProduc ? (
                           <img
-                            src={selectedProducto.imagen}
+                            src={selectedProducto.imagenProduc}
                             alt={selectedProducto.nombre}
                             className="w-full h-full object-cover"
                           />

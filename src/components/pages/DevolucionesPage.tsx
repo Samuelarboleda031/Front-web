@@ -160,7 +160,7 @@ export function DevolucionesPage() {
         }))
       }));
 
-      setVentasDisponibles(formattedSales);
+      setVentasDisponibles(formattedSales.filter(v => v.estado === "Completada"));
     } catch (error) {
       toast.error("Error al cargar datos");
       console.error(error);

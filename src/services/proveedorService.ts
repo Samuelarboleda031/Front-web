@@ -159,7 +159,7 @@ class ProveedorService {
       correo: apiData.correo,
       telefono: apiData.telefono,
       direccion: apiData.direccion,
-      estado: apiData.estado,
+      estado: apiData.estado === true || apiData.Estado === true || apiData.activo === true || apiData.Activo === true,
       tipoProveedor: tipo,
       razonSocial: apiData.razonSocial,
       representanteLegal: apiData.representanteLegal,
@@ -173,7 +173,7 @@ class ProveedorService {
       compras: apiData.compras || [],
       // Alias para compatibilidad
       numero: apiData.telefono || apiData.numero,
-      activo: apiData.estado,
+      activo: apiData.estado === true || apiData.Estado === true || apiData.activo === true || apiData.Activo === true,
       fechaCreacion: apiData.fechaCreacion || new Date().toLocaleDateString('es-CO'),
       // Campos opcionales que podrían venir
       sectorEconomico: apiData.sectorEconomico,

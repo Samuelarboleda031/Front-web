@@ -62,10 +62,10 @@ export function AgendamientoPage() {
       ]);
 
       setCitas(citasData);
-      setBarberosList(barberosData);
-      setServiciosList(serviciosData);
-      setClientesList(clientesData);
-      setPaquetesList(paquetesData);
+      setBarberosList(barberosData.filter(b => b.estado === true));
+      setServiciosList(serviciosData.filter(s => s.estado === true));
+      setClientesList(clientesData.filter(c => c.estado === true));
+      setPaquetesList(paquetesData.filter(p => p.activo === true));
     } catch (err) {
       console.error("Error al cargar datos:", err);
       // Fallback a los datos estáticos si hay error (opcional, pero mejor mostrar error)

@@ -38,6 +38,7 @@ export interface Cliente {
 
 // Interface para crear cliente
 export interface CreateClienteData {
+  usuarioId?: number;
   nombre: string;
   apellido: string;
   documento: string;
@@ -96,7 +97,24 @@ class ClientesService {
   async getClientes(): Promise<ClienteAPI[]> {
     const response = await fetch(API_BASE_URL);
     if (!response.ok) throw new Error(`Error: ${response.status}`);
-    return await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : [];
+
+    // Normalize keys
+    return Array.isArray(data) ? data.map((item: any) => ({
+      id: item.id || item.Id,
+      nombre: item.nombre || item.Nombre,
+      apellido: item.apellido || item.Apellido,
+      documento: item.documento || item.Documento,
+      correo: item.correo || item.Correo || item.email || item.Email,
+      telefono: item.telefono || item.Telefono,
+      direccion: item.direccion || item.Direccion,
+      barrio: item.barrio || item.Barrio,
+      fechaNacimiento: item.fechaNacimiento || item.FechaNacimiento,
+      fotoPerfil: item.fotoPerfil || item.FotoPerfil,
+      estado: item.estado === true || item.Estado === true,
+      usuario: item.usuario || item.Usuario
+    })) : [];
   }
 
   async getClienteById(id: number): Promise<ClienteAPI> {

@@ -11,6 +11,7 @@ export interface Insumo {
   minimo: number;
   precio: number;
   imagen: string;
+  activo?: boolean;
 }
 
 const API_BASE_URL = '/api';
@@ -149,6 +150,12 @@ class InsumosService {
             return nested;
           })(),
           imagen: String(p?.imagen ?? p?.Imagen ?? p?.imagenUrl ?? p?.ImagenUrl ?? ''),
+          activo: Boolean(
+            p?.activo === true || p?.Activo === true ||
+            p?.estado === true || p?.Estado === true ||
+            p?.active === true || p?.Active === true ||
+            (p?.activo !== false && p?.Activo !== false && p?.estado !== false && p?.Estado !== false && p?.active !== false && p?.Active !== false)
+          )
         };
       });
 
@@ -183,6 +190,12 @@ class InsumosService {
         minimo: Number(p?.minimo ?? p?.stockMinimo ?? 0),
         precio: Number(p?.precio ?? p?.valor ?? 0),
         imagen: String(p?.imagen ?? p?.Imagen ?? p?.imagenUrl ?? p?.ImagenUrl ?? ''),
+        activo: Boolean(
+          p?.activo === true || p?.Activo === true ||
+          p?.estado === true || p?.Estado === true ||
+          p?.active === true || p?.Active === true ||
+          (p?.activo !== false && p?.Activo !== false && p?.estado !== false && p?.Estado !== false && p?.active !== false && p?.Active !== false)
+        )
       };
 
       console.log(`✅ Insumo ${id} obtenido:`, data);

@@ -26,6 +26,8 @@ export interface DetalleCompra {
     cantidad: number;
     precioUnitario: number;
     subtotal?: number;
+    cantidadVentas?: number;
+    cantidadInsumos?: number;
 }
 
 export interface CreateCompraRequest {
@@ -41,6 +43,8 @@ export interface CreateCompraRequest {
         productoId: number;
         cantidad: number;
         precioUnitario: number;
+        cantidadVentas?: number;
+        cantidadInsumos?: number;
     }[];
 }
 
@@ -99,7 +103,9 @@ class CompraService {
             detalles: data.detalles.map(d => ({
                 productoId: d.productoId,
                 cantidad: d.cantidad,
-                precioUnitario: d.precioUnitario
+                precioUnitario: d.precioUnitario,
+                CantidadVentas: d.cantidadVentas || 0,
+                CantidadInsumos: d.cantidadInsumos || 0
             }))
         };
     }
@@ -127,7 +133,9 @@ class CompraService {
             productoNombre: d.producto?.nombre || 'Producto',
             cantidad: d.cantidad,
             precioUnitario: d.precioUnitario || d.precioCompra || 0, // Fallback
-            subtotal: (d.cantidad || 0) * (d.precioUnitario || 0)
+            subtotal: (d.cantidad || 0) * (d.precioUnitario || 0),
+            cantidadVentas: d.cantidadVentas || d.CantidadVentas || 0,
+            cantidadInsumos: d.cantidadInsumos || d.CantidadInsumos || 0
         }));
 
         return {
@@ -217,7 +225,9 @@ class CompraService {
                 productoNombre: d.producto?.nombre || 'Producto',
                 cantidad: d.cantidad,
                 precioUnitario: d.precioUnitario || d.precioCompra || 0,
-                subtotal: (d.cantidad || 0) * (d.precioUnitario || d.precioCompra || 0)
+                subtotal: (d.cantidad || 0) * (d.precioUnitario || d.precioCompra || 0),
+                cantidadVentas: d.cantidadVentas || d.CantidadVentas || 0,
+                cantidadInsumos: d.cantidadInsumos || d.CantidadInsumos || 0
             }));
         } catch (error) {
             console.error('Error fetching detalles compra:', error);

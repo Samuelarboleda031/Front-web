@@ -6,6 +6,7 @@ export interface Servicio {
   precio: number;
   descripcion?: string;
   duracion?: number;
+  estado?: boolean; // Add state field
 }
 
 class ServicioService {
@@ -50,7 +51,17 @@ class ServicioService {
       const text = await response.text();
       const data = text ? JSON.parse(text) : [];
       console.log('✅ Servicios obtenidos:', data);
-      return Array.isArray(data) ? data : [];
+
+      const normalizedData = Array.isArray(data) ? data.map((item: any) => ({
+        id: item.id || item.Id,
+        nombre: item.nombre || item.Nombre,
+        precio: item.precio || item.Precio,
+        descripcion: item.descripcion || item.Descripcion,
+        duracion: item.duracion || item.Duracion || item.duracionMinutes || item.DuracionMinutes || item.duracionMinutos || item.DuracionMinutos,
+        estado: item.estado === true || item.Estado === true || item.estado === 1 || item.Estado === 1
+      })) : [];
+
+      return normalizedData;
     } catch (error: any) {
       console.error('❌ Error obteniendo servicios:', error);
       throw error;

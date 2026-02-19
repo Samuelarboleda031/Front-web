@@ -96,25 +96,29 @@ export function VentasPage() {
       console.log('🔍 Usuarios cargados:', usuariosData?.length || 0);
 
       setVentas(ventasData);
-      setServicios(serviciosData || []);
-      setPaquetes(paquetesData || []);
-      setProductosAPI(productosData || []);
+      setServicios((serviciosData || []).filter(s => s.estado === true));
+      setPaquetes((paquetesData || []).filter(p => p.activo === true));
+      setProductosAPI((productosData || []).filter(p => p.activo === true));
 
-      // Filtrar clientes: Mostrar TODOS los usuarios excepto los administradores
-      // Esto permite que usuarios con otros roles (o sin rol) puedan ser seleccionados como clientes
-      const clientes = usuariosData.filter((u: any) => u.rolId !== 1 && u.rolId !== AppRole.ADMIN);
+      // Filtrar clientes: Mostrar TODOS los usuarios activos excepto los administradores
+      const clientes = usuariosData.filter((u: any) =>
+        u.rolId !== 1 &&
+        u.rolId !== AppRole.ADMIN &&
+        u.estado === true
+      );
       setClientesAPI(clientes);
       console.log('🔍 Clientes filtrados (todos excepto admin):', clientes.length);
 
-      // Filtrar barberos: Usuarios que NO son Clientes ni Administradores
+      // Filtrar barberos: Usuarios activos que NO son Clientes ni Administradores
       const barberos = usuariosData.filter((u: any) =>
         u.rolId !== AppRole.CLIENTE &&
-        u.rolId !== AppRole.ADMIN
+        u.rolId !== AppRole.ADMIN &&
+        u.estado === true
       );
 
-      // Si la lista de barberos está vacía, incluimos a los admins para que el sistema sea funcional
+      // Si la lista de barberos está vacía, incluimos a los admins activos para que el sistema sea funcional
       if (barberos.length === 0) {
-        setBarberosAPI(usuariosData.filter((u: any) => u.rolId === AppRole.ADMIN || u.rolId === 1));
+        setBarberosAPI(usuariosData.filter((u: any) => (u.rolId === AppRole.ADMIN || u.rolId === 1) && u.estado === true));
       } else {
         setBarberosAPI(barberos);
       }

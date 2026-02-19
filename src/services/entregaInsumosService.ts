@@ -25,6 +25,7 @@ export interface InsumoEntrega {
   categoria: string;
   cantidad: number;
   precio: number;
+  imagen?: string;
 }
 
 export interface CreateEntregaData {
